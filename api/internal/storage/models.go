@@ -107,7 +107,7 @@ type Word struct {
 	SourceLabel string `gorm:"size:255;index"`
 	Phonetics   string `gorm:"type:text"`
 	Explanation string `gorm:"type:text"`
-	IsVIP       bool   `gorm:"not null;default:false;index"`
+	IsVIP       bool   `gorm:"column:is_v_ip;not null;default:false;index"`
 	Status      string `gorm:"size:32;not null;default:published;index"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
@@ -118,12 +118,14 @@ type Word struct {
 }
 
 type ClassificationSummary struct {
-	ID        uint   `gorm:"primaryKey"`
-	SubjectID uint   `gorm:"not null;index;uniqueIndex:idx_subject_classification_name,priority:1"`
-	Name      string `gorm:"size:120;not null;uniqueIndex:idx_subject_classification_name,priority:2"`
-	WordCount int64  `gorm:"not null;default:0;index"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID            uint   `gorm:"primaryKey"`
+	SubjectID     uint   `gorm:"not null;index;uniqueIndex:idx_subject_classification_name,priority:1"`
+	Name          string `gorm:"size:120;not null;uniqueIndex:idx_subject_classification_name,priority:2"`
+	WordCount     int64  `gorm:"column:word_count;not null;default:0;index"`
+	FreeWordCount int64  `gorm:"column:free_word_count;not null;default:0;index"`
+	VIPWordCount  int64  `gorm:"column:vip_word_count;not null;default:0"`
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type Plan struct {

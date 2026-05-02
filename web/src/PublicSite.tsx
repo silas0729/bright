@@ -24,6 +24,15 @@ const publicSessionStorageKey = "brights_public_session";
 
 type AuthMode = "login" | "register";
 type PublicView = "home" | "profile";
+type NoticeDialogTone = "info" | "success" | "error";
+
+type NoticeDialogState = {
+  tone: NoticeDialogTone;
+  title: string;
+  message: string;
+  actionLabel?: string;
+  actionHref?: string;
+};
 
 const fallbackSiteSettings: SiteSetting = {
   site_name: "Brights 英语单词学习站",
@@ -95,11 +104,13 @@ export default function PublicSite() {
   const [checkoutError, setCheckoutError] = useState("");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
+  const [noticeDialog, setNoticeDialog] = useState<NoticeDialogState | null>(null);
 
   const deferredQuery = useDeferredValue(query);
   const activeCheckoutOrder = checkoutStatus?.order ?? checkoutOrder;
   const currentSettings = siteSettings ?? fallbackSiteSettings;
   const learnerName = currentUser?.display_name || currentUser?.username || "";
+  const learnerAccessToken = session?.access_token ?? "";
   const speechSupported = canUseBrowserSpeech();
   const activeView: PublicView = resolvePublicView(currentHash);
   const classifications = classificationResult?.items ?? [];
@@ -107,6 +118,7 @@ export default function PublicSite() {
   const speakTimerRef = useRef<number | null>(null);
   const speechTokenRef = useRef(0);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
+  const checkoutNoticeKeyRef = useRef("");
 
   useEffect(() => {
     let active = true;
@@ -259,6 +271,7 @@ export default function PublicSite() {
         subjectKey,
         page: classificationPage,
         pageSize: publicClassificationPageSize,
+        token: learnerAccessToken || undefined,
       })
       .then((result) => {
         if (!active) {
@@ -282,7 +295,7 @@ export default function PublicSite() {
     return () => {
       active = false;
     };
-  }, [classificationPage, subjectKey]);
+  }, [classificationPage, learnerAccessToken, subjectKey]);
 
   useEffect(() => {
     if (!classificationResult) {
@@ -308,6 +321,7 @@ export default function PublicSite() {
         query: deferredQuery,
         page,
         pageSize: publicPageSize,
+        token: learnerAccessToken || undefined,
       })
       .then((result) => {
         if (!active) {
@@ -331,7 +345,7 @@ export default function PublicSite() {
     return () => {
       active = false;
     };
-  }, [classification, deferredQuery, page, subjectKey]);
+  }, [classification, deferredQuery, learnerAccessToken, page, subjectKey]);
 
   useEffect(() => {
     if (!activeCheckoutOrder?.code_url) {
@@ -437,6 +451,103 @@ export default function PublicSite() {
     };
   }, [speechSupported]);
 
+  useEffect(() => {
+    if (!authNotice) {
+      return;
+    }
+    openNoticeDialog({
+      tone: "success",
+      title: "操作已完成",
+      message: authNotice,
+    });
+    setAuthNotice("");
+  }, [authNotice]);
+
+  useEffect(() => {
+    if (!authError) {
+      return;
+    }
+    openNoticeDialog({
+      tone: "error",
+      title: "请检查后再试",
+      message: authError,
+    });
+    setAuthError("");
+  }, [authError]);
+
+  useEffect(() => {
+    if (!classificationError) {
+      return;
+    }
+    openNoticeDialog({
+      tone: "error",
+      title: "分类加载失败",
+      message: classificationError,
+    });
+    setClassificationError("");
+  }, [classificationError]);
+
+  useEffect(() => {
+    if (!error) {
+      return;
+    }
+    openNoticeDialog({
+      tone: "error",
+      title: "内容加载失败",
+      message: error,
+    });
+    setError("");
+  }, [error]);
+
+  useEffect(() => {
+    if (!checkoutError) {
+      return;
+    }
+    openNoticeDialog({
+      tone: "error",
+      title: "当前操作未完成",
+      message: checkoutError,
+      actionLabel: currentUser ? "查看会员方案" : "先登录学习账号",
+      actionHref: currentUser ? "#plans" : "#profile",
+    });
+    setCheckoutError("");
+  }, [checkoutError, currentUser]);
+
+  useEffect(() => {
+    const order = checkoutStatus?.order;
+    if (!order || order.status !== "success") {
+      return;
+    }
+
+    const noticeKey = `${order.order_no}:${order.status}`;
+    if (checkoutNoticeKeyRef.current === noticeKey) {
+      return;
+    }
+    checkoutNoticeKeyRef.current = noticeKey;
+
+    const membershipMessage = checkoutStatus?.subscription
+      ? checkoutStatus.subscription.current_period_end
+        ? `会员已生效，有效期至 ${formatDateTime(checkoutStatus.subscription.current_period_end)}。`
+        : "会员已生效，当前为长期有效。"
+      : "支付已成功，我们正在同步你的会员权益。";
+
+    openNoticeDialog({
+      tone: "success",
+      title: "支付成功",
+      message: membershipMessage,
+      actionLabel: "回到词库继续学习",
+      actionHref: "#catalog",
+    });
+  }, [checkoutStatus]);
+
+  function openNoticeDialog(nextNotice: NoticeDialogState) {
+    setNoticeDialog(nextNotice);
+  }
+
+  function closeNoticeDialog() {
+    setNoticeDialog(null);
+  }
+
   async function refreshAuthCaptcha(mode: AuthMode) {
     setAuthCaptchaLoading(true);
     try {
@@ -469,6 +580,7 @@ export default function PublicSite() {
     setCheckoutError("");
     setCheckoutBusy(false);
     setQrCodeDataUrl("");
+    checkoutNoticeKeyRef.current = "";
   }
 
   function closeCheckout() {
@@ -480,6 +592,7 @@ export default function PublicSite() {
     setCheckoutError("");
     setCheckoutBusy(false);
     setQrCodeDataUrl("");
+    checkoutNoticeKeyRef.current = "";
   }
 
   function handleSpeakWord(term: string) {
@@ -669,6 +782,35 @@ export default function PublicSite() {
     return subjects.find((item) => item.key === key)?.name ?? key;
   };
 
+  const findClassificationStat = (name: string) => {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      return null;
+    }
+    return classifications.find((item) => item.name === trimmedName) ?? null;
+  };
+
+  const handleSelectClassification = (nextClassification: string) => {
+    setClassification(nextClassification);
+    setPage(1);
+
+    const targetClassification = findClassificationStat(nextClassification);
+    if (!targetClassification) {
+      return;
+    }
+    if (!targetClassification.requires_membership || targetClassification.accessible_count > 0) {
+      return;
+    }
+
+    openNoticeDialog({
+      tone: "info",
+      title: "这个场景需要会员才能学习",
+      message: `「${targetClassification.name}」当前属于会员专享内容，开通后可查看 ${formatCount(targetClassification.count)} 个场景词。`,
+      actionLabel: currentUser ? "去看会员方案" : "先登录学习账号",
+      actionHref: currentUser ? "#plans" : "#profile",
+    });
+  };
+
   const profileIntroTitle = currentUser ? "你的学习账号与会员安排" : "先注册学习账号，再开始持续学习";
   const profileIntroDescription = currentUser
     ? `你好，${learnerName}。这里集中放你的账号信息、购买入口和后续学习安排，后面扩展更多学科内容时也继续使用这一套学习身份。`
@@ -677,8 +819,24 @@ export default function PublicSite() {
   const classificationOnCurrentPage = classification === "" || classifications.some((item) => item.name === classification);
   const classificationOptions: ClassificationStat[] =
     classification !== "" && !classifications.some((item) => item.name === classification)
-      ? [{ name: classification, count: 0 }, ...classifications]
+      ? [
+          {
+            name: classification,
+            count: 0,
+            free_count: 0,
+            vip_count: 0,
+            accessible_count: 0,
+            requires_membership: false,
+            has_member_content: false,
+          },
+          ...classifications,
+        ]
       : classifications;
+  const selectedClassificationStat = classification ? findClassificationStat(classification) : null;
+  const selectedClassificationLocked =
+    !!selectedClassificationStat &&
+    selectedClassificationStat.requires_membership &&
+    selectedClassificationStat.accessible_count === 0;
 
   return (
     <div className="site-shell">
@@ -983,8 +1141,6 @@ export default function PublicSite() {
                         </div>
                       </div>
                     </div>
-                    {authNotice ? <div className="feedback-banner feedback-success">{authNotice}</div> : null}
-                    {authError ? <div className="feedback-banner feedback-error">{authError}</div> : null}
                     <button className="primary-button" disabled={authBusy !== ""} type="submit">
                       {authBusy === "register"
                         ? "注册中..."
@@ -997,8 +1153,6 @@ export default function PublicSite() {
                   </form>
                 ) : (
                   <div className="profile-card-body">
-                    {authNotice ? <div className="feedback-banner feedback-success">{authNotice}</div> : null}
-                    {authError ? <div className="feedback-banner feedback-error">{authError}</div> : null}
                     <div className="feedback-banner">
                       购买会员后，后台会直接把会员状态和有效期关联到账号 <strong>{currentUser.username}</strong>，你在前台继续学习时就能一直使用同一个账号。
                     </div>
@@ -1150,17 +1304,15 @@ export default function PublicSite() {
                     className={classification === item.name ? "sidebar-link sidebar-link-active" : "sidebar-link"}
                     key={item.name}
                     onClick={() => {
-                      setClassification(item.name);
-                      setPage(1);
+                      handleSelectClassification(item.name);
                     }}
                     type="button"
                   >
-                    {item.name}
+                    {formatClassificationButtonLabel(item)}
                     <span>{formatCount(item.count)}</span>
                   </button>
                 ))}
               </div>
-              {classificationError ? <div className="sidebar-feedback">{classificationError}</div> : null}
               {loadingClassifications ? <div className="sidebar-feedback">正在加载分类...</div> : null}
               <div className="sidebar-pagination">
                 <PagerControls
@@ -1204,6 +1356,18 @@ export default function PublicSite() {
                 <div>
                   <p className="section-eyebrow">词库学习</p>
                   <h2>{classification || "全部单词"}</h2>
+                  {selectedClassificationStat?.has_member_content ? (
+                    <div className="catalog-membership-chip-row">
+                      <span className={selectedClassificationLocked ? "pill pill-warning" : "pill pill-muted"}>
+                        {selectedClassificationLocked ? "会员专享分类" : "本分类含会员内容"}
+                      </span>
+                      <span className="helper-text">
+                        {selectedClassificationLocked
+                          ? `开通后可学习 ${formatCount(selectedClassificationStat.count)} 个场景词。`
+                          : `当前可先学习 ${formatCount(selectedClassificationStat.accessible_count)} 个可见词，开通后可查看完整内容。`}
+                      </span>
+                    </div>
+                  ) : null}
                   <p className="helper-text word-pronounce-tip">
                     {speechSupported
                       ? "点击单词即可调用浏览器朗读英文发音，再点一次同一个单词可停止。"
@@ -1219,14 +1383,13 @@ export default function PublicSite() {
                     <select
                       value={classification}
                       onChange={(event) => {
-                        setClassification(event.target.value);
-                        setPage(1);
+                        handleSelectClassification(event.target.value);
                       }}
                     >
                       <option value="">全部分类</option>
                       {classificationOptions.map((item) => (
                         <option key={item.name} value={item.name}>
-                          {item.name}
+                          {formatClassificationOptionLabel(item)}
                         </option>
                       ))}
                     </select>
@@ -1263,10 +1426,34 @@ export default function PublicSite() {
                 </div>
               </div>
 
-              {error ? <div className="feedback-banner feedback-error">{error}</div> : null}
               {loadingWords ? <div className="feedback-banner">正在加载学习内容...</div> : null}
 
               <div className="word-table-wrap">
+                {selectedClassificationLocked ? (
+                  <div className="locked-classification-card">
+                    <span className="pill pill-warning">会员专享</span>
+                    <h3>{classification}</h3>
+                    <p>
+                      这个场景当前属于会员专享内容。开通后可学习{" "}
+                      {formatCount(selectedClassificationStat?.count ?? 0)} 个场景词，并继续使用点读与检索。
+                    </p>
+                    <div className="button-row">
+                      <a className="primary-button" href={currentUser ? "#plans" : "#profile"}>
+                        {currentUser ? "去看会员方案" : "先登录学习账号"}
+                      </a>
+                      <button
+                        className="secondary-button"
+                        onClick={() => {
+                          setClassification("");
+                          setPage(1);
+                        }}
+                        type="button"
+                      >
+                        先看可免费学习的分类
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
                 <table className="word-table">
                   <thead>
                     <tr>
@@ -1306,7 +1493,7 @@ export default function PublicSite() {
                     ))}
                   </tbody>
                 </table>
-                {!loadingWords && (words?.items ?? []).length === 0 ? (
+                {!selectedClassificationLocked && !loadingWords && (words?.items ?? []).length === 0 ? (
                   <div className="feedback-banner">当前筛选条件下还没有匹配内容，换个关键词试试看。</div>
                 ) : null}
               </div>
@@ -1324,6 +1511,40 @@ export default function PublicSite() {
           </main>
         </div>
       )}
+
+      {noticeDialog ? (
+        <div
+          className="notice-dialog-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeNoticeDialog();
+            }
+          }}
+        >
+          <section className="notice-dialog-card">
+            <div className="notice-dialog-header">
+              <span className={`pill ${noticeDialogToneClass(noticeDialog.tone)}`}>{noticeDialogTitleTag(noticeDialog.tone)}</span>
+              <button className="secondary-button small-button" onClick={closeNoticeDialog} type="button">
+                关闭
+              </button>
+            </div>
+            <div className="notice-dialog-body">
+              <h3>{noticeDialog.title}</h3>
+              <p>{noticeDialog.message}</p>
+            </div>
+            <div className="button-row notice-dialog-actions">
+              {noticeDialog.actionLabel && noticeDialog.actionHref ? (
+                <a className="primary-button" href={noticeDialog.actionHref} onClick={closeNoticeDialog}>
+                  {noticeDialog.actionLabel}
+                </a>
+              ) : null}
+              <button className="secondary-button" onClick={closeNoticeDialog} type="button">
+                我知道了
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {checkoutPlan ? (
         <div
@@ -1368,7 +1589,6 @@ export default function PublicSite() {
                     placeholder={checkoutPlan.name}
                   />
                 </label>
-                {checkoutError ? <div className="feedback-banner feedback-error">{checkoutError}</div> : null}
                 <button className="primary-button" disabled={checkoutBusy} type="submit">
                   {checkoutBusy ? "正在生成订单..." : "生成支付二维码"}
                 </button>
@@ -1440,7 +1660,6 @@ export default function PublicSite() {
                         : "，当前为长期有效"}
                     </div>
                   ) : null}
-                  {checkoutError ? <div className="feedback-banner feedback-error">{checkoutError}</div> : null}
                   {activeCheckoutOrder?.error_message ? (
                     <div className="feedback-banner feedback-error">{activeCheckoutOrder.error_message}</div>
                   ) : null}
@@ -1633,5 +1852,53 @@ function subscriptionStatusLabel(status?: string) {
       return "已取消";
     default:
       return status || "-";
+  }
+}
+
+function classificationBadgeLabel(item: ClassificationStat) {
+  if (item.requires_membership) {
+    return "会员专享";
+  }
+  if (item.has_member_content) {
+    return "含会员内容";
+  }
+  return "";
+}
+
+function formatClassificationButtonLabel(item: ClassificationStat) {
+  const badge = classificationBadgeLabel(item);
+  if (!badge) {
+    return item.name;
+  }
+  return `${item.name} · ${badge}`;
+}
+
+function formatClassificationOptionLabel(item: ClassificationStat) {
+  const badge = classificationBadgeLabel(item);
+  if (!badge) {
+    return item.name;
+  }
+  return `${item.name}（${badge}）`;
+}
+
+function noticeDialogToneClass(tone: NoticeDialogTone) {
+  switch (tone) {
+    case "success":
+      return "pill-success";
+    case "error":
+      return "pill-danger";
+    default:
+      return "pill-warning";
+  }
+}
+
+function noticeDialogTitleTag(tone: NoticeDialogTone) {
+  switch (tone) {
+    case "success":
+      return "已完成";
+    case "error":
+      return "请处理";
+    default:
+      return "提示";
   }
 }

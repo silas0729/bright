@@ -19,7 +19,10 @@ import (
 	"brights/api/internal/storage"
 )
 
-const topicCategoryKind = "topic"
+const (
+	topicCategoryKind         = "topic"
+	unclassifiedCategoryValue = "__unclassified__"
+)
 
 type Service struct {
 	db        *gorm.DB
@@ -762,11 +765,20 @@ func (s *Service) ListWords(ctx context.Context, filter domain.WordFilter) (doma
 	}
 
 	if strings.TrimSpace(filter.Classification) != "" {
-		query = query.Joins("LEFT JOIN categories ON categories.id = words.category_id").Where("categories.name = ?", strings.TrimSpace(filter.Classification))
+		classification := strings.TrimSpace(filter.Classification)
+		if classification == unclassifiedCategoryValue {
+			query = query.Where("words.category_id IS NULL")
+		} else {
+			query = query.Joins("LEFT JOIN categories ON categories.id = words.category_id").Where("categories.name = ?", classification)
+		}
 	}
 
 	if filter.GradeID > 0 {
 		query = query.Where("grade_id = ?", filter.GradeID)
+	}
+
+	if filter.HideVIP {
+		query = query.Where("words.is_v_ip = ?", false)
 	}
 
 	if q := strings.TrimSpace(filter.Query); q != "" {
@@ -851,9 +863,18 @@ func (s *Service) ListClassificationStatsPaged(ctx context.Context, filter domai
 
 	items := make([]domain.ClassificationStat, 0, len(models))
 	for _, model := range models {
+		accessibleCount := model.WordCount
+		if filter.HideVIP {
+			accessibleCount = model.FreeWordCount
+		}
 		items = append(items, domain.ClassificationStat{
-			Name:  model.Name,
-			Count: int(model.WordCount),
+			Name:               model.Name,
+			Count:              int(model.WordCount),
+			FreeCount:          int(model.FreeWordCount),
+			VIPCount:           int(model.VIPWordCount),
+			AccessibleCount:    int(accessibleCount),
+			RequiresMembership: model.FreeWordCount == 0 && model.VIPWordCount > 0,
+			HasMemberContent:   model.VIPWordCount > 0,
 		})
 	}
 
@@ -878,22 +899,7 @@ func (s *Service) EnsureClassificationSummaries(ctx context.Context) error {
 		return nil
 	}
 
-	var summarySubjectIDs []uint
-	if err := s.db.WithContext(ctx).
-		Model(&storage.ClassificationSummary{}).
-		Distinct("subject_id").
-		Pluck("subject_id", &summarySubjectIDs).Error; err != nil {
-		return err
-	}
-	existing := make(map[uint]struct{}, len(summarySubjectIDs))
-	for _, subjectID := range summarySubjectIDs {
-		existing[subjectID] = struct{}{}
-	}
-
 	for _, subjectID := range subjectIDs {
-		if _, ok := existing[subjectID]; ok {
-			continue
-		}
 		if err := s.refreshClassificationSummariesForSubject(ctx, subjectID); err != nil {
 			return err
 		}
@@ -917,8 +923,10 @@ func (s *Service) refreshClassificationSummariesForSubjectTx(tx *gorm.DB, subjec
 	}
 
 	type row struct {
-		Name      string
-		WordCount int64
+		Name          string `gorm:"column:name"`
+		WordCount     int64  `gorm:"column:word_count"`
+		FreeWordCount int64  `gorm:"column:free_word_count"`
+		VIPWordCount  int64  `gorm:"column:vip_word_count"`
 	}
 
 	var rows []row
@@ -926,7 +934,12 @@ func (s *Service) refreshClassificationSummariesForSubjectTx(tx *gorm.DB, subjec
 		Table("words").
 		Joins("LEFT JOIN categories ON categories.id = words.category_id").
 		Where("words.subject_id = ?", subjectID).
-		Select("COALESCE(categories.name, 'Unclassified') AS name, COUNT(words.id) AS word_count").
+		Select(
+			"COALESCE(categories.name, 'Unclassified') AS name, " +
+				"COUNT(words.id) AS word_count, " +
+				"SUM(CASE WHEN words.is_v_ip THEN 0 ELSE 1 END) AS free_word_count, " +
+				"SUM(CASE WHEN words.is_v_ip THEN 1 ELSE 0 END) AS vip_word_count",
+		).
 		Group("COALESCE(categories.name, 'Unclassified')").
 		Scan(&rows).Error; err != nil {
 		return err
@@ -943,9 +956,11 @@ func (s *Service) refreshClassificationSummariesForSubjectTx(tx *gorm.DB, subjec
 	summaries := make([]storage.ClassificationSummary, 0, len(rows))
 	for _, row := range rows {
 		summaries = append(summaries, storage.ClassificationSummary{
-			SubjectID: subjectID,
-			Name:      row.Name,
-			WordCount: row.WordCount,
+			SubjectID:     subjectID,
+			Name:          row.Name,
+			WordCount:     row.WordCount,
+			FreeWordCount: row.FreeWordCount,
+			VIPWordCount:  row.VIPWordCount,
 		})
 	}
 	return tx.CreateInBatches(summaries, 100).Error
@@ -1382,6 +1397,84 @@ func (s *Service) UpdateWord(ctx context.Context, id uint64, input domain.Update
 	}
 
 	return toWord(model), nil
+}
+
+func (s *Service) BatchUpdateWordVIP(ctx context.Context, input domain.BatchUpdateWordVIPInput) (domain.BatchUpdateWordVIPResult, error) {
+	subject, err := s.resolveSubject(ctx, input.SubjectID, input.SubjectKey)
+	if err != nil {
+		return domain.BatchUpdateWordVIPResult{}, err
+	}
+
+	result := domain.BatchUpdateWordVIPResult{
+		SubjectKey: subject.Key,
+		IsVIP:      input.IsVIP,
+	}
+
+	query := s.db.WithContext(ctx).Model(&storage.Word{}).Where("subject_id = ?", subject.ID)
+
+	switch {
+	case input.CategoryID != nil && *input.CategoryID > 0:
+		var category storage.Category
+		if err := s.db.WithContext(ctx).Where("id = ?", *input.CategoryID).First(&category).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domain.BatchUpdateWordVIPResult{}, errors.New("category does not exist")
+			}
+			return domain.BatchUpdateWordVIPResult{}, err
+		}
+		if category.SubjectID != subject.ID {
+			return domain.BatchUpdateWordVIPResult{}, errors.New("category does not belong to the selected subject")
+		}
+		query = query.Where("category_id = ?", category.ID)
+		result.CategoryID = uintPtr(category.ID)
+		result.Classification = category.Name
+	case strings.TrimSpace(input.Classification) != "":
+		classification := strings.TrimSpace(input.Classification)
+		if classification == unclassifiedCategoryValue {
+			query = query.Where("category_id IS NULL")
+			result.Classification = "Unclassified"
+		} else {
+			var category storage.Category
+			if err := s.db.WithContext(ctx).
+				Where("subject_id = ? AND kind = ? AND name = ?", subject.ID, topicCategoryKind, classification).
+				First(&category).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return domain.BatchUpdateWordVIPResult{}, errors.New("classification does not exist")
+				}
+				return domain.BatchUpdateWordVIPResult{}, err
+			}
+			query = query.Where("category_id = ?", category.ID)
+			result.CategoryID = uintPtr(category.ID)
+			result.Classification = category.Name
+		}
+	default:
+		return domain.BatchUpdateWordVIPResult{}, errors.New("classification or category is required")
+	}
+
+	var targets []storage.Word
+	if err := query.Select("id", "is_v_ip").Find(&targets).Error; err != nil {
+		return domain.BatchUpdateWordVIPResult{}, err
+	}
+
+	ids := make([]uint64, 0, len(targets))
+	for _, item := range targets {
+		if item.IsVIP != input.IsVIP {
+			ids = append(ids, item.ID)
+		}
+	}
+	result.UpdatedCount = int64(len(ids))
+	if len(ids) == 0 {
+		return result, nil
+	}
+
+	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&storage.Word{}).Where("id IN ?", ids).Update("is_v_ip", input.IsVIP).Error; err != nil {
+			return err
+		}
+		return s.refreshClassificationSummariesForSubjectTx(tx, subject.ID)
+	}); err != nil {
+		return domain.BatchUpdateWordVIPResult{}, err
+	}
+	return result, nil
 }
 
 func (s *Service) CreatePlan(ctx context.Context, input domain.CreatePlanInput) (domain.Plan, error) {

@@ -119,6 +119,121 @@ brights/
 - `POST /api/v1/admin/subjects`
 - `POST /api/v1/admin/words`
 - `POST /api/v1/admin/plans`
+- `GET /mcp/info`
+- `WS /mcp`
+
+## MCP 接入
+
+Brights 现在提供了一个基于 WebSocket 的 MCP 入口，地址是：
+
+- `GET /mcp/info`
+- `WS /mcp`
+
+### 鉴权方式
+
+MCP 连接需要学员登录态，并且该学员对指定学科有有效会员。
+
+- 推荐方式：`Authorization: Bearer <learner_access_token>`
+- 兼容方式：`ws://localhost:8080/mcp?subject=english&token=<learner_access_token>`
+
+其中：
+
+- `subject` 或 `subject_key` 必填
+- token 可以来自 `POST /api/v1/auth/login` 或 `POST /api/v1/auth/register` 返回的 `access_token`
+
+### 工具命名风格
+
+对外暴露的工具名已经调整为更短、更接近 XiaozhiMCP 常见风格的 `snake_case` 名称：
+
+- `list_subjects`
+- `list_categories`
+- `list_grades`
+- `search_words`
+- `list_classification_stats`
+- `list_membership_plans`
+- `get_catalog_stats`
+
+为了兼容旧调用，下面这些名字仍然可以继续调用，但不会在 `tools/list` 中重复暴露：
+
+- `brights_list_subjects`
+- `brights_list_categories`
+- `brights_list_grades`
+- `brights_search_words`
+- `brights_list_classification_stats`
+- `brights_list_membership_plans`
+- `brights_get_catalog_stats`
+- `list_words`
+- `list_plans`
+
+### 返回结构
+
+`tools/call` 成功时会返回：
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"success\": true,\n  \"tool\": \"search_words\",\n  \"result\": { ... }\n}"
+    }
+  ],
+  "structuredContent": {
+    "success": true,
+    "tool": "search_words",
+    "result": {}
+  }
+}
+```
+
+业务执行失败时会返回 `isError: true`，并保持同样的 envelope：
+
+```json
+{
+  "isError": true,
+  "structuredContent": {
+    "success": false,
+    "tool": "search_words",
+    "error": "active membership is required for subject english"
+  }
+}
+```
+
+### 本地示例客户端
+
+仓库里已经带了一个可以直接跑的 PowerShell WebSocket 示例：
+
+```powershell
+cd D:\ProjectCode\brights
+Copy-Item api\examples\mcp-client.config.example.json api\examples\mcp-client.config.json
+```
+
+把 `api/examples/mcp-client.config.json` 里的这几个字段改掉：
+
+- `access_token`：填学员登录接口拿到的 token
+- `subject_key`：填你要访问的学科，例如 `english`
+- `tool_name`：默认是 `search_words`
+
+然后运行：
+
+```powershell
+cd D:\ProjectCode\brights
+powershell -ExecutionPolicy Bypass -File .\api\examples\mcp-client.ps1 -Config .\api\examples\mcp-client.config.json
+```
+
+如果你只想先看工具列表：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\api\examples\mcp-client.ps1 -Config .\api\examples\mcp-client.config.json -ListToolsOnly
+```
+
+### 建议调用顺序
+
+客户端连接后，建议按这个顺序走：
+
+1. 发送 `initialize`
+2. 发送 `notifications/initialized`
+3. 发送 `tools/list`
+4. 发送 `tools/call`
 
 ## 本地运行
 
@@ -181,4 +296,3 @@ npm run dev
 1. 先把后台登录和 MySQL 版本做出来
 2. 然后把 `words / topics / plans / orders / memberships` 这些表建起来
 3. 最后再接微信支付真实商户参数
-

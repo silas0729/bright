@@ -52,14 +52,20 @@ type Word struct {
 }
 
 type ClassificationStat struct {
-	Name  string `json:"name"`
-	Count int    `json:"count"`
+	Name               string `json:"name"`
+	Count              int    `json:"count"`
+	FreeCount          int    `json:"free_count"`
+	VIPCount           int    `json:"vip_count"`
+	AccessibleCount    int    `json:"accessible_count"`
+	RequiresMembership bool   `json:"requires_membership"`
+	HasMemberContent   bool   `json:"has_member_content"`
 }
 
 type ClassificationStatFilter struct {
 	SubjectKey string
 	Page       int
 	PageSize   int
+	HideVIP    bool
 }
 
 type Plan struct {
@@ -211,6 +217,7 @@ type WordFilter struct {
 	Query          string
 	Page           int
 	PageSize       int
+	HideVIP        bool
 }
 
 type PagedWords struct {
@@ -345,6 +352,22 @@ type UpdateWordInput struct {
 	Phonetics      string `json:"phonetics"`
 	Explanation    string `json:"explanation"`
 	IsVIP          bool   `json:"is_vip"`
+}
+
+type BatchUpdateWordVIPInput struct {
+	SubjectID      uint   `json:"subject_id"`
+	SubjectKey     string `json:"subject_key"`
+	CategoryID     *uint  `json:"category_id"`
+	Classification string `json:"classification"`
+	IsVIP          bool   `json:"is_vip"`
+}
+
+type BatchUpdateWordVIPResult struct {
+	SubjectKey     string `json:"subject_key"`
+	CategoryID     *uint  `json:"category_id,omitempty"`
+	Classification string `json:"classification"`
+	IsVIP          bool   `json:"is_vip"`
+	UpdatedCount   int64  `json:"updated_count"`
 }
 
 type CreatePlanInput struct {

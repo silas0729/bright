@@ -157,6 +157,88 @@ func TestEnsureClassificationSummariesBackfillsAndPages(t *testing.T) {
 	}
 }
 
+func TestListWordsAndClassificationsHideVIP(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+	if err := svc.SeedDefaults(ctx); err != nil {
+		t.Fatalf("seed defaults: %v", err)
+	}
+
+	seedInputs := []domain.CreateWordInput{
+		{SubjectKey: "english", Classification: "travel", Term: "boarding", Translation: "登机", IsVIP: false},
+		{SubjectKey: "english", Classification: "travel", Term: "upgrade", Translation: "升舱", IsVIP: true},
+		{SubjectKey: "english", Classification: "finance", Term: "invoice", Translation: "发票", IsVIP: true},
+		{SubjectKey: "english", Term: "context", Translation: "语境", IsVIP: false},
+	}
+	for _, input := range seedInputs {
+		if _, err := svc.CreateWord(ctx, input); err != nil {
+			t.Fatalf("create word %q: %v", input.Term, err)
+		}
+	}
+
+	freeWords, err := svc.ListWords(ctx, domain.WordFilter{
+		SubjectKey: "english",
+		Page:       1,
+		PageSize:   20,
+		HideVIP:    true,
+	})
+	if err != nil {
+		t.Fatalf("list free words: %v", err)
+	}
+	if freeWords.Total != 2 {
+		t.Fatalf("expected 2 free words, got %d", freeWords.Total)
+	}
+	for _, item := range freeWords.Items {
+		if item.IsVIP {
+			t.Fatalf("expected hide vip filter to exclude vip words, got %+v", item)
+		}
+	}
+
+	freeStats, err := svc.ListClassificationStatsPaged(ctx, domain.ClassificationStatFilter{
+		SubjectKey: "english",
+		Page:       1,
+		PageSize:   10,
+		HideVIP:    true,
+	})
+	if err != nil {
+		t.Fatalf("list free classification stats: %v", err)
+	}
+	if freeStats.Total != 3 {
+		t.Fatalf("expected 3 visible classifications for non-members, got %d", freeStats.Total)
+	}
+
+	freeStatsByName := make(map[string]domain.ClassificationStat, len(freeStats.Items))
+	for _, item := range freeStats.Items {
+		freeStatsByName[item.Name] = item
+	}
+	if freeStatsByName["travel"].Count != 2 || freeStatsByName["travel"].AccessibleCount != 1 || !freeStatsByName["travel"].HasMemberContent {
+		t.Fatalf("unexpected travel stat for non-members: %+v", freeStatsByName["travel"])
+	}
+	if freeStatsByName["Unclassified"].Count != 1 || freeStatsByName["Unclassified"].AccessibleCount != 1 {
+		t.Fatalf("unexpected unclassified stat for non-members: %+v", freeStatsByName["Unclassified"])
+	}
+	if freeStatsByName["finance"].Count != 1 || freeStatsByName["finance"].AccessibleCount != 0 || !freeStatsByName["finance"].RequiresMembership {
+		t.Fatalf("unexpected finance stat for non-members: %+v", freeStatsByName["finance"])
+	}
+
+	allStats, err := svc.ListClassificationStatsPaged(ctx, domain.ClassificationStatFilter{
+		SubjectKey: "english",
+		Page:       1,
+		PageSize:   10,
+	})
+	if err != nil {
+		t.Fatalf("list all classification stats: %v", err)
+	}
+
+	allCounts := make(map[string]int, len(allStats.Items))
+	for _, item := range allStats.Items {
+		allCounts[item.Name] = item.Count
+	}
+	if allCounts["travel"] != 2 || allCounts["finance"] != 1 || allCounts["Unclassified"] != 1 {
+		t.Fatalf("unexpected all classification counts: %+v", allCounts)
+	}
+}
+
 func TestUpdateCategoryRefreshesClassificationSummaries(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
@@ -283,6 +365,144 @@ func TestUpdateWordMovesSubjectAndRebuildsSummaries(t *testing.T) {
 	}
 	if len(scienceStats.Items) != 1 || scienceStats.Items[0].Name != "physics" || scienceStats.Items[0].Count != 1 {
 		t.Fatalf("unexpected science classification stats: %+v", scienceStats.Items)
+	}
+}
+
+func TestBatchUpdateWordVIPByClassification(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+	if err := svc.SeedDefaults(ctx); err != nil {
+		t.Fatalf("seed defaults: %v", err)
+	}
+
+	travelOne, err := svc.CreateWord(ctx, domain.CreateWordInput{
+		SubjectKey:     "english",
+		Classification: "travel",
+		Term:           "boarding",
+		Translation:    "登机",
+	})
+	if err != nil {
+		t.Fatalf("create first travel word: %v", err)
+	}
+	travelTwo, err := svc.CreateWord(ctx, domain.CreateWordInput{
+		SubjectKey:     "english",
+		Classification: "travel",
+		Term:           "luggage",
+		Translation:    "行李",
+	})
+	if err != nil {
+		t.Fatalf("create second travel word: %v", err)
+	}
+	otherWord, err := svc.CreateWord(ctx, domain.CreateWordInput{
+		SubjectKey:     "english",
+		Classification: "finance",
+		Term:           "invoice",
+		Translation:    "发票",
+	})
+	if err != nil {
+		t.Fatalf("create finance word: %v", err)
+	}
+
+	if travelOne.CategoryID == nil || *travelOne.CategoryID == 0 {
+		t.Fatal("expected travel category id")
+	}
+
+	result, err := svc.BatchUpdateWordVIP(ctx, domain.BatchUpdateWordVIPInput{
+		SubjectKey: "english",
+		CategoryID: travelOne.CategoryID,
+		IsVIP:      true,
+	})
+	if err != nil {
+		t.Fatalf("batch update vip: %v", err)
+	}
+	if result.UpdatedCount != 2 {
+		t.Fatalf("expected 2 updated words, got %d", result.UpdatedCount)
+	}
+	if result.Classification != "travel" {
+		t.Fatalf("expected classification travel, got %q", result.Classification)
+	}
+
+	var words []storage.Word
+	if err := svc.db.WithContext(ctx).Order("id asc").Find(&words).Error; err != nil {
+		t.Fatalf("load words: %v", err)
+	}
+	if len(words) != 3 {
+		t.Fatalf("expected 3 words, got %d", len(words))
+	}
+	if !words[0].IsVIP || !words[1].IsVIP {
+		t.Fatalf("expected travel words to become VIP, got %+v", words[:2])
+	}
+	if words[2].IsVIP {
+		t.Fatalf("expected finance word to remain non-VIP, got %+v", words[2])
+	}
+
+	hiddenStats, err := svc.ListClassificationStatsPaged(ctx, domain.ClassificationStatFilter{
+		SubjectKey: "english",
+		Page:       1,
+		PageSize:   10,
+		HideVIP:    true,
+	})
+	if err != nil {
+		t.Fatalf("list free classification stats after vip update: %v", err)
+	}
+	if hiddenStats.Total != 2 {
+		t.Fatalf("expected two visible classifications after vip update, got %d", hiddenStats.Total)
+	}
+	hiddenStatsByName := make(map[string]domain.ClassificationStat, len(hiddenStats.Items))
+	for _, item := range hiddenStats.Items {
+		hiddenStatsByName[item.Name] = item
+	}
+	if hiddenStatsByName["finance"].AccessibleCount != 1 || hiddenStatsByName["finance"].Count != 1 {
+		t.Fatalf("unexpected finance stat after vip update: %+v", hiddenStatsByName["finance"])
+	}
+	if hiddenStatsByName["travel"].AccessibleCount != 0 || !hiddenStatsByName["travel"].RequiresMembership {
+		t.Fatalf("unexpected travel stat after vip update: %+v", hiddenStatsByName["travel"])
+	}
+
+	resetResult, err := svc.BatchUpdateWordVIP(ctx, domain.BatchUpdateWordVIPInput{
+		SubjectKey:     "english",
+		Classification: "travel",
+		IsVIP:          false,
+	})
+	if err != nil {
+		t.Fatalf("reset vip by classification: %v", err)
+	}
+	if resetResult.UpdatedCount != 2 {
+		t.Fatalf("expected 2 reset words, got %d", resetResult.UpdatedCount)
+	}
+
+	var reloaded []storage.Word
+	if err := svc.db.WithContext(ctx).Order("id asc").Find(&reloaded).Error; err != nil {
+		t.Fatalf("reload all words: %v", err)
+	}
+	if len(reloaded) != 3 {
+		t.Fatalf("expected 3 reloaded words, got %d", len(reloaded))
+	}
+	for _, item := range reloaded {
+		if item.Term == travelTwo.Term && item.IsVIP {
+			t.Fatal("expected travel word to be reset to non-VIP")
+		}
+		if item.Term == otherWord.Term && item.IsVIP {
+			t.Fatal("expected finance word to remain non-VIP")
+		}
+	}
+
+	visibleStats, err := svc.ListClassificationStatsPaged(ctx, domain.ClassificationStatFilter{
+		SubjectKey: "english",
+		Page:       1,
+		PageSize:   10,
+		HideVIP:    true,
+	})
+	if err != nil {
+		t.Fatalf("list free classification stats after vip reset: %v", err)
+	}
+
+	visibleStatsByName := make(map[string]domain.ClassificationStat, len(visibleStats.Items))
+	for _, item := range visibleStats.Items {
+		visibleStatsByName[item.Name] = item
+	}
+	if visibleStatsByName["travel"].AccessibleCount != 2 || visibleStatsByName["finance"].AccessibleCount != 1 {
+		t.Fatalf("unexpected free classification stats after vip reset: %+v", visibleStatsByName)
 	}
 }
 

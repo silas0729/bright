@@ -53,6 +53,28 @@ func learnerClaimsFromContext(c *gin.Context) (userauth.Claims, error) {
 	return claims, nil
 }
 
+func (s *Server) optionalLearnerClaims(c *gin.Context) (userauth.Claims, bool) {
+	if s.userAuth == nil {
+		return userauth.Claims{}, false
+	}
+
+	header := strings.TrimSpace(c.GetHeader("Authorization"))
+	if header == "" {
+		return userauth.Claims{}, false
+	}
+
+	parts := strings.SplitN(header, " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return userauth.Claims{}, false
+	}
+
+	claims, err := s.userAuth.ParseToken(strings.TrimSpace(parts[1]))
+	if err != nil {
+		return userauth.Claims{}, false
+	}
+	return claims, true
+}
+
 func (s *Server) handleLearnerRegister(c *gin.Context) {
 	var input domain.LearnerRegisterInput
 	if err := c.ShouldBindJSON(&input); err != nil {

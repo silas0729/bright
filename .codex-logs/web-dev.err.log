@@ -166,3 +166,922 @@ Incoming: []
 Consider adding an error boundary to your tree to customize error handling behavior.
 Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
 
+[2m19:36:35[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: applyIconLink is not defined
+[39m > src/AdminPortal.tsx:623:4
+    621 |    useEffect(() => {
+    622 |      document.title = siteSettings?.site_name ? `${siteSettings.site_name} 管理后台` : "Brights 管理后台";
+    623 |      applyIconLink(siteSettings?.site_icon || "");
+        |      ^
+    624 |    }, [siteSettings?.site_icon, siteSettings?.site_name]);
+    625 |  
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25989:19
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:13249:28
+ > commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:13336:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15484:12
+ > recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15476:10
+ > recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15718:10
+
+[2m19:36:35[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminPortal> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m19:37:03[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: applyIconLink is not defined
+[39m > src/AdminPortal.tsx:623:4
+    621 |    useEffect(() => {
+    622 |      document.title = siteSettings?.site_name ? `${siteSettings.site_name} 管理后台` : "Brights 管理后台";
+    623 |      applyIconLink(siteSettings?.site_icon || "");
+        |      ^
+    624 |    }, [siteSettings?.site_icon, siteSettings?.site_name]);
+    625 |  
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25989:19
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:13249:28
+ > commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:13336:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15484:12
+ > recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15476:10
+ > recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15718:10
+
+[2m19:37:03[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminPortal> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m19:37:03[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: applyIconLink is not defined
+[39m > src/AdminPortal.tsx:623:4
+    621 |    useEffect(() => {
+    622 |      document.title = siteSettings?.site_name ? `${siteSettings.site_name} 管理后台` : "Brights 管理后台";
+    623 |      applyIconLink(siteSettings?.site_icon || "");
+        |      ^
+    624 |    }, [siteSettings?.site_icon, siteSettings?.site_name]);
+    625 |  
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25989:19
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:13249:28
+ > commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:13336:10
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15832:10
+ > recursivelyTraverseReconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15784:8
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15824:10
+ > recursivelyTraverseReconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15784:8
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15885:10
+
+[2m19:37:03[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminPortal> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m19:37:24[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: applyIconLink is not defined
+[39m > src/AdminPortal.tsx:623:4
+    621 |    useEffect(() => {
+    622 |      document.title = siteSettings?.site_name ? `${siteSettings.site_name} 管理后台` : "Brights 管理后台";
+    623 |      applyIconLink(siteSettings?.site_icon || "");
+        |      ^
+    624 |    }, [siteSettings?.site_icon, siteSettings?.site_name]);
+    625 |  
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25989:19
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:13249:28
+ > commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:13336:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15484:12
+ > recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15476:10
+ > recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15718:10
+
+[2m19:37:24[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminPortal> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m19:37:25[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: applyIconLink is not defined
+[39m > src/AdminPortal.tsx:623:4
+    621 |    useEffect(() => {
+    622 |      document.title = siteSettings?.site_name ? `${siteSettings.site_name} 管理后台` : "Brights 管理后台";
+    623 |      applyIconLink(siteSettings?.site_icon || "");
+        |      ^
+    624 |    }, [siteSettings?.site_icon, siteSettings?.site_name]);
+    625 |  
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25989:19
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:13249:28
+ > commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:13336:10
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15832:10
+ > recursivelyTraverseReconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15784:8
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15824:10
+ > recursivelyTraverseReconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15784:8
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15885:10
+
+[2m19:37:25[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminPortal> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m19:37:26[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: applyIconLink is not defined
+[39m > src/AdminPortal.tsx:623:4
+    621 |    useEffect(() => {
+    622 |      document.title = siteSettings?.site_name ? `${siteSettings.site_name} 管理后台` : "Brights 管理后台";
+    623 |      applyIconLink(siteSettings?.site_icon || "");
+        |      ^
+    624 |    }, [siteSettings?.site_icon, siteSettings?.site_name]);
+    625 |  
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25989:19
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:13249:28
+ > commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:13336:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15484:12
+ > recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15476:10
+ > recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15718:10
+
+[2m19:37:26[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminPortal> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m19:37:26[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: applyIconLink is not defined
+[39m > src/AdminPortal.tsx:623:4
+    621 |    useEffect(() => {
+    622 |      document.title = siteSettings?.site_name ? `${siteSettings.site_name} 管理后台` : "Brights 管理后台";
+    623 |      applyIconLink(siteSettings?.site_icon || "");
+        |      ^
+    624 |    }, [siteSettings?.site_icon, siteSettings?.site_name]);
+    625 |  
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25989:19
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:13249:28
+ > commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:13336:10
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15832:10
+ > recursivelyTraverseReconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15784:8
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15824:10
+ > recursivelyTraverseReconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15784:8
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15885:10
+
+[2m19:37:26[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminPortal> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m19:37:55[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: applyIconLink is not defined
+[39m > src/AdminPortal.tsx:623:4
+    621 |    useEffect(() => {
+    622 |      document.title = siteSettings?.site_name ? `${siteSettings.site_name} 管理后台` : "Brights 管理后台";
+    623 |      applyIconLink(siteSettings?.site_icon || "");
+        |      ^
+    624 |    }, [siteSettings?.site_icon, siteSettings?.site_name]);
+    625 |  
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25989:19
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:13249:28
+ > commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:13336:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15484:12
+ > recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15476:10
+ > recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15718:10
+
+[2m19:37:55[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminPortal> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m19:37:55[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: applyIconLink is not defined
+[39m > src/AdminPortal.tsx:623:4
+    621 |    useEffect(() => {
+    622 |      document.title = siteSettings?.site_name ? `${siteSettings.site_name} 管理后台` : "Brights 管理后台";
+    623 |      applyIconLink(siteSettings?.site_icon || "");
+        |      ^
+    624 |    }, [siteSettings?.site_icon, siteSettings?.site_name]);
+    625 |  
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25989:19
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:13249:28
+ > commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:13336:10
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15832:10
+ > recursivelyTraverseReconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15784:8
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15824:10
+ > recursivelyTraverseReconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15784:8
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15885:10
+
+[2m19:37:55[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminPortal> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m19:39:17[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: applyIconLink is not defined
+[39m > src/AdminPortal.tsx:623:4
+    621 |    useEffect(() => {
+    622 |      document.title = siteSettings?.site_name ? `${siteSettings.site_name} 管理后台` : "Brights 管理后台";
+    623 |      applyIconLink(siteSettings?.site_icon || "");
+        |      ^
+    624 |    }, [siteSettings?.site_icon, siteSettings?.site_name]);
+    625 |  
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25989:19
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:13249:28
+ > commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:13336:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15484:12
+ > recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15476:10
+ > recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15718:10
+
+[2m19:39:17[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminPortal> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m19:39:17[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: applyIconLink is not defined
+[39m > src/AdminPortal.tsx:623:4
+    621 |    useEffect(() => {
+    622 |      document.title = siteSettings?.site_name ? `${siteSettings.site_name} 管理后台` : "Brights 管理后台";
+    623 |      applyIconLink(siteSettings?.site_icon || "");
+        |      ^
+    624 |    }, [siteSettings?.site_icon, siteSettings?.site_name]);
+    625 |  
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25989:19
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:13249:28
+ > commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:13336:10
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15832:10
+ > recursivelyTraverseReconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15784:8
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15824:10
+ > recursivelyTraverseReconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15784:8
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15885:10
+
+[2m19:39:17[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminPortal> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m19:39:47[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: applyIconLink is not defined
+[39m > src/AdminPortal.tsx:623:4
+    621 |    useEffect(() => {
+    622 |      document.title = siteSettings?.site_name ? `${siteSettings.site_name} 管理后台` : "Brights 管理后台";
+    623 |      applyIconLink(siteSettings?.site_icon || "");
+        |      ^
+    624 |    }, [siteSettings?.site_icon, siteSettings?.site_name]);
+    625 |  
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25989:19
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:13249:28
+ > commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:13336:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15484:12
+ > recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15476:10
+ > recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:15439:10
+ > commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:15718:10
+
+[2m19:39:47[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminPortal> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m19:39:47[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: applyIconLink is not defined
+[39m > src/AdminPortal.tsx:623:4
+    621 |    useEffect(() => {
+    622 |      document.title = siteSettings?.site_name ? `${siteSettings.site_name} 管理后台` : "Brights 管理后台";
+    623 |      applyIconLink(siteSettings?.site_icon || "");
+        |      ^
+    624 |    }, [siteSettings?.site_icon, siteSettings?.site_name]);
+    625 |  
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25989:19
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:13249:28
+ > commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:13336:10
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15832:10
+ > recursivelyTraverseReconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15784:8
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15824:10
+ > recursivelyTraverseReconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15784:8
+ > reconnectPassiveEffects node_modules/react-dom/cjs/react-dom-client.development.js:15885:10
+
+[2m19:39:47[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminPortal> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m19:55:23[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mFetch request failed: TypeError: Failed to fetch
+    at window.fetch (chrome-extension://odphnbhiddhdpoccbialllejaajemdio/scripts/inspector.js:7:3144)
+    at request (http://127.0.0.1:5173/src/api.ts?t=1777721550328:3:25)
+    at Object.getClassifications (http://127.0.0.1:5173/src/api.ts?t=1777721550328:30:10)
+    at http://127.0.0.1:5173/src/PublicSite.tsx?t=1777721633991:140:7
+    at Object.react_stack_bottom_frame (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:12904:13)
+    at runWithFiberInDEV (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:851:66)
+    at commitHookEffectListMount (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6617:153)
+    at commitHookPassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6652:55)
+    at reconnectPassiveEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7701:6)
+    at recursivelyTraverseReconnectPassiveEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7688:5)
+[2m19:58:20[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mFetch request failed: TypeError: Failed to fetch
+    at window.fetch (chrome-extension://odphnbhiddhdpoccbialllejaajemdio/scripts/inspector.js:7:3144)
+    at request (http://127.0.0.1:5173/src/api.ts?t=1777721550328:3:25)
+    at Object.getClassifications (http://127.0.0.1:5173/src/api.ts?t=1777721550328:30:10)
+    at http://127.0.0.1:5173/src/PublicSite.tsx?t=1777722965259:174:7
+    at Object.react_stack_bottom_frame (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:12904:13)
+    at runWithFiberInDEV (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:851:66)
+    at commitHookEffectListMount (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6617:153)
+    at commitHookPassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6652:55)
+    at commitPassiveMountOnFiber (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7618:22)
+    at recursivelyTraversePassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7606:5)
+[2m19:58:20[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mFetch request failed: TypeError: Failed to fetch
+    at window.fetch (chrome-extension://odphnbhiddhdpoccbialllejaajemdio/scripts/inspector.js:7:3144)
+    at request (http://127.0.0.1:5173/src/api.ts?t=1777721550328:3:25)
+    at Object.getClassifications (http://127.0.0.1:5173/src/api.ts?t=1777721550328:30:10)
+    at http://127.0.0.1:5173/src/PublicSite.tsx?t=1777722965259:174:7
+    at Object.react_stack_bottom_frame (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:12904:13)
+    at runWithFiberInDEV (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:851:66)
+    at commitHookEffectListMount (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6617:153)
+    at commitHookPassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6652:55)
+    at reconnectPassiveEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7701:6)
+    at recursivelyTraverseReconnectPassiveEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7688:5)
+[2m19:58:21[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mFetch request failed: TypeError: Failed to fetch
+    at window.fetch (chrome-extension://odphnbhiddhdpoccbialllejaajemdio/scripts/inspector.js:7:3144)
+    at request (http://127.0.0.1:5173/src/api.ts?t=1777721550328:3:25)
+    at Object.getClassifications (http://127.0.0.1:5173/src/api.ts?t=1777721550328:30:10)
+    at http://127.0.0.1:5173/src/PublicSite.tsx?t=1777722965259:174:7
+    at Object.react_stack_bottom_frame (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:12904:13)
+    at runWithFiberInDEV (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:851:66)
+    at commitHookEffectListMount (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6617:153)
+    at commitHookPassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6652:55)
+    at reconnectPassiveEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7701:6)
+    at recursivelyTraverseReconnectPassiveEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7688:5)
+[2m19:58:21[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mFetch request failed: TypeError: Failed to fetch
+    at window.fetch (chrome-extension://odphnbhiddhdpoccbialllejaajemdio/scripts/inspector.js:7:3144)
+    at request (http://127.0.0.1:5173/src/api.ts?t=1777721550328:3:25)
+    at Object.getClassifications (http://127.0.0.1:5173/src/api.ts?t=1777721550328:30:10)
+    at http://127.0.0.1:5173/src/PublicSite.tsx?t=1777722965259:174:7
+    at Object.react_stack_bottom_frame (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:12904:13)
+    at runWithFiberInDEV (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:851:66)
+    at commitHookEffectListMount (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6617:153)
+    at commitHookPassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6652:55)
+    at commitPassiveMountOnFiber (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7618:22)
+    at recursivelyTraversePassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7606:5)
+[2m20:00:41[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mFetch request failed: TypeError: Failed to fetch
+    at window.fetch (chrome-extension://odphnbhiddhdpoccbialllejaajemdio/scripts/inspector.js:7:3144)
+    at request (http://127.0.0.1:5173/src/api.ts?t=1777721550328:3:25)
+    at Object.adminWords (http://127.0.0.1:5173/src/api.ts?t=1777721550328:196:10)
+    at http://127.0.0.1:5173/src/AdminPortal.tsx?t=1777722026664:349:8
+    at Object.react_stack_bottom_frame (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:12904:13)
+    at runWithFiberInDEV (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:851:66)
+    at commitHookEffectListMount (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6617:153)
+    at commitHookPassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6652:55)
+    at commitPassiveMountOnFiber (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7618:22)
+    at recursivelyTraversePassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7606:5)
+[2m20:08:01[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mFetch request failed: TypeError: Failed to fetch
+    at window.fetch (chrome-extension://odphnbhiddhdpoccbialllejaajemdio/scripts/inspector.js:7:3144)
+    at request (http://127.0.0.1:5173/src/api.ts?t=1777721550328:3:25)
+    at Object.getClassifications (http://127.0.0.1:5173/src/api.ts?t=1777721550328:30:10)
+    at http://127.0.0.1:5173/src/PublicSite.tsx?t=1777723629323:175:7
+    at Object.react_stack_bottom_frame (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:12904:13)
+    at runWithFiberInDEV (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:851:66)
+    at commitHookEffectListMount (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6617:153)
+    at commitHookPassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6652:55)
+    at reconnectPassiveEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7701:6)
+    at recursivelyTraverseReconnectPassiveEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7688:5)
+[2m20:12:22[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Expected `}` but found `:`
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/PublicSite.tsx:756:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m756 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m)[0m[38;5;249m [0m:[38;5;249m [0m[38;5;249mn[0m[38;5;249mu[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m}[0m
+ [38;5;240m    │[0m             ┬  
+ [38;5;240m    │[0m             ╰── `}` expected
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/PublicSite.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m20:12:22[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/PublicSite.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m20:12:22[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Expected `}` but found `:`
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/PublicSite.tsx:756:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m756 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m)[0m[38;5;249m [0m:[38;5;249m [0m[38;5;249mn[0m[38;5;249mu[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m}[0m
+ [38;5;240m    │[0m             ┬  
+ [38;5;240m    │[0m             ╰── `}` expected
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/PublicSite.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m20:12:22[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/PublicSite.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m20:12:22[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Expected `}` but found `:`
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/PublicSite.tsx:756:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m756 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m)[0m[38;5;249m [0m:[38;5;249m [0m[38;5;249mn[0m[38;5;249mu[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m}[0m
+ [38;5;240m    │[0m             ┬  
+ [38;5;240m    │[0m             ╰── `}` expected
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/PublicSite.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m20:12:22[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/PublicSite.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m20:13:45[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Expected `}` but found `:`
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/PublicSite.tsx:756:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m756 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m)[0m[38;5;249m [0m:[38;5;249m [0m[38;5;249mn[0m[38;5;249mu[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m}[0m
+ [38;5;240m    │[0m             ┬  
+ [38;5;240m    │[0m             ╰── `}` expected
+[38;5;246m─────╯[0m
+
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/PublicSite.tsx[39m
+[2m20:13:45[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Expected `}` but found `:`
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/PublicSite.tsx:756:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m756 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m)[0m[38;5;249m [0m:[38;5;249m [0m[38;5;249mn[0m[38;5;249mu[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m}[0m
+ [38;5;240m    │[0m             ┬  
+ [38;5;240m    │[0m             ╰── `}` expected
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/PublicSite.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m20:15:11[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Expected `}` but found `:`
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/PublicSite.tsx:756:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m756 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m)[0m[38;5;249m [0m:[38;5;249m [0m[38;5;249mn[0m[38;5;249mu[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m}[0m
+ [38;5;240m    │[0m             ┬  
+ [38;5;240m    │[0m             ╰── `}` expected
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/PublicSite.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m20:15:32[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Expected `}` but found `:`
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/PublicSite.tsx:756:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m756 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m)[0m[38;5;249m [0m:[38;5;249m [0m[38;5;249mn[0m[38;5;249mu[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m}[0m
+ [38;5;240m    │[0m             ┬  
+ [38;5;240m    │[0m             ╰── `}` expected
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/PublicSite.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m20:15:33[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Expected `}` but found `:`
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/PublicSite.tsx:756:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m756 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m)[0m[38;5;249m [0m:[38;5;249m [0m[38;5;249mn[0m[38;5;249mu[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m}[0m
+ [38;5;240m    │[0m             ┬  
+ [38;5;240m    │[0m             ╰── `}` expected
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/PublicSite.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m20:15:35[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Expected `}` but found `:`
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/PublicSite.tsx:756:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m756 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m)[0m[38;5;249m [0m:[38;5;249m [0m[38;5;249mn[0m[38;5;249mu[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m}[0m
+ [38;5;240m    │[0m             ┬  
+ [38;5;240m    │[0m             ╰── `}` expected
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/PublicSite.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m20:15:36[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Expected `}` but found `:`
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/PublicSite.tsx:756:13 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m756 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m)[0m[38;5;249m [0m:[38;5;249m [0m[38;5;249mn[0m[38;5;249mu[0m[38;5;249ml[0m[38;5;249ml[0m[38;5;249m}[0m
+ [38;5;240m    │[0m             ┬  
+ [38;5;240m    │[0m             ╰── `}` expected
+[38;5;246m─────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/PublicSite.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m20:30:50[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mThe final argument passed to useEffect changed size between renders. The order and size of this array must remain constant.
+
+Previous: [english]
+Incoming: [1, english]
+[2m20:30:50[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mThe final argument passed to useEffect changed size between renders. The order and size of this array must remain constant.
+
+Previous: [学校和大学, 3, , english]
+Incoming: [学校和大学, 1, 3, , english]
+[2m23:46:02[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mFetch request failed: TypeError: Failed to fetch
+    at window.fetch (chrome-extension://odphnbhiddhdpoccbialllejaajemdio/scripts/inspector.js:7:3144)
+    at request (http://127.0.0.1:5173/src/api.ts?t=1777724960781:3:25)
+    at Object.getClassifications (http://127.0.0.1:5173/src/api.ts?t=1777724960781:35:10)
+    at http://127.0.0.1:5173/src/PublicSite.tsx?t=1777725246667:212:7
+    at Object.react_stack_bottom_frame (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:12904:13)
+    at runWithFiberInDEV (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:851:66)
+    at commitHookEffectListMount (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6617:153)
+    at commitHookPassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6652:55)
+    at commitPassiveMountOnFiber (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7618:22)
+    at recursivelyTraversePassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7606:5)
+[2m23:46:02[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mFetch request failed: TypeError: Failed to fetch
+    at window.fetch (chrome-extension://odphnbhiddhdpoccbialllejaajemdio/scripts/inspector.js:7:3144)
+    at request (http://127.0.0.1:5173/src/api.ts?t=1777724960781:3:25)
+    at Object.getClassifications (http://127.0.0.1:5173/src/api.ts?t=1777724960781:35:10)
+    at http://127.0.0.1:5173/src/PublicSite.tsx?t=1777725246667:212:7
+    at Object.react_stack_bottom_frame (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:12904:13)
+    at runWithFiberInDEV (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:851:66)
+    at commitHookEffectListMount (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6617:153)
+    at commitHookPassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6652:55)
+    at reconnectPassiveEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7701:6)
+    at recursivelyTraverseReconnectPassiveEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7688:5)
+[2m23:46:12[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mFetch request failed: TypeError: Failed to fetch
+    at window.fetch (chrome-extension://odphnbhiddhdpoccbialllejaajemdio/scripts/inspector.js:7:3144)
+    at request (http://127.0.0.1:5173/src/api.ts?t=1777724960781:3:25)
+    at Object.getClassifications (http://127.0.0.1:5173/src/api.ts?t=1777724960781:35:10)
+    at http://127.0.0.1:5173/src/PublicSite.tsx?t=1777725246667:212:7
+    at Object.react_stack_bottom_frame (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:12904:13)
+    at runWithFiberInDEV (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:851:66)
+    at commitHookEffectListMount (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6617:153)
+    at commitHookPassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6652:55)
+    at commitPassiveMountOnFiber (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7618:22)
+    at recursivelyTraversePassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7606:5)
+[2m23:48:37[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mFetch request failed: TypeError: Failed to fetch
+    at window.fetch (chrome-extension://odphnbhiddhdpoccbialllejaajemdio/scripts/inspector.js:7:3144)
+    at request (http://127.0.0.1:5173/src/api.ts?t=1777724960781:3:25)
+    at Object.getClassifications (http://127.0.0.1:5173/src/api.ts?t=1777724960781:35:10)
+    at http://127.0.0.1:5173/src/PublicSite.tsx?t=1777725246667:212:7
+    at Object.react_stack_bottom_frame (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:12904:13)
+    at runWithFiberInDEV (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:851:66)
+    at commitHookEffectListMount (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6617:153)
+    at commitHookPassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6652:55)
+    at commitPassiveMountOnFiber (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7618:22)
+    at recursivelyTraversePassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7606:5)
+[2m23:48:39[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mFetch request failed: TypeError: Failed to fetch
+    at window.fetch (chrome-extension://odphnbhiddhdpoccbialllejaajemdio/scripts/inspector.js:7:3144)
+    at request (http://127.0.0.1:5173/src/api.ts?t=1777724960781:3:25)
+    at Object.getClassifications (http://127.0.0.1:5173/src/api.ts?t=1777724960781:35:10)
+    at http://127.0.0.1:5173/src/PublicSite.tsx?t=1777725246667:212:7
+    at Object.react_stack_bottom_frame (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:12904:13)
+    at runWithFiberInDEV (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:851:66)
+    at commitHookEffectListMount (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6617:153)
+    at commitHookPassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:6652:55)
+    at commitPassiveMountOnFiber (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7618:22)
+    at recursivelyTraversePassiveMountEffects (http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=e3e5c79b:7606:5)
+[2m00:05:27[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/site/settings[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m00:05:27[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/subjects[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m00:05:27[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/stats[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m00:05:27[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/plans[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m00:05:27[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/auth/me[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m00:05:27[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/words?subject=english&page=1&page_size=18&classification=%E5%AA%92%E4%BD%93[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m00:05:27[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/classifications?subject=english&page=9&page_size=8[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m00:05:27[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/auth/captcha?scene=learner_login[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m00:16:17[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Logical expressions and coalesce expressions cannot be mixed
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/AdminPortal.tsx:1416:19 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1416 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mu[0m[38;5;249mb[0m[38;5;249mj[0m[38;5;249me[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mK[0m[38;5;249me[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0mitem.subject_key ?? subjectFilter || "english"[38;5;249m,[0m
+ [38;5;240m     │[0m                   ───────────────────────┬──────────────────────  
+ [38;5;240m     │[0m                                          ╰──────────────────────── 
+ [38;5;240m     │[0m 
+ [38;5;240m     │[0m [38;5;115mHelp[0m: Wrap either expression by parentheses
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/AdminPortal.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m00:16:17[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/AdminPortal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m00:16:17[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Logical expressions and coalesce expressions cannot be mixed
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/AdminPortal.tsx:1416:19 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1416 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mu[0m[38;5;249mb[0m[38;5;249mj[0m[38;5;249me[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mK[0m[38;5;249me[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0mitem.subject_key ?? subjectFilter || "english"[38;5;249m,[0m
+ [38;5;240m     │[0m                   ───────────────────────┬──────────────────────  
+ [38;5;240m     │[0m                                          ╰──────────────────────── 
+ [38;5;240m     │[0m 
+ [38;5;240m     │[0m [38;5;115mHelp[0m: Wrap either expression by parentheses
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/AdminPortal.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m00:16:17[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/AdminPortal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m00:17:09[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Logical expressions and coalesce expressions cannot be mixed
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/AdminPortal.tsx:1416:19 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1416 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mu[0m[38;5;249mb[0m[38;5;249mj[0m[38;5;249me[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mK[0m[38;5;249me[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0mitem.subject_key ?? subjectFilter || "english"[38;5;249m,[0m
+ [38;5;240m     │[0m                   ───────────────────────┬──────────────────────  
+ [38;5;240m     │[0m                                          ╰──────────────────────── 
+ [38;5;240m     │[0m 
+ [38;5;240m     │[0m [38;5;115mHelp[0m: Wrap either expression by parentheses
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/AdminPortal.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m00:17:09[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/AdminPortal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m00:17:09[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Logical expressions and coalesce expressions cannot be mixed
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/AdminPortal.tsx:1416:19 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1416 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mu[0m[38;5;249mb[0m[38;5;249mj[0m[38;5;249me[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mK[0m[38;5;249me[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0mitem.subject_key ?? subjectFilter || "english"[38;5;249m,[0m
+ [38;5;240m     │[0m                   ───────────────────────┬──────────────────────  
+ [38;5;240m     │[0m                                          ╰──────────────────────── 
+ [38;5;240m     │[0m 
+ [38;5;240m     │[0m [38;5;115mHelp[0m: Wrap either expression by parentheses
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/AdminPortal.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m00:17:09[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/AdminPortal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m00:17:24[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Logical expressions and coalesce expressions cannot be mixed
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/AdminPortal.tsx:1416:19 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1416 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mu[0m[38;5;249mb[0m[38;5;249mj[0m[38;5;249me[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mK[0m[38;5;249me[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0mitem.subject_key ?? subjectFilter || "english"[38;5;249m,[0m
+ [38;5;240m     │[0m                   ───────────────────────┬──────────────────────  
+ [38;5;240m     │[0m                                          ╰──────────────────────── 
+ [38;5;240m     │[0m 
+ [38;5;240m     │[0m [38;5;115mHelp[0m: Wrap either expression by parentheses
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/AdminPortal.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m00:17:24[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/AdminPortal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m00:17:24[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Logical expressions and coalesce expressions cannot be mixed
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/AdminPortal.tsx:1416:19 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1416 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mu[0m[38;5;249mb[0m[38;5;249mj[0m[38;5;249me[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mK[0m[38;5;249me[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0mitem.subject_key ?? subjectFilter || "english"[38;5;249m,[0m
+ [38;5;240m     │[0m                   ───────────────────────┬──────────────────────  
+ [38;5;240m     │[0m                                          ╰──────────────────────── 
+ [38;5;240m     │[0m 
+ [38;5;240m     │[0m [38;5;115mHelp[0m: Wrap either expression by parentheses
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/AdminPortal.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m00:17:24[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/AdminPortal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m00:17:38[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Logical expressions and coalesce expressions cannot be mixed
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/AdminPortal.tsx:1416:19 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1416 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mu[0m[38;5;249mb[0m[38;5;249mj[0m[38;5;249me[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mK[0m[38;5;249me[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0mitem.subject_key ?? subjectFilter || "english"[38;5;249m,[0m
+ [38;5;240m     │[0m                   ───────────────────────┬──────────────────────  
+ [38;5;240m     │[0m                                          ╰──────────────────────── 
+ [38;5;240m     │[0m 
+ [38;5;240m     │[0m [38;5;115mHelp[0m: Wrap either expression by parentheses
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/AdminPortal.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m00:17:38[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/AdminPortal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m00:17:38[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Logical expressions and coalesce expressions cannot be mixed
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/AdminPortal.tsx:1416:19 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1416 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mu[0m[38;5;249mb[0m[38;5;249mj[0m[38;5;249me[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mK[0m[38;5;249me[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0mitem.subject_key ?? subjectFilter || "english"[38;5;249m,[0m
+ [38;5;240m     │[0m                   ───────────────────────┬──────────────────────  
+ [38;5;240m     │[0m                                          ╰──────────────────────── 
+ [38;5;240m     │[0m 
+ [38;5;240m     │[0m [38;5;115mHelp[0m: Wrap either expression by parentheses
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/AdminPortal.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m00:17:38[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/AdminPortal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m00:17:46[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Logical expressions and coalesce expressions cannot be mixed
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/AdminPortal.tsx:1416:19 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1416 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mu[0m[38;5;249mb[0m[38;5;249mj[0m[38;5;249me[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mK[0m[38;5;249me[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0mitem.subject_key ?? subjectFilter || "english"[38;5;249m,[0m
+ [38;5;240m     │[0m                   ───────────────────────┬──────────────────────  
+ [38;5;240m     │[0m                                          ╰──────────────────────── 
+ [38;5;240m     │[0m 
+ [38;5;240m     │[0m [38;5;115mHelp[0m: Wrap either expression by parentheses
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/AdminPortal.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m00:17:46[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/AdminPortal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m00:17:46[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Logical expressions and coalesce expressions cannot be mixed
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/AdminPortal.tsx:1416:19 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1416 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mu[0m[38;5;249mb[0m[38;5;249mj[0m[38;5;249me[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mK[0m[38;5;249me[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0mitem.subject_key ?? subjectFilter || "english"[38;5;249m,[0m
+ [38;5;240m     │[0m                   ───────────────────────┬──────────────────────  
+ [38;5;240m     │[0m                                          ╰──────────────────────── 
+ [38;5;240m     │[0m 
+ [38;5;240m     │[0m [38;5;115mHelp[0m: Wrap either expression by parentheses
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/AdminPortal.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m00:17:46[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/AdminPortal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m00:18:37[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Logical expressions and coalesce expressions cannot be mixed
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/AdminPortal.tsx:1416:19 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1416 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mu[0m[38;5;249mb[0m[38;5;249mj[0m[38;5;249me[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mK[0m[38;5;249me[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0mitem.subject_key ?? subjectFilter || "english"[38;5;249m,[0m
+ [38;5;240m     │[0m                   ───────────────────────┬──────────────────────  
+ [38;5;240m     │[0m                                          ╰──────────────────────── 
+ [38;5;240m     │[0m 
+ [38;5;240m     │[0m [38;5;115mHelp[0m: Wrap either expression by parentheses
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/AdminPortal.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m00:18:37[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/AdminPortal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m00:18:37[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Logical expressions and coalesce expressions cannot be mixed
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/AdminPortal.tsx:1416:19 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1416 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mu[0m[38;5;249mb[0m[38;5;249mj[0m[38;5;249me[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mK[0m[38;5;249me[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0mitem.subject_key ?? subjectFilter || "english"[38;5;249m,[0m
+ [38;5;240m     │[0m                   ───────────────────────┬──────────────────────  
+ [38;5;240m     │[0m                                          ╰──────────────────────── 
+ [38;5;240m     │[0m 
+ [38;5;240m     │[0m [38;5;115mHelp[0m: Wrap either expression by parentheses
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/AdminPortal.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m00:18:37[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/AdminPortal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m00:18:43[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Logical expressions and coalesce expressions cannot be mixed
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/AdminPortal.tsx:1416:19 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1416 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mu[0m[38;5;249mb[0m[38;5;249mj[0m[38;5;249me[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mK[0m[38;5;249me[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0mitem.subject_key ?? subjectFilter || "english"[38;5;249m,[0m
+ [38;5;240m     │[0m                   ───────────────────────┬──────────────────────  
+ [38;5;240m     │[0m                                          ╰──────────────────────── 
+ [38;5;240m     │[0m 
+ [38;5;240m     │[0m [38;5;115mHelp[0m: Wrap either expression by parentheses
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/AdminPortal.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m00:18:43[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/AdminPortal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m00:18:43[22m [31m[1m[vite][22m[39m [31mInternal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] Error:[0m Logical expressions and coalesce expressions cannot be mixed
+      [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m src/AdminPortal.tsx:1416:19 [38;5;246m][0m
+      [38;5;246m│[0m
+ [38;5;246m1416 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249ms[0m[38;5;249mu[0m[38;5;249mb[0m[38;5;249mj[0m[38;5;249me[0m[38;5;249mc[0m[38;5;249mt[0m[38;5;249mK[0m[38;5;249me[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0mitem.subject_key ?? subjectFilter || "english"[38;5;249m,[0m
+ [38;5;240m     │[0m                   ───────────────────────┬──────────────────────  
+ [38;5;240m     │[0m                                          ╰──────────────────────── 
+ [38;5;240m     │[0m 
+ [38;5;240m     │[0m [38;5;115mHelp[0m: Wrap either expression by parentheses
+[38;5;246m──────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36mD:/ProjectCode/brights/web/src/AdminPortal.tsx[39m
+      at transformWithOxc (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3343:19)
+      at TransformPluginContext.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:3411:26)
+      at EnvironmentPluginContainer.transform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:30164:51)
+      at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
+      at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
+[2m00:18:43[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/AdminPortal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)

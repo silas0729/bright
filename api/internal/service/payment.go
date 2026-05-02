@@ -672,6 +672,26 @@ func (s *Service) findLatestSubscriptionStatus(ctx context.Context, customerRef,
 	return &status, nil
 }
 
+func (s *Service) LearnerHasActiveMembership(ctx context.Context, customerRef, subjectKey string) (bool, error) {
+	customerRef = strings.TrimSpace(customerRef)
+	subjectKey = normalizeKey(subjectKey)
+	if customerRef == "" || subjectKey == "" {
+		return false, nil
+	}
+
+	subscription, err := s.findLatestSubscriptionStatus(ctx, customerRef, subjectKey)
+	if err != nil {
+		return false, err
+	}
+	if subscription == nil || subscription.Status != subscriptionStatusActive {
+		return false, nil
+	}
+	if subscription.CurrentPeriodEnd != nil && subscription.CurrentPeriodEnd.Before(time.Now()) {
+		return false, nil
+	}
+	return true, nil
+}
+
 func (s *Service) getWechatPayConfigModel(ctx context.Context) (storage.WechatPayConfig, bool, error) {
 	var model storage.WechatPayConfig
 	err := s.db.WithContext(ctx).Order("id desc").First(&model).Error

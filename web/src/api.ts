@@ -32,6 +32,11 @@ export interface Grade {
 export interface ClassificationStat {
   name: string;
   count: number;
+  free_count: number;
+  vip_count: number;
+  accessible_count: number;
+  requires_membership: boolean;
+  has_member_content: boolean;
 }
 
 export interface Word {
@@ -399,8 +404,8 @@ export interface CreateWordInput {
 }
 
 export interface UpdateWordInput {
-  legacy_id?: number;
-  subject_key: string;
+ legacy_id?: number;
+ subject_key: string;
   classification?: string;
   category_name?: string;
   grade_id?: number | null;
@@ -409,7 +414,22 @@ export interface UpdateWordInput {
   source: string;
   phonetics: string;
   explanation: string;
+ is_vip: boolean;
+}
+
+export interface BatchUpdateWordVIPInput {
+  subject_key: string;
+  category_id?: number;
+  classification?: string;
   is_vip: boolean;
+}
+
+export interface BatchUpdateWordVIPResult {
+  subject_key: string;
+  category_id?: number;
+  classification: string;
+  is_vip: boolean;
+  updated_count: number;
 }
 
 export interface CreateAdminUserInput {
@@ -468,7 +488,8 @@ export interface UpdateSubscriptionInput {
   clear_cancelled_at?: boolean;
 }
 
-const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+export const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+const baseUrl = apiBaseUrl;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${baseUrl}${path}`, init);
@@ -501,13 +522,29 @@ export const api = {
   getStats() {
     return request<CatalogStats>("/api/v1/stats");
   },
-  getClassifications(params: { subjectKey: string; page: number; pageSize: number }) {
+  getClassifications(params: { subjectKey: string; page: number; pageSize: number; token?: string }) {
     const search = new URLSearchParams({
       subject: params.subjectKey,
       page: String(params.page),
       page_size: String(params.pageSize),
     });
-    return request<PagedClassificationStats>(`/api/v1/classifications?${search.toString()}`);
+    return request<PagedClassificationStats>(`/api/v1/classifications?${search.toString()}`, {
+      headers: params.token
+        ? {
+            Authorization: `Bearer ${params.token}`,
+          }
+        : undefined,
+    });
+  },
+  getCategories(subjectKey: string, kind = "topic") {
+    const search = new URLSearchParams();
+    if (subjectKey) {
+      search.set("subject", subjectKey);
+    }
+    if (kind) {
+      search.set("kind", kind);
+    }
+    return request<Category[]>(`/api/v1/categories?${search.toString()}`);
   },
   getWords(params: {
     subjectKey: string;
@@ -515,6 +552,7 @@ export const api = {
     query: string;
     page: number;
     pageSize: number;
+    token?: string;
   }) {
     const search = new URLSearchParams({
       subject: params.subjectKey,
@@ -527,7 +565,13 @@ export const api = {
     if (params.query) {
       search.set("q", params.query);
     }
-    return request<PagedWords>(`/api/v1/words?${search.toString()}`);
+    return request<PagedWords>(`/api/v1/words?${search.toString()}`, {
+      headers: params.token
+        ? {
+            Authorization: `Bearer ${params.token}`,
+          }
+        : undefined,
+    });
   },
   getPlans() {
     return request<Plan[]>("/api/v1/plans");
@@ -801,6 +845,13 @@ export const api = {
   },
   adminUpdateWord(token: string, id: number, payload: UpdateWordInput) {
     return request<Word>(`/api/v1/admin/words/${id}`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  adminBatchUpdateWordVIP(token: string, payload: BatchUpdateWordVIPInput) {
+    return request<BatchUpdateWordVIPResult>("/api/v1/admin/words/batch-vip", {
       method: "PUT",
       headers: authHeaders(token),
       body: JSON.stringify(payload),

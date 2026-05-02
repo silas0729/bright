@@ -12,6 +12,7 @@ import (
 
 	"brights/api/internal/adminauth"
 	"brights/api/internal/domain"
+	"brights/api/internal/mcp"
 	"brights/api/internal/service"
 	"brights/api/internal/userauth"
 )
@@ -33,6 +34,10 @@ func (s *Server) Routes() http.Handler {
 
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery(), corsMiddleware())
+	mcpServer := mcp.NewServer(s.service, s.userAuth)
+
+	router.GET("/mcp", mcpServer.HandleWebSocket)
+	router.GET("/mcp/info", mcpServer.HandleInfo)
 
 	v1 := router.Group("/api/v1")
 	v1.GET("/health", s.handleHealth)
@@ -99,6 +104,7 @@ func (s *Server) Routes() http.Handler {
 	admin.POST("/grades", s.permissionRequired("grade.write"), s.handleCreateGrade)
 	admin.PUT("/grades/:id", s.permissionRequired("grade.write"), s.handleUpdateGrade)
 	admin.POST("/words", s.permissionRequired("catalog.write"), s.handleCreateWord)
+	admin.PUT("/words/batch-vip", s.permissionRequired("catalog.write"), s.handleBatchUpdateWordVIP)
 	admin.PUT("/words/:id", s.permissionRequired("catalog.write"), s.handleUpdateWord)
 	admin.POST("/plans", s.permissionRequired("plan.write"), s.handleCreatePlan)
 	admin.PUT("/plans/:id", s.permissionRequired("plan.write"), s.handleUpdatePlan)
@@ -136,10 +142,17 @@ func (s *Server) handleStats(c *gin.Context) {
 func (s *Server) handleClassifications(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "8"))
+	subjectKey := c.Query("subject")
+	canAccessVIP, err := s.canAccessVIPContent(c, subjectKey)
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, err)
+		return
+	}
 	items, err := s.service.ListClassificationStatsPaged(c.Request.Context(), domain.ClassificationStatFilter{
-		SubjectKey: c.Query("subject"),
+		SubjectKey: subjectKey,
 		Page:       page,
 		PageSize:   pageSize,
+		HideVIP:    !canAccessVIP,
 	})
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, err)
@@ -171,22 +184,15 @@ func (s *Server) handleGrades(c *gin.Context) {
 }
 
 func (s *Server) handleWords(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
-	subjectID, _ := strconv.ParseUint(c.DefaultQuery("subject_id", "0"), 10, 64)
-	categoryID, _ := strconv.ParseUint(c.DefaultQuery("category_id", "0"), 10, 64)
-	gradeID, _ := strconv.ParseUint(c.DefaultQuery("grade_id", "0"), 10, 64)
+	filter := wordFilterFromRequest(c)
+	canAccessVIP, err := s.canAccessVIPContent(c, filter.SubjectKey)
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, err)
+		return
+	}
+	filter.HideVIP = !canAccessVIP
 
-	result, err := s.service.ListWords(c.Request.Context(), domain.WordFilter{
-		SubjectID:      uint(subjectID),
-		SubjectKey:     c.Query("subject"),
-		CategoryID:     uint(categoryID),
-		Classification: c.Query("classification"),
-		GradeID:        uint(gradeID),
-		Query:          c.Query("q"),
-		Page:           page,
-		PageSize:       pageSize,
-	})
+	result, err := s.service.ListWords(c.Request.Context(), filter)
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, err)
 		return
@@ -382,7 +388,12 @@ func (s *Server) handleUpdateAdminRole(c *gin.Context) {
 }
 
 func (s *Server) handleAdminWords(c *gin.Context) {
-	s.handleWords(c)
+	result, err := s.service.ListWords(c.Request.Context(), wordFilterFromRequest(c))
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, err)
+		return
+	}
+	c.JSON(http.StatusOK, result)
 }
 
 func (s *Server) handleAdminCategories(c *gin.Context) {
@@ -617,6 +628,20 @@ func (s *Server) handleUpdateWord(c *gin.Context) {
 	c.JSON(http.StatusOK, item)
 }
 
+func (s *Server) handleBatchUpdateWordVIP(c *gin.Context) {
+	var input domain.BatchUpdateWordVIPInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	item, err := s.service.BatchUpdateWordVIP(c.Request.Context(), input)
+	if err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, item)
+}
+
 func (s *Server) handleCreatePlan(c *gin.Context) {
 	var input domain.CreatePlanInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -666,4 +691,37 @@ func defaultIfBlank(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func wordFilterFromRequest(c *gin.Context) domain.WordFilter {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	subjectID, _ := strconv.ParseUint(c.DefaultQuery("subject_id", "0"), 10, 64)
+	categoryID, _ := strconv.ParseUint(c.DefaultQuery("category_id", "0"), 10, 64)
+	gradeID, _ := strconv.ParseUint(c.DefaultQuery("grade_id", "0"), 10, 64)
+
+	return domain.WordFilter{
+		SubjectID:      uint(subjectID),
+		SubjectKey:     c.Query("subject"),
+		CategoryID:     uint(categoryID),
+		Classification: c.Query("classification"),
+		GradeID:        uint(gradeID),
+		Query:          c.Query("q"),
+		Page:           page,
+		PageSize:       pageSize,
+	}
+}
+
+func (s *Server) canAccessVIPContent(c *gin.Context, subjectKey string) (bool, error) {
+	subjectKey = strings.TrimSpace(subjectKey)
+	if subjectKey == "" {
+		return false, nil
+	}
+
+	claims, ok := s.optionalLearnerClaims(c)
+	if !ok {
+		return false, nil
+	}
+
+	return s.service.LearnerHasActiveMembership(c.Request.Context(), claims.Username, subjectKey)
 }

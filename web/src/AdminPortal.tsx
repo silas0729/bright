@@ -30,9 +30,19 @@ import {
 const adminPageSize = 10;
 const adminSessionStorageKey = "brights_admin_session";
 const adminUIStateStorageKey = "brights_admin_ui_state";
+const unclassifiedCategoryValue = "__unclassified__";
 
 type AdminSection = "dashboard" | "import" | "catalog" | "site" | "payments" | "memberships" | "learners" | "admins";
 type ContentEditModal = "subject" | "category" | "grade" | "word" | null;
+type NoticeDialogTone = "info" | "success" | "error" | "warning";
+
+type ConfirmDialogState = {
+  tone: NoticeDialogTone;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+};
 
 const defaultSiteForm: SiteSetting = {
   site_name: "Brights 英语单词学习站",
@@ -64,6 +74,7 @@ export default function AdminPortal() {
     adminUserQuery?: string;
     learnerQuery?: string;
     wordQuery?: string;
+    wordClassificationFilter?: string;
     categoryQuery?: string;
     gradeQuery?: string;
     paymentQuery?: string;
@@ -86,6 +97,8 @@ export default function AdminPortal() {
   const [words, setWords] = useState<PagedWords | null>(null);
   const [categories, setCategories] = useState<PagedCategories | null>(null);
   const [grades, setGrades] = useState<PagedGrades | null>(null);
+  const [wordFilterCategories, setWordFilterCategories] = useState<Category[]>([]);
+  const [wordEditorCategories, setWordEditorCategories] = useState<Category[]>([]);
   const [stats, setStats] = useState<CatalogStats | null>(null);
   const [siteSettings, setSiteSettings] = useState<SiteSetting | null>(null);
   const [wechatPayConfig, setWechatPayConfig] = useState<WechatPayConfig | null>(null);
@@ -103,6 +116,7 @@ export default function AdminPortal() {
   const [reloadKey, setReloadKey] = useState(0);
   const [activeSection, setActiveSection] = useState<AdminSection>(persistedUIState.activeSection ?? "dashboard");
   const [contentEditModal, setContentEditModal] = useState<ContentEditModal>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 
   const [setupForm, setSetupForm] = useState({
     username: "",
@@ -237,6 +251,9 @@ export default function AdminPortal() {
   const [adminUserQuery, setAdminUserQuery] = useState(persistedUIState.adminUserQuery ?? "");
   const [learnerQuery, setLearnerQuery] = useState(persistedUIState.learnerQuery ?? "");
   const [wordQuery, setWordQuery] = useState(persistedUIState.wordQuery ?? "");
+  const [wordClassificationFilter, setWordClassificationFilter] = useState(
+    persistedUIState.wordClassificationFilter ?? "",
+  );
   const [categoryQuery, setCategoryQuery] = useState(persistedUIState.categoryQuery ?? "");
   const [gradeQuery, setGradeQuery] = useState(persistedUIState.gradeQuery ?? "");
   const [paymentQuery, setPaymentQuery] = useState(persistedUIState.paymentQuery ?? "");
@@ -287,6 +304,25 @@ export default function AdminPortal() {
   const canManagePlans =
     currentAdmin?.is_super === true || permissionSet.has("*") || permissionSet.has("plan.write");
   const useWechatPayPublicKeyMode = wechatPayForm.authMode !== "auto_certificate";
+  const noticeDialog = authError
+    ? {
+        tone: "error" as NoticeDialogTone,
+        title: "登录状态需要处理",
+        message: authError,
+      }
+    : dataError
+      ? {
+          tone: "error" as NoticeDialogTone,
+          title: "这次操作暂时没有完成",
+          message: dataError,
+        }
+      : notice
+        ? {
+            tone: "success" as NoticeDialogTone,
+            title: "操作已完成",
+            message: notice,
+          }
+        : null;
 
   const formatPlanLabel = (planKey: string) => {
     const match = plans.find((item) => item.key === planKey);
@@ -461,6 +497,7 @@ export default function AdminPortal() {
         pageSize: adminPageSize,
         query: deferredWordQuery,
         subjectKey: subjectFilter,
+        classification: wordClassificationFilter,
       }),
       api.adminCategories(token, {
         page: categoryPage,
@@ -584,6 +621,7 @@ export default function AdminPortal() {
     paymentStatusFilter,
     reloadKey,
     subjectFilter,
+    wordClassificationFilter,
     subscriptionPage,
     subscriptionStatusFilter,
     token,
@@ -614,6 +652,73 @@ export default function AdminPortal() {
       subjectKey: hasSubject(current.subjectKey) ? current.subjectKey : defaultSubjectKey,
     }));
   }, [subjectFilter, subjects]);
+
+  useEffect(() => {
+    let active = true;
+
+    api
+      .getCategories(subjectFilter, "topic")
+      .then((items) => {
+        if (!active) {
+          return;
+        }
+        setWordFilterCategories(items);
+      })
+      .catch(() => {
+        if (active) {
+          setWordFilterCategories([]);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [reloadKey, subjectFilter]);
+
+  useEffect(() => {
+    if (
+      wordClassificationFilter &&
+      wordClassificationFilter !== unclassifiedCategoryValue &&
+      !wordFilterCategories.some((item) => item.name === wordClassificationFilter)
+    ) {
+      setWordClassificationFilter("");
+    }
+  }, [wordClassificationFilter, wordFilterCategories]);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!wordEditor.subjectKey) {
+      setWordEditorCategories([]);
+      return () => {
+        active = false;
+      };
+    }
+
+    if (wordEditor.subjectKey === subjectFilter) {
+      setWordEditorCategories(wordFilterCategories);
+      return () => {
+        active = false;
+      };
+    }
+
+    api
+      .getCategories(wordEditor.subjectKey, "topic")
+      .then((items) => {
+        if (active) {
+          setWordEditorCategories(items);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setWordEditorCategories([]);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [subjectFilter, wordEditor.subjectKey, wordFilterCategories]);
 
   useEffect(() => {
     if (!wechatPayConfigExists || !wechatPayConfig) {
@@ -668,6 +773,7 @@ export default function AdminPortal() {
         adminUserQuery,
         learnerQuery,
         wordQuery,
+        wordClassificationFilter,
         categoryQuery,
         gradeQuery,
         paymentQuery,
@@ -690,6 +796,7 @@ export default function AdminPortal() {
     adminUserQuery,
     learnerQuery,
     wordQuery,
+    wordClassificationFilter,
     categoryQuery,
     gradeQuery,
     paymentQuery,
@@ -1039,6 +1146,51 @@ export default function AdminPortal() {
     }
   }
 
+  async function handleBatchUpdateWordVIP(options: {
+    categoryId?: number;
+    classification: string;
+    label: string;
+    isVIP: boolean;
+    confirmed?: boolean;
+  }) {
+    if (!token) {
+      return;
+    }
+
+    if (!options.confirmed) {
+      const targetLabel = options.isVIP ? "会员专享内容" : "普通内容";
+      setConfirmDialog({
+        tone: options.isVIP ? "warning" : "info",
+        title: "批量调整内容开放范围",
+        message: `确定将“${options.label}”下的全部内容批量调整为${targetLabel}吗？`,
+        confirmLabel: "确认调整",
+        onConfirm: () => {
+          void handleBatchUpdateWordVIP({ ...options, confirmed: true });
+        },
+      });
+      return;
+    }
+
+    const targetLabel = options.isVIP ? "会员专享内容" : "普通内容";
+    setBusyAction("word-batch-vip");
+    setDataError("");
+    setNotice("");
+    try {
+      const result = await api.adminBatchUpdateWordVIP(token, {
+        subject_key: subjectFilter || "english",
+        category_id: options.categoryId,
+        classification: options.classification,
+        is_vip: options.isVIP,
+      });
+      setReloadKey((current) => current + 1);
+      setNotice(`已将「${options.label}」中的 ${formatCount(result.updated_count)} 条内容调整为${targetLabel}。`);
+    } catch (err) {
+      setDataError((err as Error).message);
+    } finally {
+      setBusyAction("");
+    }
+  }
+
   async function handleSiteIconSelected(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
     if (!file) {
@@ -1145,13 +1297,24 @@ export default function AdminPortal() {
     }
   }
 
-  async function handleDeletePlan(id: number) {
+  async function handleDeletePlan(id: number, confirmed = false) {
     if (!token || !canManagePlans || id <= 0) {
       return;
     }
-    if (!window.confirm("确定删除这个会员方案吗？如果已经关联订单或会员记录，系统会阻止删除。")) {
+
+    if (!confirmed) {
+      setConfirmDialog({
+        tone: "warning",
+        title: "删除会员方案",
+        message: "确定删除这个会员方案吗？如果已经关联订单或会员记录，系统会阻止删除。",
+        confirmLabel: "确认删除",
+        onConfirm: () => {
+          void handleDeletePlan(id, true);
+        },
+      });
       return;
     }
+
     setBusyAction("plan-delete");
     setDataError("");
     setNotice("");
@@ -1421,7 +1584,7 @@ export default function AdminPortal() {
       sort: String(subject.sort ?? 0),
       featured: subject.featured,
     });
-    setNotice(`已载入科目「${subject.name}」，修改后保存即可生效。`);
+    setNotice("");
     setDataError("");
     setContentEditModal("subject");
   }
@@ -1437,7 +1600,7 @@ export default function AdminPortal() {
       sort: String(item.sort ?? 0),
       enabled: item.enabled,
     });
-    setNotice(`已载入内容分组「${item.name}」，修改后保存即可生效。`);
+    setNotice("");
     setDataError("");
     setContentEditModal("category");
   }
@@ -1452,7 +1615,7 @@ export default function AdminPortal() {
       sort: String(item.sort ?? 0),
       enabled: item.enabled,
     });
-    setNotice(`已载入学习阶段「${item.name}」，修改后保存即可生效。`);
+    setNotice("");
     setDataError("");
     setContentEditModal("grade");
   }
@@ -1471,9 +1634,17 @@ export default function AdminPortal() {
       explanation: item.explanation || "",
       isVIP: Boolean(item.is_vip),
     });
-    setNotice(`已载入单词「${item.term}」，修改后保存即可生效。`);
+    setNotice("");
     setDataError("");
     setContentEditModal("word");
+  }
+
+  function focusWordsByClassification(name: string) {
+    setActiveSection("catalog");
+    setWordClassificationFilter(name);
+    setWordPage(1);
+    setNotice("");
+    setDataError("");
   }
 
   function closeContentEditModal() {
@@ -1494,6 +1665,93 @@ export default function AdminPortal() {
         break;
     }
     setContentEditModal(null);
+  }
+
+  function closeNoticeDialog() {
+    setNotice("");
+    setAuthError("");
+    setDataError("");
+  }
+
+  function closeConfirmDialog() {
+    setConfirmDialog(null);
+  }
+
+  function handleConfirmDialog() {
+    const nextAction = confirmDialog?.onConfirm;
+    setConfirmDialog(null);
+    nextAction?.();
+  }
+
+  function renderDialogOverlays() {
+    return (
+      <>
+        {noticeDialog ? (
+          <div
+            className="notice-dialog-backdrop"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                closeNoticeDialog();
+              }
+            }}
+          >
+            <section aria-modal="true" className="notice-dialog-card" role="dialog">
+              <div className="notice-dialog-header">
+                <span className={`pill ${noticeDialogToneClass(noticeDialog.tone)}`}>
+                  {noticeDialogTitleTag(noticeDialog.tone)}
+                </span>
+                <button className="secondary-button small-button" onClick={closeNoticeDialog} type="button">
+                  关闭
+                </button>
+              </div>
+              <div className="notice-dialog-body">
+                <h3>{noticeDialog.title}</h3>
+                <p>{noticeDialog.message}</p>
+              </div>
+              <div className="button-row notice-dialog-actions">
+                <button className="primary-button" onClick={closeNoticeDialog} type="button">
+                  我知道了
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+
+        {confirmDialog ? (
+          <div
+            className="notice-dialog-backdrop"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                closeConfirmDialog();
+              }
+            }}
+          >
+            <section aria-modal="true" className="notice-dialog-card" role="dialog">
+              <div className="notice-dialog-header">
+                <span className={`pill ${noticeDialogToneClass(confirmDialog.tone)}`}>
+                  {noticeDialogTitleTag(confirmDialog.tone)}
+                </span>
+                <button className="secondary-button small-button" onClick={closeConfirmDialog} type="button">
+                  关闭
+                </button>
+              </div>
+              <div className="notice-dialog-body">
+                <h3>{confirmDialog.title}</h3>
+                <p>{confirmDialog.message}</p>
+              </div>
+              <div className="button-row notice-dialog-actions">
+                <button className="secondary-button" onClick={closeConfirmDialog} type="button">
+                  先取消
+                </button>
+                <button className="primary-button" onClick={handleConfirmDialog} type="button">
+                  {confirmDialog.confirmLabel}
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+      </>
+    );
   }
 
   function startEditLearner(item: AdminLearnerUser) {
@@ -1664,21 +1922,19 @@ export default function AdminPortal() {
   if (!currentAdmin || !token) {
     const needsSetup = setupStatus?.initialized === false;
     return (
-      <div className="admin-auth-shell">
-        <section className="auth-card">
-          <p className="section-eyebrow">Brights 管理后台</p>
-          <h1>{needsSetup ? "首次开通后台管理" : "后台登录"}</h1>
-          <p>
-            {needsSetup
-              ? "当前还没有后台账号，请先由运营负责人设置第一个超级管理员。首次开通后，后续账号都可以在后台继续新增和管理。"
-              : "使用后台账号登录后，即可统一维护学习内容、站点展示、收费方案、会员服务和学员账号。"}
-          </p>
+      <>
+        <div className="admin-auth-shell">
+          <section className="auth-card">
+            <p className="section-eyebrow">Brights 管理后台</p>
+            <h1>{needsSetup ? "首次开通后台管理" : "后台登录"}</h1>
+            <p>
+              {needsSetup
+                ? "当前还没有后台账号，请先由运营负责人设置第一个超级管理员。首次开通后，后续账号都可以在后台继续新增和管理。"
+                : "使用后台账号登录后，即可统一维护学习内容、站点展示、收费方案、会员服务和学员账号。"}
+            </p>
 
-          {notice ? <div className="feedback-banner feedback-success">{notice}</div> : null}
-          {authError ? <div className="feedback-banner feedback-error">{authError}</div> : null}
-
-          {needsSetup ? (
-            <form className="setup-form" onSubmit={handleSetupBootstrap}>
+            {needsSetup ? (
+              <form className="setup-form" onSubmit={handleSetupBootstrap}>
               <label className="form-field">
                 <span>后台登录账号</span>
                 <input
@@ -1779,10 +2035,12 @@ export default function AdminPortal() {
               <button className="primary-button" disabled={busyAction === "login"} type="submit">
                 {busyAction === "login" ? "登录中..." : "进入运营后台"}
               </button>
-            </form>
-          )}
-        </section>
-      </div>
+              </form>
+            )}
+          </section>
+        </div>
+        {renderDialogOverlays()}
+      </>
     );
   }
 
@@ -1877,9 +2135,6 @@ export default function AdminPortal() {
         </aside>
 
         <main className="admin-main">
-          {notice ? <div className="feedback-banner feedback-success">{notice}</div> : null}
-          {authError ? <div className="feedback-banner feedback-error">{authError}</div> : null}
-          {dataError ? <div className="feedback-banner feedback-error">{dataError}</div> : null}
           {dataLoading ? <div className="feedback-banner">正在同步后台数据...</div> : null}
 
           {activeSection === "dashboard" ? (
@@ -2347,12 +2602,19 @@ export default function AdminPortal() {
                     <label className="form-field">
                       <span>内容分组</span>
                       <input
+                        list="word-category-options-inline"
                         value={wordEditor.classification}
                         onChange={(event) => {
                           setWordEditor((current) => ({ ...current, classification: event.target.value }));
                         }}
                         placeholder="旅行常用英语单词"
                       />
+                      <datalist id="word-category-options-inline">
+                        {wordEditorCategories.map((category) => (
+                          <option key={category.id} value={category.name} />
+                        ))}
+                      </datalist>
+                      <p className="helper-text">可以直接选择已有分类，也可以输入新的分类名称，保存后会自动归类。</p>
                     </label>
                     <label className="form-field">
                       <span>学习阶段</span>
@@ -2428,22 +2690,87 @@ export default function AdminPortal() {
               <div className="table-section">
                 <div className="section-toolbar">
                   <h2>词库内容列表</h2>
-                  <input
-                    className="toolbar-search"
-                    value={wordQuery}
-                    onChange={(event) => {
-                      setWordQuery(event.target.value);
-                      setWordPage(1);
-                    }}
-                    placeholder="搜索单词、释义或音标"
-                  />
+                  <div className="toolbar-controls">
+                    <select
+                      value={wordClassificationFilter}
+                      onChange={(event) => {
+                        setWordClassificationFilter(event.target.value);
+                        setWordPage(1);
+                      }}
+                    >
+                      <option value="">全部分类</option>
+                      <option value={unclassifiedCategoryValue}>未分类</option>
+                      {wordFilterCategories.map((category) => (
+                        <option key={category.id} value={category.name}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      className="toolbar-search"
+                      value={wordQuery}
+                      onChange={(event) => {
+                        setWordQuery(event.target.value);
+                        setWordPage(1);
+                      }}
+                      placeholder="搜索单词、释义或音标"
+                    />
+                  </div>
                 </div>
+                {wordClassificationFilter ? (
+                  <div className="feedback-banner">
+                    <div className="button-row">
+                      <span>
+                        当前正在查看分类「
+                        {wordClassificationFilter === unclassifiedCategoryValue ? "未分类" : wordClassificationFilter}
+                        」的内容。
+                      </span>
+                      <button
+                        className="secondary-button small-button"
+                        disabled={busyAction === "word-batch-vip"}
+                        onClick={() =>
+                          void handleBatchUpdateWordVIP({
+                            categoryId:
+                              wordClassificationFilter === unclassifiedCategoryValue
+                                ? undefined
+                                : wordFilterCategories.find((item) => item.name === wordClassificationFilter)?.id,
+                            classification: wordClassificationFilter,
+                            label: wordClassificationFilter === unclassifiedCategoryValue ? "未分类" : wordClassificationFilter,
+                            isVIP: true,
+                          })
+                        }
+                        type="button"
+                      >
+                        整个分类设为会员专享
+                      </button>
+                      <button
+                        className="secondary-button small-button"
+                        disabled={busyAction === "word-batch-vip"}
+                        onClick={() =>
+                          void handleBatchUpdateWordVIP({
+                            categoryId:
+                              wordClassificationFilter === unclassifiedCategoryValue
+                                ? undefined
+                                : wordFilterCategories.find((item) => item.name === wordClassificationFilter)?.id,
+                            classification: wordClassificationFilter,
+                            label: wordClassificationFilter === unclassifiedCategoryValue ? "未分类" : wordClassificationFilter,
+                            isVIP: false,
+                          })
+                        }
+                        type="button"
+                      >
+                        整个分类设为普通内容
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
                 <DataTable
-                  columns={["单词", "释义", "内容分组", "来源", "音标", "操作"]}
+                  columns={["单词", "释义", "内容分组", "内容权限", "来源", "音标", "操作"]}
                   rows={(words?.items ?? []).map((item) => [
                     item.term,
                     item.translation || "-",
                     item.category_id ? item.classification : "未分类",
+                    item.is_vip ? "会员专享" : "普通内容",
                     item.source || "-",
                     item.phonetics || "-",
                     <button className="secondary-button small-button" onClick={() => startEditWord(item)} type="button">
@@ -2481,9 +2808,44 @@ export default function AdminPortal() {
                     formatSubjectLabel(item.subject_key || ""),
                     item.kind,
                     item.enabled ? "启用" : "停用",
-                    <button className="secondary-button small-button" onClick={() => startEditCategory(item)} type="button">
-                      编辑
-                    </button>,
+                    <div className="button-row" key={`category-actions-${item.id}`}>
+                      <button className="secondary-button small-button" onClick={() => startEditCategory(item)} type="button">
+                        编辑
+                      </button>
+                      <button className="secondary-button small-button" onClick={() => focusWordsByClassification(item.name)} type="button">
+                        查看单词
+                      </button>
+                      <button
+                        className="secondary-button small-button"
+                        disabled={busyAction === "word-batch-vip"}
+                        onClick={() =>
+                          void handleBatchUpdateWordVIP({
+                            categoryId: item.id,
+                            classification: item.name,
+                            label: item.name,
+                            isVIP: true,
+                          })
+                        }
+                        type="button"
+                      >
+                        设为会员
+                      </button>
+                      <button
+                        className="secondary-button small-button"
+                        disabled={busyAction === "word-batch-vip"}
+                        onClick={() =>
+                          void handleBatchUpdateWordVIP({
+                            categoryId: item.id,
+                            classification: item.name,
+                            label: item.name,
+                            isVIP: false,
+                          })
+                        }
+                        type="button"
+                      >
+                        设为普通
+                      </button>
+                    </div>,
                   ])}
                   emptyText="当前还没有符合条件的内容分组。"
                 />
@@ -4204,12 +4566,19 @@ export default function AdminPortal() {
                       <label className="form-field">
                         <span>内容分组</span>
                         <input
+                          list="word-category-options-modal"
                           value={wordEditor.classification}
                           onChange={(event) => {
                             setWordEditor((current) => ({ ...current, classification: event.target.value }));
                           }}
                           placeholder="旅行常用英语单词"
                         />
+                        <datalist id="word-category-options-modal">
+                          {wordEditorCategories.map((category) => (
+                            <option key={category.id} value={category.name} />
+                          ))}
+                        </datalist>
+                        <p className="helper-text">可以直接选择已有分类，也可以输入新的分类名称，保存后会自动归类。</p>
                       </label>
                       <label className="form-field">
                         <span>学习阶段</span>
@@ -4286,6 +4655,7 @@ export default function AdminPortal() {
           ) : null}
         </main>
       </div>
+      {renderDialogOverlays()}
     </div>
   );
 }
@@ -4650,5 +5020,31 @@ function adminRoleLabel(roleKey: string, fallbackName?: string) {
       return "数据查看";
     default:
       return fallbackName || roleKey;
+  }
+}
+
+function noticeDialogToneClass(tone: NoticeDialogTone) {
+  switch (tone) {
+    case "success":
+      return "pill-success";
+    case "warning":
+      return "pill-warning";
+    case "error":
+      return "pill-danger";
+    default:
+      return "pill-muted";
+  }
+}
+
+function noticeDialogTitleTag(tone: NoticeDialogTone) {
+  switch (tone) {
+    case "success":
+      return "操作完成";
+    case "warning":
+      return "请确认";
+    case "error":
+      return "需要处理";
+    default:
+      return "温馨提示";
   }
 }
