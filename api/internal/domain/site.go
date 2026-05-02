@@ -2,6 +2,7 @@ package domain
 
 type SiteSetting struct {
 	SiteName        string `json:"site_name"`
+	SiteIcon        string `json:"site_icon"`
 	SiteTagline     string `json:"site_tagline"`
 	HeroTitle       string `json:"hero_title"`
 	HeroDescription string `json:"hero_description"`
@@ -15,6 +16,7 @@ type SiteSetting struct {
 
 type SaveSiteSettingInput struct {
 	SiteName        string `json:"site_name"`
+	SiteIcon        string `json:"site_icon"`
 	SiteTagline     string `json:"site_tagline"`
 	HeroTitle       string `json:"hero_title"`
 	HeroDescription string `json:"hero_description"`

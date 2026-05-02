@@ -140,6 +140,7 @@ export interface CaptchaChallenge {
 
 export interface SiteSetting {
   site_name: string;
+  site_icon: string;
   site_tagline: string;
   hero_title: string;
   hero_description: string;
@@ -153,6 +154,7 @@ export interface SiteSetting {
 
 export interface SaveSiteSettingInput {
   site_name: string;
+  site_icon: string;
   site_tagline: string;
   hero_title: string;
   hero_description: string;

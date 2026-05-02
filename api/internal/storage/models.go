@@ -169,6 +169,7 @@ type LearnerUser struct {
 type SiteSetting struct {
 	ID              uint   `gorm:"primaryKey"`
 	SiteName        string `gorm:"size:120;not null"`
+	SiteIcon        string `gorm:"type:longtext"`
 	SiteTagline     string `gorm:"size:255"`
 	HeroTitle       string `gorm:"size:255;not null"`
 	HeroDescription string `gorm:"type:text"`

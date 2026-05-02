@@ -23,6 +23,7 @@ func (s *Service) SaveSiteSetting(ctx context.Context, input domain.SaveSiteSett
 	}
 
 	model.SiteName = defaultIfTrimmedBlank(input.SiteName, defaultSiteSetting().SiteName)
+	model.SiteIcon = strings.TrimSpace(input.SiteIcon)
 	model.SiteTagline = strings.TrimSpace(input.SiteTagline)
 	model.HeroTitle = defaultIfTrimmedBlank(input.HeroTitle, defaultSiteSetting().HeroTitle)
 	model.HeroDescription = defaultIfTrimmedBlank(input.HeroDescription, defaultSiteSetting().HeroDescription)
@@ -59,6 +60,7 @@ func (s *Service) ensureSiteSetting(ctx context.Context) (storage.SiteSetting, e
 func defaultSiteSetting() storage.SiteSetting {
 	return storage.SiteSetting{
 		SiteName:        "Brights 英语单词学习站",
+		SiteIcon:        "",
 		SiteTagline:     "先学真正会用到的词，再把词汇量慢慢做厚。",
 		HeroTitle:       "高频英语单词，从真实场景开始学",
 		HeroDescription: "围绕校园、日常、旅行、职场等高频场景整理常用英语单词，先学真正会遇到、会使用、会反复出现的词，再逐步扩展到更多学科和更系统的学习内容。",
@@ -74,6 +76,7 @@ func defaultSiteSetting() storage.SiteSetting {
 func toSiteSetting(model storage.SiteSetting) domain.SiteSetting {
 	return domain.SiteSetting{
 		SiteName:        model.SiteName,
+		SiteIcon:        model.SiteIcon,
 		SiteTagline:     model.SiteTagline,
 		HeroTitle:       model.HeroTitle,
 		HeroDescription: model.HeroDescription,

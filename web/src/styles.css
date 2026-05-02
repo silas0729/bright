@@ -354,6 +354,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   width: 48px;
   height: 48px;
   border-radius: 14px;
@@ -362,6 +363,12 @@ textarea {
   font-weight: 800;
   background: var(--brand);
   box-shadow: none;
+}
+
+.site-logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .site-brand strong {
@@ -1204,6 +1211,62 @@ textarea {
   gap: 10px;
 }
 
+.site-icon-field {
+  display: grid;
+  gap: 16px;
+}
+
+.site-icon-preview-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-soft);
+}
+
+.site-icon-preview-frame {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.site-icon-preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.site-icon-preview-fallback {
+  color: var(--brand);
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.site-icon-preview-meta {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.site-icon-preview-meta strong {
+  font-weight: 800;
+}
+
+.site-icon-preview-meta span {
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 0.92rem;
+}
+
 .detail-list {
   margin: 0;
   padding-left: 20px;
@@ -1330,6 +1393,11 @@ textarea {
 
   .upload-picker-action {
     width: 100%;
+  }
+
+  .site-icon-preview-card {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .toolbar-search {

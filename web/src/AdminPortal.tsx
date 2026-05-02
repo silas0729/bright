@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useState, type FormEvent } from "react";
+import { useDeferredValue, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 
 import {
   api,
@@ -32,6 +32,7 @@ type AdminSection = "dashboard" | "import" | "catalog" | "site" | "payments" | "
 
 const defaultSiteForm: SiteSetting = {
   site_name: "Brights 英语单词学习站",
+  site_icon: "",
   site_tagline: "先学真正会用到的词，再把词汇量慢慢做厚。",
   hero_title: "高频英语单词，从真实场景开始学",
   hero_description:
@@ -139,6 +140,7 @@ export default function AdminPortal() {
     description: "",
   });
   const [siteForm, setSiteForm] = useState<SiteSetting>(defaultSiteForm);
+  const [siteIconPickerKey, setSiteIconPickerKey] = useState(0);
   const [adminEditor, setAdminEditor] = useState({
     id: 0,
     username: "",
@@ -617,6 +619,11 @@ export default function AdminPortal() {
   }, [wechatPayConfig, wechatPayConfigExists]);
 
   useEffect(() => {
+    document.title = siteSettings?.site_name ? `${siteSettings.site_name} 管理后台` : "Brights 管理后台";
+    applyIconLink(siteSettings?.site_icon || "");
+  }, [siteSettings?.site_icon, siteSettings?.site_name]);
+
+  useEffect(() => {
     window.localStorage.setItem(
       adminUIStateStorageKey,
       JSON.stringify({
@@ -925,6 +932,41 @@ export default function AdminPortal() {
     } finally {
       setBusyAction("");
     }
+  }
+
+  async function handleSiteIconSelected(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) {
+      return;
+    }
+
+    const normalizedName = file.name.toLowerCase();
+    const isAllowedImage =
+      file.type.startsWith("image/") ||
+      normalizedName.endsWith(".ico") ||
+      normalizedName.endsWith(".png") ||
+      normalizedName.endsWith(".svg") ||
+      normalizedName.endsWith(".jpg") ||
+      normalizedName.endsWith(".jpeg") ||
+      normalizedName.endsWith(".webp");
+
+    if (!isAllowedImage) {
+      setDataError("站点图标只支持 ico、png、svg、jpg、jpeg、webp 图片。");
+      return;
+    }
+
+    setDataError("");
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setSiteForm((current) => ({ ...current, site_icon: dataUrl }));
+    } catch {
+      setDataError("站点图标读取失败，请换一个文件再试。");
+    }
+  }
+
+  function handleClearSiteIcon() {
+    setSiteForm((current) => ({ ...current, site_icon: "" }));
+    setSiteIconPickerKey((current) => current + 1);
   }
 
   async function handleSaveSiteSettings(event: FormEvent<HTMLFormElement>) {
@@ -1519,7 +1561,13 @@ export default function AdminPortal() {
       <header className="admin-topbar">
         <div className="admin-topbar-left">
           <div className="site-brand">
-            <span className="site-logo">B</span>
+            <span className="site-logo">
+              {siteSettings?.site_icon ? (
+                <img alt={`${siteSettings.site_name} 图标`} className="site-logo-image" src={siteSettings.site_icon} />
+              ) : (
+                "B"
+              )}
+            </span>
             <div>
               <strong>{siteSettings?.site_name || "Brights 管理后台"}</strong>
               <p>内容上架、收费运营与学员服务中心</p>
@@ -1870,6 +1918,35 @@ export default function AdminPortal() {
                   </form>
                 </article>
               </div>
+
+              <article className="content-card">
+                <div className="section-toolbar">
+                  <h2>已开通科目</h2>
+                </div>
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>科目名称</th>
+                        <th>科目编码</th>
+                        <th>前台优先展示</th>
+                        <th>科目说明</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {subjects.map((subject) => (
+                        <tr key={subject.key}>
+                          <td>{subject.name}</td>
+                          <td>{subject.key}</td>
+                          <td>{subject.featured ? "是" : "否"}</td>
+                          <td>{subject.description || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {subjects.length === 0 ? <div className="feedback-banner">当前还没有开通任何学习科目。</div> : null}
+                </div>
+              </article>
             </section>
           ) : null}
 
@@ -1992,6 +2069,48 @@ export default function AdminPortal() {
                   <h2>前台基础信息</h2>
                   <form className="setup-form" onSubmit={handleSaveSiteSettings}>
                     <label className="form-field">
+                      <span>网站图标</span>
+                      <div className="site-icon-field">
+                        <label className={`upload-picker ${siteForm.site_icon ? "upload-picker-ready" : ""}`}>
+                          <input
+                            accept="image/png,image/x-icon,image/svg+xml,image/jpeg,image/webp,.ico"
+                            className="upload-picker-input"
+                            disabled={!canManageSiteSettings}
+                            key={siteIconPickerKey}
+                            onChange={(event) => {
+                              void handleSiteIconSelected(event);
+                            }}
+                            type="file"
+                          />
+                          <div className="upload-picker-main">
+                            <div className="upload-picker-meta">
+                              <strong>{siteForm.site_icon ? "已上传网站图标" : "上传网站图标"}</strong>
+                              <span>建议使用正方形 ico、png 或 svg，小图标会同时用于浏览器标签页和站点品牌标识。</span>
+                            </div>
+                            <span className="upload-picker-action">{siteForm.site_icon ? "重新上传" : "选择图标"}</span>
+                          </div>
+                        </label>
+                        <div className="site-icon-preview-card">
+                          <div className="site-icon-preview-frame">
+                            {siteForm.site_icon ? (
+                              <img alt="网站图标预览" className="site-icon-preview-image" src={siteForm.site_icon} />
+                            ) : (
+                              <span className="site-icon-preview-fallback">B</span>
+                            )}
+                          </div>
+                          <div className="site-icon-preview-meta">
+                            <strong>{siteForm.site_icon ? "当前图标预览" : "暂未上传图标"}</strong>
+                            <span>{siteForm.site_icon ? "保存后会同步到前台页面和浏览器标签页。" : "上传后可以让站点在浏览器标签页里更容易识别。"}</span>
+                          </div>
+                          {canManageSiteSettings && siteForm.site_icon ? (
+                            <button className="secondary-button small-button" onClick={handleClearSiteIcon} type="button">
+                              清空图标
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </label>
+                    <label className="form-field">
                       <span>站点名称</span>
                       <input
                         disabled={!canManageSiteSettings}
@@ -2111,6 +2230,11 @@ export default function AdminPortal() {
                     <div className="feedback-banner">
                       默认 SEO 已按“高频英语单词 + 场景词汇 + 会员学习 + 多学科扩展”方向预设，后续可根据你的实际内容继续优化。
                     </div>
+                    {canManageSiteSettings ? (
+                      <button className="primary-button" disabled={busyAction === "site-settings"} type="submit">
+                        {busyAction === "site-settings" ? "保存中..." : "保存搜索优化设置"}
+                      </button>
+                    ) : null}
                   </form>
                 </article>
               </div>
@@ -3229,30 +3353,53 @@ export default function AdminPortal() {
 
               <article className="content-card">
                 <h2>岗位权限模板</h2>
-                <div className="role-grid">
-                  {roles.map((role) => (
-                    <div className="role-card" key={role.key}>
-                      <div className="role-card-header">
-                        <strong>{adminRoleLabel(role.key, role.name)}</strong>
-                        <span className="pill pill-muted">{role.key}</span>
-                      </div>
-                      <p>{role.description}</p>
-                      <div className="tag-list">
-                        {role.permissions.map((permission) => (
-                          <span className="tag" key={permission} title={permission}>
-                            {permissionLabel(permission)}
-                          </span>
-                        ))}
-                      </div>
-                      {!role.system && canManageAdmins ? (
-                        <button className="secondary-button small-button" onClick={() => startEditRole(role)} type="button">
-                          调整岗位模板
-                        </button>
-                      ) : (
-                        <span className="helper-text">{role.system ? "系统内置岗位模板" : "只读"}</span>
-                      )}
-                    </div>
-                  ))}
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>岗位名称</th>
+                        <th>岗位编码</th>
+                        <th>职责说明</th>
+                        <th>权限范围</th>
+                        <th>系统内置</th>
+                        {canManageAdmins ? <th>操作</th> : null}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {roles.map((role) => (
+                        <tr key={role.key}>
+                          <td>{adminRoleLabel(role.key, role.name)}</td>
+                          <td>{role.key}</td>
+                          <td>{role.description || "-"}</td>
+                          <td>
+                            <div className="tag-list">
+                              {role.permissions.map((permission) => (
+                                <span className="tag" key={permission} title={permission}>
+                                  {permissionLabel(permission)}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td>{role.system ? "是" : "否"}</td>
+                          {canManageAdmins ? (
+                            <td>
+                              {!role.system ? (
+                                <button
+                                  className="secondary-button small-button"
+                                  onClick={() => startEditRole(role)}
+                                  type="button"
+                                >
+                                  调整模板
+                                </button>
+                              ) : (
+                                <span className="helper-text">系统内置</span>
+                              )}
+                            </td>
+                          ) : null}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </article>
             </section>
@@ -3454,6 +3601,38 @@ function formatFileSize(bytes?: number) {
     return `${(bytes / 1024).toFixed(1)} KB`;
   }
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function applyIconLink(href?: string) {
+  const normalized = (href ?? "").trim();
+  let link = document.querySelector('link[rel="icon"]') as HTMLLinkElement | null;
+  if (!link) {
+    link = document.createElement("link");
+    link.setAttribute("rel", "icon");
+    document.head.appendChild(link);
+  }
+
+  if (!normalized) {
+    link.removeAttribute("href");
+    return;
+  }
+
+  link.setAttribute("href", normalized);
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("invalid file result"));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("read file failed"));
+    reader.readAsDataURL(file);
+  });
 }
 
 function paymentStatusLabel(status?: string) {

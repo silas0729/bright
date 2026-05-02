@@ -24,6 +24,7 @@ type AuthMode = "login" | "register";
 
 const fallbackSiteSettings: SiteSetting = {
   site_name: "Brights 英语单词学习站",
+  site_icon: "",
   site_tagline: "先学真正会用到的词，再把词汇量慢慢做厚。",
   hero_title: "高频英语单词，从真实场景开始学",
   hero_description:
@@ -126,6 +127,7 @@ export default function PublicSite() {
     document.title = currentSettings.seo_title || currentSettings.site_name;
     applyMetaTag("description", currentSettings.seo_description);
     applyMetaTag("keywords", currentSettings.seo_keywords);
+    applyIconLink(currentSettings.site_icon);
   }, [currentSettings]);
 
   useEffect(() => {
@@ -581,7 +583,13 @@ export default function PublicSite() {
     <div className="site-shell">
       <header className="site-header">
         <div className="site-brand">
-          <span className="site-logo">B</span>
+          <span className="site-logo">
+            {currentSettings.site_icon ? (
+              <img alt={`${currentSettings.site_name} 图标`} className="site-logo-image" src={currentSettings.site_icon} />
+            ) : (
+              "B"
+            )}
+          </span>
           <div>
             <strong>{currentSettings.site_name}</strong>
             <p>{currentSettings.site_tagline}</p>
@@ -1195,6 +1203,23 @@ function applyMetaTag(name: string, content: string) {
     document.head.appendChild(meta);
   }
   meta.setAttribute("content", trimmed);
+}
+
+function applyIconLink(href?: string) {
+  const normalized = (href ?? "").trim();
+  let link = document.querySelector('link[rel="icon"]') as HTMLLinkElement | null;
+  if (!link) {
+    link = document.createElement("link");
+    link.setAttribute("rel", "icon");
+    document.head.appendChild(link);
+  }
+
+  if (!normalized) {
+    link.removeAttribute("href");
+    return;
+  }
+
+  link.setAttribute("href", normalized);
 }
 
 function readStoredState<T>(key: string, fallback: T): T {
