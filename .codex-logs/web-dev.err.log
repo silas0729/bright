@@ -1085,3 +1085,66 @@ AggregateError [ECONNREFUSED]:
       at async loadAndTransform (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24512:26)
       at async viteTransformMiddleware (file:///D:/ProjectCode/brights/web/node_modules/vite/dist/node/chunks/node.js:24306:20)
 [2m00:18:43[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/AdminPortal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m01:52:50[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/site/settings[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m01:52:50[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/subjects[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m01:52:50[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/auth/me[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m01:52:50[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/stats[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m01:52:50[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/plans[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m01:52:50[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/classifications?subject=english&page=1&page_size=8[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m01:52:50[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/words?subject=english&page=1&page_size=18[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m01:52:50[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/auth/captcha?scene=learner_login[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m01:52:50[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/classifications?subject=english&page=1&page_size=8[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m01:52:50[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/v1/words?subject=english&page=1&page_size=18[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m02:11:29[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mReferenceError[22m: noticeDialogToneClass is not defined
+[39m > PublicSite src/PublicSite.tsx:1526:31
+    1524 |            <section className="notice-dialog-card">
+    1525 |              <div className="notice-dialog-header">
+    1526 |                <span className={`pill ${noticeDialogToneClass(noticeDialog.tone)}`}>{noticeDialogTitleTag(noticeDialog...
+         |                                 ^
+    1527 |                <button className="secondary-button small-button" onClick={closeNoticeDialog} type="button">
+    1528 |                  关闭
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:17450:10
+ > performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:16583:34
+
+[2m02:11:29[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <PublicSite> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+

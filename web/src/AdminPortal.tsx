@@ -34,6 +34,7 @@ const unclassifiedCategoryValue = "__unclassified__";
 
 type AdminSection = "dashboard" | "import" | "catalog" | "site" | "payments" | "memberships" | "learners" | "admins";
 type ContentEditModal = "subject" | "category" | "grade" | "word" | null;
+type PanelEditModal = "plan" | "subscription" | "learner" | "admin" | "role" | null;
 type NoticeDialogTone = "info" | "success" | "error" | "warning";
 
 type ConfirmDialogState = {
@@ -106,7 +107,6 @@ export default function AdminPortal() {
   const [paymentOrders, setPaymentOrders] = useState<PagedPaymentOrders | null>(null);
   const [subscriptions, setSubscriptions] = useState<PagedSubscriptions | null>(null);
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<PaymentOrderStatus | null>(null);
-  const [selectedSubscription, setSelectedSubscription] = useState<SubscriptionStatus | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -116,6 +116,7 @@ export default function AdminPortal() {
   const [reloadKey, setReloadKey] = useState(0);
   const [activeSection, setActiveSection] = useState<AdminSection>(persistedUIState.activeSection ?? "dashboard");
   const [contentEditModal, setContentEditModal] = useState<ContentEditModal>(null);
+  const [panelEditModal, setPanelEditModal] = useState<PanelEditModal>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 
   const [setupForm, setSetupForm] = useState({
@@ -474,7 +475,6 @@ export default function AdminPortal() {
       setPaymentOrders(null);
       setSubscriptions(null);
       setSelectedOrderDetail(null);
-      setSelectedSubscription(null);
       return;
     }
 
@@ -1289,6 +1289,9 @@ export default function AdminPortal() {
       }
 
       resetPlanEditor();
+      if (panelEditModal === "plan") {
+        setPanelEditModal(null);
+      }
       setReloadKey((current) => current + 1);
     } catch (err) {
       setDataError((err as Error).message);
@@ -1348,7 +1351,7 @@ export default function AdminPortal() {
     }
   }
 
-  async function startEditSubscription(item: SubscriptionStatus) {
+async function startEditSubscription(item: SubscriptionStatus) {
     if (!token || !canViewPayments) {
       return;
     }
@@ -1356,7 +1359,6 @@ export default function AdminPortal() {
     setDataError("");
     try {
       const detail = await api.adminSubscription(token, item.id);
-      setSelectedSubscription(detail);
       setSubscriptionEditor({
         id: detail.id,
         customerRef: detail.customer_ref,
@@ -1369,6 +1371,7 @@ export default function AdminPortal() {
         currentPeriodEnd: toDateTimeLocalValue(detail.current_period_end),
         cancelledAt: toDateTimeLocalValue(detail.cancelled_at),
       });
+      setPanelEditModal("subscription");
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -1385,7 +1388,7 @@ export default function AdminPortal() {
     setDataError("");
     setNotice("");
     try {
-      const updated = await api.adminUpdateSubscription(token, subscriptionEditor.id, {
+      await api.adminUpdateSubscription(token, subscriptionEditor.id, {
         plan_key: subscriptionEditor.planKey,
         status: subscriptionEditor.status,
         auto_renew: subscriptionEditor.autoRenew,
@@ -1398,19 +1401,10 @@ export default function AdminPortal() {
         clear_current_period_end: subscriptionEditor.currentPeriodEnd === "",
         clear_cancelled_at: subscriptionEditor.cancelledAt === "",
       });
-      setSelectedSubscription(updated);
-      setSubscriptionEditor({
-        id: updated.id,
-        customerRef: updated.customer_ref,
-        planKey: updated.plan_key,
-        subjectKey: updated.subject_key,
-        status: updated.status,
-        autoRenew: updated.auto_renew,
-        startedAt: toDateTimeLocalValue(updated.started_at),
-        currentPeriodStart: toDateTimeLocalValue(updated.current_period_start),
-        currentPeriodEnd: toDateTimeLocalValue(updated.current_period_end),
-        cancelledAt: toDateTimeLocalValue(updated.cancelled_at),
-      });
+      resetSubscriptionEditor();
+      if (panelEditModal === "subscription") {
+        setPanelEditModal(null);
+      }
       setReloadKey((current) => current + 1);
       setNotice("会员服务状态已更新。");
     } catch (err) {
@@ -1473,6 +1467,9 @@ export default function AdminPortal() {
         status: learnerEditor.status,
       });
       resetLearnerEditor();
+      if (panelEditModal === "learner") {
+        setPanelEditModal(null);
+      }
       setReloadKey((current) => current + 1);
       setNotice("学员资料已更新。");
     } catch (err) {
@@ -1512,6 +1509,9 @@ export default function AdminPortal() {
         setNotice("后台账号已创建。");
       }
       resetAdminEditor();
+      if (panelEditModal === "admin") {
+        setPanelEditModal(null);
+      }
       setAdminUserPage(1);
       setReloadKey((current) => current + 1);
     } catch (err) {
@@ -1552,6 +1552,9 @@ export default function AdminPortal() {
         setNotice("岗位权限模板已创建。");
       }
       resetRoleEditor();
+      if (panelEditModal === "role") {
+        setPanelEditModal(null);
+      }
       setReloadKey((current) => current + 1);
     } catch (err) {
       setDataError((err as Error).message);
@@ -1560,7 +1563,7 @@ export default function AdminPortal() {
     }
   }
 
-  function startEditPlan(plan: Plan) {
+function startEditPlan(plan: Plan) {
     setPlanEditor({
       id: plan.id ?? 0,
       key: plan.key,
@@ -1573,6 +1576,13 @@ export default function AdminPortal() {
       features: plan.features.join("\n"),
     });
     setActiveSection("payments");
+    setPanelEditModal("plan");
+  }
+
+  function openCreatePlanModal() {
+    resetPlanEditor();
+    setActiveSection("payments");
+    setPanelEditModal("plan");
   }
 
   function startEditSubject(subject: Subject) {
@@ -1754,7 +1764,7 @@ export default function AdminPortal() {
     );
   }
 
-  function startEditLearner(item: AdminLearnerUser) {
+function startEditLearner(item: AdminLearnerUser) {
     setLearnerEditor({
       id: item.id,
       username: item.username,
@@ -1762,6 +1772,7 @@ export default function AdminPortal() {
       status: item.status,
     });
     setActiveSection("learners");
+    setPanelEditModal("learner");
   }
 
   function startEditAdminUser(item: AdminUser) {
@@ -1775,6 +1786,13 @@ export default function AdminPortal() {
       isSuper: item.is_super,
     });
     setActiveSection("admins");
+    setPanelEditModal("admin");
+  }
+
+  function openCreateAdminUserModal() {
+    resetAdminEditor();
+    setActiveSection("admins");
+    setPanelEditModal("admin");
   }
 
   function startEditRole(role: AdminRole) {
@@ -1791,6 +1809,13 @@ export default function AdminPortal() {
       sort: String(role.sort),
     });
     setActiveSection("admins");
+    setPanelEditModal("role");
+  }
+
+  function openCreateRoleModal() {
+    resetRoleEditor();
+    setActiveSection("admins");
+    setPanelEditModal("role");
   }
 
   function resetSubjectEditor() {
@@ -1860,7 +1885,6 @@ export default function AdminPortal() {
   }
 
   function resetSubscriptionEditor() {
-    setSelectedSubscription(null);
     setSubscriptionEditor({
       id: 0,
       customerRef: "",
@@ -1905,6 +1929,29 @@ export default function AdminPortal() {
       permissions: "admin.read\ncatalog.read\npayment.read\nplan.read",
       sort: "0",
     });
+  }
+
+  function closePanelEditModal() {
+    switch (panelEditModal) {
+      case "plan":
+        resetPlanEditor();
+        break;
+      case "subscription":
+        resetSubscriptionEditor();
+        break;
+      case "learner":
+        resetLearnerEditor();
+        break;
+      case "admin":
+        resetAdminEditor();
+        break;
+      case "role":
+        resetRoleEditor();
+        break;
+      default:
+        break;
+    }
+    setPanelEditModal(null);
   }
 
   if (authLoading) {
@@ -3089,107 +3136,17 @@ export default function AdminPortal() {
               </div>
 
               <div className="admin-card-grid">
-                {canManagePlans ? (
+{canManagePlans ? (
                   <article className="content-card">
-                    <h2>{planEditor.id > 0 ? "调整会员方案" : "新增会员方案"}</h2>
-                    <form className="setup-form" onSubmit={handleSavePlan}>
-                      <label className="form-field">
-                        <span>方案编码</span>
-                        <input
-                          disabled={planEditor.id > 0}
-                          value={planEditor.key}
-                          onChange={(event) => {
-                            setPlanEditor((current) => ({ ...current, key: event.target.value }));
-                          }}
-                          placeholder="english-monthly"
-                        />
-                      </label>
-                      <label className="form-field">
-                        <span>前台展示名称</span>
-                        <input
-                          value={planEditor.name}
-                          onChange={(event) => {
-                            setPlanEditor((current) => ({ ...current, name: event.target.value }));
-                          }}
-                          placeholder="英语月度会员"
-                        />
-                      </label>
-                      <div className="form-grid-two">
-                        <label className="form-field">
-                          <span>收费方式</span>
-                          <select
-                            value={planEditor.billingMode}
-                            onChange={(event) => {
-                              setPlanEditor((current) => ({ ...current, billingMode: event.target.value }));
-                            }}
-                          >
-                            <option value="monthly">按月会员</option>
-                            <option value="lifetime">一次性买断</option>
-                          </select>
-                        </label>
-                        <label className="form-field">
-                          <span>售价（元）</span>
-                          <input
-                            inputMode="decimal"
-                            value={planEditor.priceYuan}
-                            onChange={(event) => {
-                              setPlanEditor((current) => ({ ...current, priceYuan: event.target.value }));
-                            }}
-                            placeholder="19.90"
-                          />
-                        </label>
-                      </div>
-                      <label className="form-field">
-                        <span>方案说明</span>
-                        <textarea
-                          rows={3}
-                          value={planEditor.description}
-                          onChange={(event) => {
-                            setPlanEditor((current) => ({ ...current, description: event.target.value }));
-                          }}
-                        />
-                      </label>
-                      <label className="form-field">
-                        <span>收款渠道编码</span>
-                        <textarea
-                          rows={3}
-                          value={planEditor.paymentChannels}
-                          onChange={(event) => {
-                            setPlanEditor((current) => ({ ...current, paymentChannels: event.target.value }));
-                          }}
-                          placeholder={"wechat\nwechat_native"}
-                        />
-                      </label>
-                      <label className="form-field">
-                        <span>学员可获得的权益</span>
-                        <textarea
-                          rows={4}
-                          value={planEditor.features}
-                          onChange={(event) => {
-                            setPlanEditor((current) => ({ ...current, features: event.target.value }));
-                          }}
-                          placeholder={"高频词学习\n场景分类\n持续更新"}
-                        />
-                      </label>
-                      <label className="checkbox-field">
-                        <input
-                          checked={planEditor.recommended}
-                          onChange={(event) => {
-                            setPlanEditor((current) => ({ ...current, recommended: event.target.checked }));
-                          }}
-                          type="checkbox"
-                        />
-                        <span>前台标记为推荐方案</span>
-                      </label>
-                      <div className="button-row">
-                        <button className="primary-button" disabled={busyAction === "plan"} type="submit">
-                          {busyAction === "plan" ? "保存中..." : planEditor.id > 0 ? "保存方案" : "新增方案"}
-                        </button>
-                        <button className="secondary-button" onClick={resetPlanEditor} type="button">
-                          清空表单
-                        </button>
-                      </div>
-                    </form>
+                    <h2>会员方案设置</h2>
+                    <p className="helper-text">
+                      新增和修改会员方案都改为弹窗处理，方便你边看方案列表边调整，不会打断当前分页和筛选位置。
+                    </p>
+                    <div className="button-row">
+                      <button className="primary-button" onClick={openCreatePlanModal} type="button">
+                        新增会员方案
+                      </button>
+                    </div>
                   </article>
                 ) : (
                   <article className="content-card">
@@ -3582,115 +3539,9 @@ export default function AdminPortal() {
               <div className="admin-card-grid">
                 <article className="content-card">
                   <h2>调整会员状态</h2>
-                  {selectedSubscription ? (
-                    <form className="setup-form" onSubmit={handleSaveSubscription}>
-                      <div className="form-grid-two">
-                        <label className="form-field">
-                          <span>学员账号</span>
-                          <input disabled value={subscriptionEditor.customerRef} />
-                        </label>
-                        <label className="form-field">
-                          <span>所属科目</span>
-                          <input disabled value={formatSubjectLabel(subscriptionEditor.subjectKey)} />
-                        </label>
-                      </div>
-                      <div className="form-grid-two">
-                        <label className="form-field">
-                          <span>开通方案</span>
-                          <select
-                            value={subscriptionEditor.planKey}
-                            onChange={(event) => {
-                              setSubscriptionEditor((current) => ({ ...current, planKey: event.target.value }));
-                            }}
-                          >
-                            {plans.map((plan) => (
-                              <option key={plan.key} value={plan.key}>
-                                {plan.name} ({plan.key})
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="form-field">
-                          <span>服务状态</span>
-                          <select
-                            value={subscriptionEditor.status}
-                            onChange={(event) => {
-                              setSubscriptionEditor((current) => ({ ...current, status: event.target.value }));
-                            }}
-                          >
-                            <option value="active">生效中</option>
-                            <option value="pending">待生效</option>
-                            <option value="expired">已过期</option>
-                            <option value="cancelled">已取消</option>
-                          </select>
-                        </label>
-                      </div>
-                      <label className="checkbox-field">
-                        <input
-                          checked={subscriptionEditor.autoRenew}
-                          onChange={(event) => {
-                            setSubscriptionEditor((current) => ({ ...current, autoRenew: event.target.checked }));
-                          }}
-                          type="checkbox"
-                        />
-                        <span>标记为自动续费用户</span>
-                      </label>
-                      <div className="form-grid-two">
-                        <label className="form-field">
-                          <span>开通时间</span>
-                          <input
-                            type="datetime-local"
-                            value={subscriptionEditor.startedAt}
-                            onChange={(event) => {
-                              setSubscriptionEditor((current) => ({ ...current, startedAt: event.target.value }));
-                            }}
-                          />
-                        </label>
-                        <label className="form-field">
-                          <span>当前服务周期开始</span>
-                          <input
-                            type="datetime-local"
-                            value={subscriptionEditor.currentPeriodStart}
-                            onChange={(event) => {
-                              setSubscriptionEditor((current) => ({ ...current, currentPeriodStart: event.target.value }));
-                            }}
-                          />
-                        </label>
-                      </div>
-                      <div className="form-grid-two">
-                        <label className="form-field">
-                          <span>当前服务周期结束</span>
-                          <input
-                            type="datetime-local"
-                            value={subscriptionEditor.currentPeriodEnd}
-                            onChange={(event) => {
-                              setSubscriptionEditor((current) => ({ ...current, currentPeriodEnd: event.target.value }));
-                            }}
-                          />
-                        </label>
-                        <label className="form-field">
-                          <span>终止时间</span>
-                          <input
-                            type="datetime-local"
-                            value={subscriptionEditor.cancelledAt}
-                            onChange={(event) => {
-                              setSubscriptionEditor((current) => ({ ...current, cancelledAt: event.target.value }));
-                            }}
-                          />
-                        </label>
-                      </div>
-                      <div className="button-row">
-                        <button className="primary-button" disabled={busyAction === "subscription-save"} type="submit">
-                          {busyAction === "subscription-save" ? "保存中..." : "保存服务状态"}
-                        </button>
-                        <button className="secondary-button" onClick={resetSubscriptionEditor} type="button">
-                          取消调整
-                        </button>
-                      </div>
-                    </form>
-                  ) : (
-                    <p className="helper-text">从下方列表中选中一条会员记录后，就可以人工调整方案、状态和有效期。</p>
-                  )}
+                  <p className="helper-text">
+                    从下方会员记录列表点击“调整”后，会以弹窗方式修改方案、状态和有效期，方便对照当前记录处理。
+                  </p>
                 </article>
 
                 <article className="content-card">
@@ -3791,47 +3642,7 @@ export default function AdminPortal() {
               <div className="admin-card-grid">
                 <article className="content-card">
                   <h2>调整学员资料</h2>
-                  {learnerEditor.id > 0 ? (
-                    <form className="setup-form" onSubmit={handleSaveLearnerUser}>
-                      <label className="form-field">
-                        <span>学员账号</span>
-                        <input disabled value={learnerEditor.username} />
-                      </label>
-                      <label className="form-field">
-                        <span>昵称</span>
-                        <input
-                          disabled={!canManageLearners}
-                          value={learnerEditor.displayName}
-                          onChange={(event) => {
-                            setLearnerEditor((current) => ({ ...current, displayName: event.target.value }));
-                          }}
-                        />
-                      </label>
-                      <label className="form-field">
-                        <span>账号状态</span>
-                        <select
-                          disabled={!canManageLearners}
-                          value={learnerEditor.status}
-                          onChange={(event) => {
-                            setLearnerEditor((current) => ({ ...current, status: event.target.value }));
-                          }}
-                        >
-                          <option value="active">启用</option>
-                          <option value="disabled">停用</option>
-                        </select>
-                      </label>
-                      <div className="button-row">
-                        <button className="primary-button" disabled={busyAction === "learner-user"} type="submit">
-                          {busyAction === "learner-user" ? "保存中..." : "保存学员资料"}
-                        </button>
-                        <button className="secondary-button" onClick={resetLearnerEditor} type="button">
-                          取消调整
-                        </button>
-                      </div>
-                    </form>
-                  ) : (
-                    <p className="helper-text">从下方学员列表中选择一个账号后，就可以查看并调整昵称或状态。</p>
-                  )}
+                  <p className="helper-text">从下方学员列表中选择一个账号后，会弹出资料调整窗口，修改昵称或账号状态更直观。</p>
                 </article>
 
                 <article className="content-card">
@@ -3970,165 +3781,27 @@ export default function AdminPortal() {
                   </form>
                 </article>
 
-                {canManageAdmins ? (
+{canManageAdmins ? (
                   <article className="content-card">
-                    <h2>{adminEditor.id > 0 ? "调整后台账号" : "新增后台账号"}</h2>
-                    <form className="setup-form" onSubmit={handleSaveAdminUser}>
-                      <label className="form-field">
-                        <span>后台登录账号</span>
-                        <input
-                          disabled={adminEditor.id > 0}
-                          value={adminEditor.username}
-                          onChange={(event) => {
-                            setAdminEditor((current) => ({ ...current, username: event.target.value }));
-                          }}
-                          placeholder="content-manager"
-                        />
-                      </label>
-                      <label className="form-field">
-                        <span>成员姓名</span>
-                        <input
-                          value={adminEditor.displayName}
-                          onChange={(event) => {
-                            setAdminEditor((current) => ({ ...current, displayName: event.target.value }));
-                          }}
-                          placeholder="内容运营"
-                        />
-                      </label>
-                      <label className="form-field">
-                        <span>{adminEditor.id > 0 ? "重置密码（可选）" : "登录密码"}</span>
-                        <input
-                          type="password"
-                          value={adminEditor.password}
-                          onChange={(event) => {
-                            setAdminEditor((current) => ({ ...current, password: event.target.value }));
-                          }}
-                          placeholder="至少 8 位"
-                        />
-                      </label>
-                      <div className="form-grid-two">
-                        <label className="form-field">
-                          <span>岗位权限</span>
-                          <select
-                            value={adminEditor.role}
-                            onChange={(event) => {
-                              const nextRole = event.target.value;
-                              setAdminEditor((current) => ({
-                                ...current,
-                                role: nextRole,
-                                isSuper: nextRole === "super_admin" ? true : current.isSuper,
-                              }));
-                            }}
-                          >
-                            {roles.map((role) => (
-                              <option key={role.key} value={role.key}>
-                                {adminRoleLabel(role.key, role.name)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="form-field">
-                          <span>使用状态</span>
-                          <select
-                            value={adminEditor.status}
-                            onChange={(event) => {
-                              setAdminEditor((current) => ({ ...current, status: event.target.value }));
-                            }}
-                          >
-                            <option value="active">启用</option>
-                            <option value="disabled">停用</option>
-                          </select>
-                        </label>
-                      </div>
-                      <label className="checkbox-field">
-                        <input
-                          checked={adminEditor.isSuper}
-                          disabled={adminEditor.role === "super_admin"}
-                          onChange={(event) => {
-                            setAdminEditor((current) => ({ ...current, isSuper: event.target.checked }));
-                          }}
-                          type="checkbox"
-                        />
-                        <span>授予全站最高权限</span>
-                      </label>
-                      <div className="button-row">
-                        <button className="primary-button" disabled={busyAction === "admin-user"} type="submit">
-                          {adminEditor.id > 0 ? "保存账号调整" : "新增后台账号"}
-                        </button>
-                        <button className="secondary-button" onClick={resetAdminEditor} type="button">
-                          清空表单
-                        </button>
-                      </div>
-                    </form>
+                    <h2>后台账号管理</h2>
+                    <p className="helper-text">新增和调整后台账号都改成弹窗处理，方便你边看账号列表边分配岗位和状态。</p>
+                    <div className="button-row">
+                      <button className="primary-button" onClick={openCreateAdminUserModal} type="button">
+                        新增后台账号
+                      </button>
+                    </div>
                   </article>
                 ) : null}
 
                 {canManageAdmins ? (
                   <article className="content-card">
-                    <h2>{roleEditor.id > 0 ? "调整岗位权限模板" : "新增岗位权限模板"}</h2>
-                    <form className="setup-form" onSubmit={handleSaveRole}>
-                      <label className="form-field">
-                        <span>岗位编码</span>
-                        <input
-                          disabled={roleEditor.id > 0}
-                          value={roleEditor.key}
-                          onChange={(event) => {
-                            setRoleEditor((current) => ({ ...current, key: event.target.value }));
-                          }}
-                          placeholder="ops-manager"
-                        />
-                      </label>
-                      <label className="form-field">
-                        <span>岗位名称</span>
-                        <input
-                          value={roleEditor.name}
-                          onChange={(event) => {
-                            setRoleEditor((current) => ({ ...current, name: event.target.value }));
-                          }}
-                          placeholder="运营经理"
-                        />
-                      </label>
-                      <label className="form-field">
-                        <span>职责说明</span>
-                        <textarea
-                          rows={3}
-                          value={roleEditor.description}
-                          onChange={(event) => {
-                            setRoleEditor((current) => ({ ...current, description: event.target.value }));
-                          }}
-                        />
-                      </label>
-                      <label className="form-field">
-                        <span>显示顺序</span>
-                        <input
-                          value={roleEditor.sort}
-                          onChange={(event) => {
-                            setRoleEditor((current) => ({ ...current, sort: event.target.value }));
-                          }}
-                          placeholder="0"
-                        />
-                      </label>
-                      <label className="form-field">
-                        <span>系统权限编码</span>
-                        <textarea
-                          rows={5}
-                          value={roleEditor.permissions}
-                          onChange={(event) => {
-                            setRoleEditor((current) => ({ ...current, permissions: event.target.value }));
-                          }}
-                          placeholder={"admin.read\ncatalog.read\npayment.read\nplan.read"}
-                        />
-                      </label>
-                      <p className="helper-text">每行填写一个系统权限编码，也可以用英文逗号分隔，用来定义这个岗位能查看和能处理的范围。</p>
-                      <div className="button-row">
-                        <button className="primary-button" disabled={busyAction === "admin-role"} type="submit">
-                          {roleEditor.id > 0 ? "保存岗位模板" : "新增岗位模板"}
-                        </button>
-                        <button className="secondary-button" onClick={resetRoleEditor} type="button">
-                          清空表单
-                        </button>
-                      </div>
-                    </form>
+                    <h2>岗位模板管理</h2>
+                    <p className="helper-text">岗位职责和权限范围也统一放到弹窗里编辑，查看模板列表时不会被长表单压住页面。</p>
+                    <div className="button-row">
+                      <button className="primary-button" onClick={openCreateRoleModal} type="button">
+                        新增岗位模板
+                      </button>
+                    </div>
                   </article>
                 ) : null}
               </div>
@@ -4241,6 +3914,441 @@ export default function AdminPortal() {
                 </div>
               </article>
             </section>
+          ) : null}
+
+          {panelEditModal ? (
+            <div className="admin-edit-modal-backdrop" onClick={closePanelEditModal} role="presentation">
+              <section
+                aria-labelledby="panel-edit-modal-title"
+                aria-modal="true"
+                className="admin-edit-modal"
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
+                role="dialog"
+              >
+                <div className="admin-edit-modal-header">
+                  <div>
+                    <p className="section-eyebrow">弹窗编辑</p>
+                    <h2 id="panel-edit-modal-title">
+                      {panelEditModal === "plan" ? (planEditor.id > 0 ? "调整会员方案" : "新增会员方案") : null}
+                      {panelEditModal === "subscription" ? "调整会员服务状态" : null}
+                      {panelEditModal === "learner" ? "调整学员资料" : null}
+                      {panelEditModal === "admin" ? (adminEditor.id > 0 ? "调整后台账号" : "新增后台账号") : null}
+                      {panelEditModal === "role" ? (roleEditor.id > 0 ? "调整岗位权限模板" : "新增岗位权限模板") : null}
+                    </h2>
+                  </div>
+                  <button className="secondary-button small-button" onClick={closePanelEditModal} type="button">
+                    关闭
+                  </button>
+                </div>
+
+                {panelEditModal === "plan" ? (
+                  <form className="setup-form admin-edit-modal-form" onSubmit={handleSavePlan}>
+                    <label className="form-field">
+                      <span>方案编码</span>
+                      <input
+                        disabled={planEditor.id > 0}
+                        value={planEditor.key}
+                        onChange={(event) => {
+                          setPlanEditor((current) => ({ ...current, key: event.target.value }));
+                        }}
+                        placeholder="english-monthly"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>前台展示名称</span>
+                      <input
+                        value={planEditor.name}
+                        onChange={(event) => {
+                          setPlanEditor((current) => ({ ...current, name: event.target.value }));
+                        }}
+                        placeholder="英语月度会员"
+                      />
+                    </label>
+                    <div className="form-grid-two">
+                      <label className="form-field">
+                        <span>收费方式</span>
+                        <select
+                          value={planEditor.billingMode}
+                          onChange={(event) => {
+                            setPlanEditor((current) => ({ ...current, billingMode: event.target.value }));
+                          }}
+                        >
+                          <option value="monthly">按月会员</option>
+                          <option value="lifetime">一次性买断</option>
+                        </select>
+                      </label>
+                      <label className="form-field">
+                        <span>售价（元）</span>
+                        <input
+                          inputMode="decimal"
+                          value={planEditor.priceYuan}
+                          onChange={(event) => {
+                            setPlanEditor((current) => ({ ...current, priceYuan: event.target.value }));
+                          }}
+                          placeholder="19.90"
+                        />
+                      </label>
+                    </div>
+                    <label className="form-field">
+                      <span>方案说明</span>
+                      <textarea
+                        rows={3}
+                        value={planEditor.description}
+                        onChange={(event) => {
+                          setPlanEditor((current) => ({ ...current, description: event.target.value }));
+                        }}
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>收款渠道编码</span>
+                      <textarea
+                        rows={3}
+                        value={planEditor.paymentChannels}
+                        onChange={(event) => {
+                          setPlanEditor((current) => ({ ...current, paymentChannels: event.target.value }));
+                        }}
+                        placeholder={"wechat\nwechat_native"}
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>学员可获得的权益</span>
+                      <textarea
+                        rows={4}
+                        value={planEditor.features}
+                        onChange={(event) => {
+                          setPlanEditor((current) => ({ ...current, features: event.target.value }));
+                        }}
+                        placeholder={"高频词学习\n场景分类\n持续更新"}
+                      />
+                    </label>
+                    <label className="checkbox-field">
+                      <input
+                        checked={planEditor.recommended}
+                        onChange={(event) => {
+                          setPlanEditor((current) => ({ ...current, recommended: event.target.checked }));
+                        }}
+                        type="checkbox"
+                      />
+                      <span>前台标记为推荐方案</span>
+                    </label>
+                    <div className="button-row">
+                      <button className="primary-button" disabled={busyAction === "plan"} type="submit">
+                        {busyAction === "plan" ? "保存中..." : planEditor.id > 0 ? "保存方案" : "新增方案"}
+                      </button>
+                      <button className="secondary-button" onClick={closePanelEditModal} type="button">
+                        取消
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+
+                {panelEditModal === "subscription" ? (
+                  <form className="setup-form admin-edit-modal-form" onSubmit={handleSaveSubscription}>
+                    <div className="form-grid-two">
+                      <label className="form-field">
+                        <span>学员账号</span>
+                        <input disabled value={subscriptionEditor.customerRef} />
+                      </label>
+                      <label className="form-field">
+                        <span>所属科目</span>
+                        <input disabled value={formatSubjectLabel(subscriptionEditor.subjectKey)} />
+                      </label>
+                    </div>
+                    <div className="form-grid-two">
+                      <label className="form-field">
+                        <span>开通方案</span>
+                        <select
+                          value={subscriptionEditor.planKey}
+                          onChange={(event) => {
+                            setSubscriptionEditor((current) => ({ ...current, planKey: event.target.value }));
+                          }}
+                        >
+                          {plans.map((plan) => (
+                            <option key={plan.key} value={plan.key}>
+                              {plan.name} ({plan.key})
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="form-field">
+                        <span>服务状态</span>
+                        <select
+                          value={subscriptionEditor.status}
+                          onChange={(event) => {
+                            setSubscriptionEditor((current) => ({ ...current, status: event.target.value }));
+                          }}
+                        >
+                          <option value="active">生效中</option>
+                          <option value="pending">待生效</option>
+                          <option value="expired">已过期</option>
+                          <option value="cancelled">已取消</option>
+                        </select>
+                      </label>
+                    </div>
+                    <label className="checkbox-field">
+                      <input
+                        checked={subscriptionEditor.autoRenew}
+                        onChange={(event) => {
+                          setSubscriptionEditor((current) => ({ ...current, autoRenew: event.target.checked }));
+                        }}
+                        type="checkbox"
+                      />
+                      <span>标记为自动续费用户</span>
+                    </label>
+                    <div className="form-grid-two">
+                      <label className="form-field">
+                        <span>开通时间</span>
+                        <input
+                          type="datetime-local"
+                          value={subscriptionEditor.startedAt}
+                          onChange={(event) => {
+                            setSubscriptionEditor((current) => ({ ...current, startedAt: event.target.value }));
+                          }}
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>当前服务周期开始</span>
+                        <input
+                          type="datetime-local"
+                          value={subscriptionEditor.currentPeriodStart}
+                          onChange={(event) => {
+                            setSubscriptionEditor((current) => ({ ...current, currentPeriodStart: event.target.value }));
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <div className="form-grid-two">
+                      <label className="form-field">
+                        <span>当前服务周期结束</span>
+                        <input
+                          type="datetime-local"
+                          value={subscriptionEditor.currentPeriodEnd}
+                          onChange={(event) => {
+                            setSubscriptionEditor((current) => ({ ...current, currentPeriodEnd: event.target.value }));
+                          }}
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>终止时间</span>
+                        <input
+                          type="datetime-local"
+                          value={subscriptionEditor.cancelledAt}
+                          onChange={(event) => {
+                            setSubscriptionEditor((current) => ({ ...current, cancelledAt: event.target.value }));
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <div className="button-row">
+                      <button className="primary-button" disabled={busyAction === "subscription-save"} type="submit">
+                        {busyAction === "subscription-save" ? "保存中..." : "保存服务状态"}
+                      </button>
+                      <button className="secondary-button" onClick={closePanelEditModal} type="button">
+                        取消
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+
+                {panelEditModal === "learner" ? (
+                  <form className="setup-form admin-edit-modal-form" onSubmit={handleSaveLearnerUser}>
+                    <label className="form-field">
+                      <span>学员账号</span>
+                      <input disabled value={learnerEditor.username} />
+                    </label>
+                    <label className="form-field">
+                      <span>昵称</span>
+                      <input
+                        disabled={!canManageLearners}
+                        value={learnerEditor.displayName}
+                        onChange={(event) => {
+                          setLearnerEditor((current) => ({ ...current, displayName: event.target.value }));
+                        }}
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>账号状态</span>
+                      <select
+                        disabled={!canManageLearners}
+                        value={learnerEditor.status}
+                        onChange={(event) => {
+                          setLearnerEditor((current) => ({ ...current, status: event.target.value }));
+                        }}
+                      >
+                        <option value="active">启用</option>
+                        <option value="disabled">停用</option>
+                      </select>
+                    </label>
+                    <div className="button-row">
+                      <button className="primary-button" disabled={busyAction === "learner-user"} type="submit">
+                        {busyAction === "learner-user" ? "保存中..." : "保存学员资料"}
+                      </button>
+                      <button className="secondary-button" onClick={closePanelEditModal} type="button">
+                        取消
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+
+                {panelEditModal === "admin" ? (
+                  <form className="setup-form admin-edit-modal-form" onSubmit={handleSaveAdminUser}>
+                    <label className="form-field">
+                      <span>后台登录账号</span>
+                      <input
+                        disabled={adminEditor.id > 0}
+                        value={adminEditor.username}
+                        onChange={(event) => {
+                          setAdminEditor((current) => ({ ...current, username: event.target.value }));
+                        }}
+                        placeholder="content-manager"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>成员姓名</span>
+                      <input
+                        value={adminEditor.displayName}
+                        onChange={(event) => {
+                          setAdminEditor((current) => ({ ...current, displayName: event.target.value }));
+                        }}
+                        placeholder="内容运营"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>{adminEditor.id > 0 ? "重置密码（可选）" : "登录密码"}</span>
+                      <input
+                        type="password"
+                        value={adminEditor.password}
+                        onChange={(event) => {
+                          setAdminEditor((current) => ({ ...current, password: event.target.value }));
+                        }}
+                        placeholder="至少 8 位"
+                      />
+                    </label>
+                    <div className="form-grid-two">
+                      <label className="form-field">
+                        <span>岗位权限</span>
+                        <select
+                          value={adminEditor.role}
+                          onChange={(event) => {
+                            const nextRole = event.target.value;
+                            setAdminEditor((current) => ({
+                              ...current,
+                              role: nextRole,
+                              isSuper: nextRole === "super_admin" ? true : current.isSuper,
+                            }));
+                          }}
+                        >
+                          {roles.map((role) => (
+                            <option key={role.key} value={role.key}>
+                              {adminRoleLabel(role.key, role.name)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="form-field">
+                        <span>使用状态</span>
+                        <select
+                          value={adminEditor.status}
+                          onChange={(event) => {
+                            setAdminEditor((current) => ({ ...current, status: event.target.value }));
+                          }}
+                        >
+                          <option value="active">启用</option>
+                          <option value="disabled">停用</option>
+                        </select>
+                      </label>
+                    </div>
+                    <label className="checkbox-field">
+                      <input
+                        checked={adminEditor.isSuper}
+                        disabled={adminEditor.role === "super_admin"}
+                        onChange={(event) => {
+                          setAdminEditor((current) => ({ ...current, isSuper: event.target.checked }));
+                        }}
+                        type="checkbox"
+                      />
+                      <span>授予全站最高权限</span>
+                    </label>
+                    <div className="button-row">
+                      <button className="primary-button" disabled={busyAction === "admin-user"} type="submit">
+                        {adminEditor.id > 0 ? "保存账号调整" : "新增后台账号"}
+                      </button>
+                      <button className="secondary-button" onClick={closePanelEditModal} type="button">
+                        取消
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+
+                {panelEditModal === "role" ? (
+                  <form className="setup-form admin-edit-modal-form" onSubmit={handleSaveRole}>
+                    <label className="form-field">
+                      <span>岗位编码</span>
+                      <input
+                        disabled={roleEditor.id > 0}
+                        value={roleEditor.key}
+                        onChange={(event) => {
+                          setRoleEditor((current) => ({ ...current, key: event.target.value }));
+                        }}
+                        placeholder="ops-manager"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>岗位名称</span>
+                      <input
+                        value={roleEditor.name}
+                        onChange={(event) => {
+                          setRoleEditor((current) => ({ ...current, name: event.target.value }));
+                        }}
+                        placeholder="运营经理"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>职责说明</span>
+                      <textarea
+                        rows={3}
+                        value={roleEditor.description}
+                        onChange={(event) => {
+                          setRoleEditor((current) => ({ ...current, description: event.target.value }));
+                        }}
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>显示顺序</span>
+                      <input
+                        value={roleEditor.sort}
+                        onChange={(event) => {
+                          setRoleEditor((current) => ({ ...current, sort: event.target.value }));
+                        }}
+                        placeholder="0"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>系统权限编码</span>
+                      <textarea
+                        rows={5}
+                        value={roleEditor.permissions}
+                        onChange={(event) => {
+                          setRoleEditor((current) => ({ ...current, permissions: event.target.value }));
+                        }}
+                        placeholder={"admin.read\ncatalog.read\npayment.read\nplan.read"}
+                      />
+                    </label>
+                    <p className="helper-text">每行填写一个系统权限编码，也可以用英文逗号分隔，用来定义这个岗位能查看和能处理的范围。</p>
+                    <div className="button-row">
+                      <button className="primary-button" disabled={busyAction === "admin-role"} type="submit">
+                        {roleEditor.id > 0 ? "保存岗位模板" : "新增岗位模板"}
+                      </button>
+                      <button className="secondary-button" onClick={closePanelEditModal} type="button">
+                        取消
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+              </section>
+            </div>
           ) : null}
 
           {contentEditModal ? (
