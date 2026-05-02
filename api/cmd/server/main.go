@@ -100,6 +100,9 @@ func main() {
 			}
 		}
 	}
+	if err := svc.EnsureClassificationSummaries(ctx); err != nil {
+		log.Fatal(err)
+	}
 
 	server := httpapi.NewServer(svc, authManager, userAuthManager)
 	log.Printf("brights api listening on %s", cfg.App.Addr)

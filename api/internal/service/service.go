@@ -804,29 +804,151 @@ func (s *Service) ListWords(ctx context.Context, filter domain.WordFilter) (doma
 	}, nil
 }
 
-func (s *Service) ListClassificationStats(ctx context.Context, subjectKey string) ([]domain.ClassificationStat, error) {
-	query := s.db.WithContext(ctx).Table("words").
-		Select("COALESCE(categories.name, ?) AS name, COUNT(words.id) AS count", "Unclassified").
-		Joins("LEFT JOIN categories ON categories.id = words.category_id")
+func (s *Service) ListClassificationStatsPaged(ctx context.Context, filter domain.ClassificationStatFilter) (domain.PagedClassificationStats, error) {
+	page, pageSize := normalizePage(filter.Page, filter.PageSize, 8)
+	var subjectID uint
+	if strings.TrimSpace(filter.SubjectKey) != "" {
+		subject, err := s.ensureSubject(ctx, filter.SubjectKey)
+		if err != nil {
+			return domain.PagedClassificationStats{}, err
+		}
+		subjectID = subject.ID
+	}
 
-	if strings.TrimSpace(subjectKey) != "" {
-		query = query.Joins("JOIN subjects ON subjects.id = words.subject_id").Where("subjects.subject_key = ?", strings.TrimSpace(subjectKey))
+	if subjectID > 0 {
+		var summaryCount int64
+		if err := s.db.WithContext(ctx).Model(&storage.ClassificationSummary{}).
+			Where("subject_id = ?", subjectID).
+			Count(&summaryCount).Error; err != nil {
+			return domain.PagedClassificationStats{}, err
+		}
+		if summaryCount == 0 {
+			if err := s.refreshClassificationSummariesForSubject(ctx, subjectID); err != nil {
+				return domain.PagedClassificationStats{}, err
+			}
+		}
+	}
+
+	query := s.db.WithContext(ctx).Model(&storage.ClassificationSummary{})
+	if subjectID > 0 {
+		query = query.Where("subject_id = ?", subjectID)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return domain.PagedClassificationStats{}, err
+	}
+
+	var models []storage.ClassificationSummary
+	if err := query.
+		Order("word_count desc").
+		Order("name asc").
+		Limit(pageSize).
+		Offset((page - 1) * pageSize).
+		Find(&models).Error; err != nil {
+		return domain.PagedClassificationStats{}, err
+	}
+
+	items := make([]domain.ClassificationStat, 0, len(models))
+	for _, model := range models {
+		items = append(items, domain.ClassificationStat{
+			Name:  model.Name,
+			Count: int(model.WordCount),
+		})
+	}
+
+	return domain.PagedClassificationStats{
+		Items:    items,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+	}, nil
+}
+
+func (s *Service) EnsureClassificationSummaries(ctx context.Context) error {
+	var subjectIDs []uint
+	if err := s.db.WithContext(ctx).
+		Model(&storage.Word{}).
+		Distinct("subject_id").
+		Order("subject_id asc").
+		Pluck("subject_id", &subjectIDs).Error; err != nil {
+		return err
+	}
+	if len(subjectIDs) == 0 {
+		return nil
+	}
+
+	var summarySubjectIDs []uint
+	if err := s.db.WithContext(ctx).
+		Model(&storage.ClassificationSummary{}).
+		Distinct("subject_id").
+		Pluck("subject_id", &summarySubjectIDs).Error; err != nil {
+		return err
+	}
+	existing := make(map[uint]struct{}, len(summarySubjectIDs))
+	for _, subjectID := range summarySubjectIDs {
+		existing[subjectID] = struct{}{}
+	}
+
+	for _, subjectID := range subjectIDs {
+		if _, ok := existing[subjectID]; ok {
+			continue
+		}
+		if err := s.refreshClassificationSummariesForSubject(ctx, subjectID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) refreshClassificationSummariesForSubject(ctx context.Context, subjectID uint) error {
+	if subjectID == 0 {
+		return nil
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return s.refreshClassificationSummariesForSubjectTx(tx, subjectID)
+	})
+}
+
+func (s *Service) refreshClassificationSummariesForSubjectTx(tx *gorm.DB, subjectID uint) error {
+	if subjectID == 0 {
+		return nil
 	}
 
 	type row struct {
-		Name  string
-		Count int
-	}
-	var rows []row
-	if err := query.Group("COALESCE(categories.name, 'Unclassified')").Order("count desc, name asc").Scan(&rows).Error; err != nil {
-		return nil, err
+		Name      string
+		WordCount int64
 	}
 
-	items := make([]domain.ClassificationStat, 0, len(rows))
-	for _, row := range rows {
-		items = append(items, domain.ClassificationStat{Name: row.Name, Count: row.Count})
+	var rows []row
+	if err := tx.
+		Table("words").
+		Joins("LEFT JOIN categories ON categories.id = words.category_id").
+		Where("words.subject_id = ?", subjectID).
+		Select("COALESCE(categories.name, 'Unclassified') AS name, COUNT(words.id) AS word_count").
+		Group("COALESCE(categories.name, 'Unclassified')").
+		Scan(&rows).Error; err != nil {
+		return err
 	}
-	return items, nil
+
+	if err := tx.Where("subject_id = ?", subjectID).Delete(&storage.ClassificationSummary{}).Error; err != nil {
+		return err
+	}
+
+	if len(rows) == 0 {
+		return nil
+	}
+
+	summaries := make([]storage.ClassificationSummary, 0, len(rows))
+	for _, row := range rows {
+		summaries = append(summaries, storage.ClassificationSummary{
+			SubjectID: subjectID,
+			Name:      row.Name,
+			WordCount: row.WordCount,
+		})
+	}
+	return tx.CreateInBatches(summaries, 100).Error
 }
 
 func (s *Service) Stats(ctx context.Context) (domain.CatalogStats, error) {
@@ -881,6 +1003,52 @@ func (s *Service) CreateSubject(ctx context.Context, input domain.CreateSubjectI
 	return toSubject(model), nil
 }
 
+func (s *Service) UpdateSubject(ctx context.Context, id uint, input domain.UpdateSubjectInput) (domain.Subject, error) {
+	if id == 0 {
+		return domain.Subject{}, errors.New("subject id is required")
+	}
+
+	var model storage.Subject
+	if err := s.db.WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.Subject{}, errors.New("subject does not exist")
+		}
+		return domain.Subject{}, err
+	}
+
+	nextKey := normalizeKey(input.Key)
+	nextName := strings.TrimSpace(input.Name)
+	if nextKey == "" || nextName == "" {
+		return domain.Subject{}, errors.New("subject key and name are required")
+	}
+
+	oldKey := model.Key
+	model.Key = nextKey
+	model.Name = nextName
+	model.Description = strings.TrimSpace(input.Description)
+	model.Sort = input.Sort
+	model.Featured = input.Featured
+
+	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&model).Error; err != nil {
+			return err
+		}
+		if oldKey != nextKey {
+			if err := tx.Model(&storage.PaymentOrder{}).Where("subject_key = ?", oldKey).Update("subject_key", nextKey).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&storage.MemberSubscription{}).Where("subject_key = ?", oldKey).Update("subject_key", nextKey).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return domain.Subject{}, err
+	}
+
+	return toSubject(model), nil
+}
+
 func (s *Service) CreateCategory(ctx context.Context, input domain.CreateCategoryInput) (domain.Category, error) {
 	subject, err := s.resolveSubject(ctx, input.SubjectID, input.SubjectKey)
 	if err != nil {
@@ -918,6 +1086,79 @@ func (s *Service) CreateCategory(ctx context.Context, input domain.CreateCategor
 	return toCategory(model, subject.Key), nil
 }
 
+func (s *Service) UpdateCategory(ctx context.Context, id uint, input domain.UpdateCategoryInput) (domain.Category, error) {
+	if id == 0 {
+		return domain.Category{}, errors.New("category id is required")
+	}
+
+	var model storage.Category
+	if err := s.db.WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.Category{}, errors.New("category does not exist")
+		}
+		return domain.Category{}, err
+	}
+
+	subject := storage.Subject{}
+	if input.SubjectID > 0 || strings.TrimSpace(input.SubjectKey) != "" {
+		resolved, err := s.resolveSubject(ctx, input.SubjectID, input.SubjectKey)
+		if err != nil {
+			return domain.Category{}, err
+		}
+		subject = resolved
+	} else {
+		if err := s.db.WithContext(ctx).Where("id = ?", model.SubjectID).First(&subject).Error; err != nil {
+			return domain.Category{}, err
+		}
+	}
+
+	kind := strings.TrimSpace(input.Kind)
+	if kind == "" {
+		kind = topicCategoryKind
+	}
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		return domain.Category{}, errors.New("category name is required")
+	}
+	key := strings.TrimSpace(input.Key)
+	if key == "" {
+		key = stableKey(name)
+	}
+
+	oldSubjectID := model.SubjectID
+	model.SubjectID = subject.ID
+	model.Kind = kind
+	model.Key = key
+	model.Name = name
+	model.Description = strings.TrimSpace(input.Description)
+	model.Sort = input.Sort
+	model.Enabled = boolOrDefault(input.Enabled, model.Enabled)
+
+	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&model).Error; err != nil {
+			return err
+		}
+		if oldSubjectID != subject.ID {
+			if err := tx.Model(&storage.Word{}).Where("category_id = ?", model.ID).Update("subject_id", subject.ID).Error; err != nil {
+				return err
+			}
+		}
+		if err := s.refreshClassificationSummariesForSubjectTx(tx, oldSubjectID); err != nil {
+			return err
+		}
+		if subject.ID != oldSubjectID {
+			if err := s.refreshClassificationSummariesForSubjectTx(tx, subject.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return domain.Category{}, err
+	}
+
+	return toCategory(model, subject.Key), nil
+}
+
 func (s *Service) CreateGrade(ctx context.Context, input domain.CreateGradeInput) (domain.Grade, error) {
 	model := storage.Grade{
 		Key:         normalizeKey(input.Key),
@@ -931,6 +1172,38 @@ func (s *Service) CreateGrade(ctx context.Context, input domain.CreateGradeInput
 		return domain.Grade{}, errors.New("grade key and name are required")
 	}
 	if err := s.db.WithContext(ctx).Create(&model).Error; err != nil {
+		return domain.Grade{}, err
+	}
+	return toGrade(model), nil
+}
+
+func (s *Service) UpdateGrade(ctx context.Context, id uint, input domain.UpdateGradeInput) (domain.Grade, error) {
+	if id == 0 {
+		return domain.Grade{}, errors.New("grade id is required")
+	}
+
+	var model storage.Grade
+	if err := s.db.WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.Grade{}, errors.New("grade does not exist")
+		}
+		return domain.Grade{}, err
+	}
+
+	nextKey := normalizeKey(input.Key)
+	nextName := strings.TrimSpace(input.Name)
+	if nextKey == "" || nextName == "" {
+		return domain.Grade{}, errors.New("grade key and name are required")
+	}
+
+	model.Key = nextKey
+	model.Name = nextName
+	model.Stage = strings.TrimSpace(input.Stage)
+	model.Description = strings.TrimSpace(input.Description)
+	model.Sort = input.Sort
+	model.Enabled = boolOrDefault(input.Enabled, model.Enabled)
+
+	if err := s.db.WithContext(ctx).Save(&model).Error; err != nil {
 		return domain.Grade{}, err
 	}
 	return toGrade(model), nil
@@ -981,7 +1254,121 @@ func (s *Service) CreateWord(ctx context.Context, input domain.CreateWordInput) 
 		Status:      "published",
 	}
 
-	if err := s.db.WithContext(ctx).Create(&model).Error; err != nil {
+	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&model).Error; err != nil {
+			return err
+		}
+		return s.refreshClassificationSummariesForSubjectTx(tx, subject.ID)
+	}); err != nil {
+		return domain.Word{}, err
+	}
+
+	if err := s.db.WithContext(ctx).
+		Preload("Subject").
+		Preload("Category").
+		Preload("Grade").
+		Where("id = ?", model.ID).
+		First(&model).Error; err != nil {
+		return domain.Word{}, err
+	}
+
+	return toWord(model), nil
+}
+
+func (s *Service) UpdateWord(ctx context.Context, id uint64, input domain.UpdateWordInput) (domain.Word, error) {
+	if id == 0 {
+		return domain.Word{}, errors.New("word id is required")
+	}
+
+	var model storage.Word
+	if err := s.db.WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.Word{}, errors.New("word does not exist")
+		}
+		return domain.Word{}, err
+	}
+
+	subject := storage.Subject{}
+	if input.SubjectID > 0 || strings.TrimSpace(input.SubjectKey) != "" {
+		resolved, err := s.resolveSubject(ctx, input.SubjectID, input.SubjectKey)
+		if err != nil {
+			return domain.Word{}, err
+		}
+		subject = resolved
+	} else {
+		if err := s.db.WithContext(ctx).Where("id = ?", model.SubjectID).First(&subject).Error; err != nil {
+			return domain.Word{}, err
+		}
+	}
+
+	term := strings.TrimSpace(input.Term)
+	if term == "" {
+		return domain.Word{}, errors.New("term is required")
+	}
+
+	var categoryID *uint
+	categoryName := strings.TrimSpace(input.CategoryName)
+	if categoryName == "" {
+		categoryName = strings.TrimSpace(input.Classification)
+	}
+	if input.CategoryID != nil && *input.CategoryID > 0 {
+		var category storage.Category
+		if err := s.db.WithContext(ctx).Where("id = ?", *input.CategoryID).First(&category).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domain.Word{}, errors.New("category does not exist")
+			}
+			return domain.Word{}, err
+		}
+		if category.SubjectID != subject.ID {
+			return domain.Word{}, errors.New("category does not belong to the selected subject")
+		}
+		categoryID = uintPtr(category.ID)
+	} else if categoryName != "" {
+		category, err := s.findOrCreateTopicCategory(ctx, subject.ID, categoryName)
+		if err != nil {
+			return domain.Word{}, err
+		}
+		categoryID = uintPtr(category.ID)
+	}
+
+	var gradeID *uint
+	if input.GradeID != nil && *input.GradeID > 0 {
+		var grade storage.Grade
+		if err := s.db.WithContext(ctx).Where("id = ?", *input.GradeID).First(&grade).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domain.Word{}, errors.New("grade does not exist")
+			}
+			return domain.Word{}, err
+		}
+		gradeID = uintPtr(grade.ID)
+	}
+
+	oldSubjectID := model.SubjectID
+	model.LegacyID = input.LegacyID
+	model.SubjectID = subject.ID
+	model.CategoryID = categoryID
+	model.GradeID = gradeID
+	model.Term = term
+	model.Translation = strings.TrimSpace(input.Translation)
+	model.SourceLabel = strings.TrimSpace(input.Source)
+	model.Phonetics = strings.TrimSpace(input.Phonetics)
+	model.Explanation = strings.TrimSpace(input.Explanation)
+	model.IsVIP = input.IsVIP
+
+	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&model).Error; err != nil {
+			return err
+		}
+		if err := s.refreshClassificationSummariesForSubjectTx(tx, oldSubjectID); err != nil {
+			return err
+		}
+		if subject.ID != oldSubjectID {
+			if err := s.refreshClassificationSummariesForSubjectTx(tx, subject.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
 		return domain.Word{}, err
 	}
 
@@ -1174,7 +1561,10 @@ func (s *Service) ImportWordsFromFile(ctx context.Context, input domain.ImportWo
 			}
 		}
 
-		return flush()
+		if err := flush(); err != nil {
+			return err
+		}
+		return s.refreshClassificationSummariesForSubjectTx(tx, subject.ID)
 	})
 
 	finishedAt := time.Now()

@@ -56,6 +56,12 @@ type ClassificationStat struct {
 	Count int    `json:"count"`
 }
 
+type ClassificationStatFilter struct {
+	SubjectKey string
+	Page       int
+	PageSize   int
+}
+
 type Plan struct {
 	ID              uint     `json:"id"`
 	Key             string   `json:"key"`
@@ -214,6 +220,13 @@ type PagedWords struct {
 	PageSize int    `json:"page_size"`
 }
 
+type PagedClassificationStats struct {
+	Items    []ClassificationStat `json:"items"`
+	Total    int64                `json:"total"`
+	Page     int                  `json:"page"`
+	PageSize int                  `json:"page_size"`
+}
+
 type PagedCategories struct {
 	Items    []Category `json:"items"`
 	Total    int64      `json:"total"`
@@ -254,7 +267,26 @@ type CreateSubjectInput struct {
 	Featured    bool   `json:"featured"`
 }
 
+type UpdateSubjectInput struct {
+	Key         string `json:"key"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Sort        int    `json:"sort"`
+	Featured    bool   `json:"featured"`
+}
+
 type CreateCategoryInput struct {
+	SubjectID   uint   `json:"subject_id"`
+	SubjectKey  string `json:"subject_key"`
+	Kind        string `json:"kind"`
+	Key         string `json:"key"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Sort        int    `json:"sort"`
+	Enabled     *bool  `json:"enabled"`
+}
+
+type UpdateCategoryInput struct {
 	SubjectID   uint   `json:"subject_id"`
 	SubjectKey  string `json:"subject_key"`
 	Kind        string `json:"kind"`
@@ -274,7 +306,32 @@ type CreateGradeInput struct {
 	Enabled     *bool  `json:"enabled"`
 }
 
+type UpdateGradeInput struct {
+	Key         string `json:"key"`
+	Name        string `json:"name"`
+	Stage       string `json:"stage"`
+	Description string `json:"description"`
+	Sort        int    `json:"sort"`
+	Enabled     *bool  `json:"enabled"`
+}
+
 type CreateWordInput struct {
+	LegacyID       int64  `json:"legacy_id"`
+	SubjectID      uint   `json:"subject_id"`
+	SubjectKey     string `json:"subject_key"`
+	CategoryID     *uint  `json:"category_id"`
+	CategoryName   string `json:"category_name"`
+	Classification string `json:"classification"`
+	GradeID        *uint  `json:"grade_id"`
+	Term           string `json:"term"`
+	Translation    string `json:"translation"`
+	Source         string `json:"source"`
+	Phonetics      string `json:"phonetics"`
+	Explanation    string `json:"explanation"`
+	IsVIP          bool   `json:"is_vip"`
+}
+
+type UpdateWordInput struct {
 	LegacyID       int64  `json:"legacy_id"`
 	SubjectID      uint   `json:"subject_id"`
 	SubjectKey     string `json:"subject_key"`

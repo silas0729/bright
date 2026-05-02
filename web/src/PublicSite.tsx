@@ -8,6 +8,7 @@ import {
   type ClassificationStat,
   type LearnerSession,
   type LearnerUser,
+  type PagedClassificationStats,
   type PagedWords,
   type PaymentOrderStatus,
   type Plan,
@@ -17,10 +18,12 @@ import {
 } from "./api";
 
 const publicPageSize = 18;
+const publicClassificationPageSize = 8;
 const publicUIStateStorageKey = "brights_public_ui_state";
 const publicSessionStorageKey = "brights_public_session";
 
 type AuthMode = "login" | "register";
+type PublicView = "home" | "profile";
 
 const fallbackSiteSettings: SiteSetting = {
   site_name: "Brights 英语单词学习站",
@@ -43,6 +46,7 @@ export default function PublicSite() {
   const persistedUIState = readStoredState<{
     subjectKey?: string;
     classification?: string;
+    classificationPage?: number;
     query?: string;
     page?: number;
   }>(publicUIStateStorageKey, {});
@@ -68,15 +72,20 @@ export default function PublicSite() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [stats, setStats] = useState<CatalogStats | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [classifications, setClassifications] = useState<ClassificationStat[]>([]);
+  const [classificationResult, setClassificationResult] = useState<PagedClassificationStats | null>(null);
   const [words, setWords] = useState<PagedWords | null>(null);
   const [subjectKey, setSubjectKey] = useState(persistedUIState.subjectKey ?? "english");
   const [classification, setClassification] = useState(persistedUIState.classification ?? "");
+  const [classificationPage, setClassificationPage] = useState(Math.max(1, persistedUIState.classificationPage ?? 1));
   const [query, setQuery] = useState(persistedUIState.query ?? "");
   const [page, setPage] = useState(Math.max(1, persistedUIState.page ?? 1));
+  const [currentHash, setCurrentHash] = useState(() => getCurrentHash());
+  const [loadingClassifications, setLoadingClassifications] = useState(false);
+  const [classificationError, setClassificationError] = useState("");
   const [loadingWords, setLoadingWords] = useState(false);
   const [error, setError] = useState("");
   const [speakingTerm, setSpeakingTerm] = useState("");
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   const [checkoutPlan, setCheckoutPlan] = useState<Plan | null>(null);
   const [checkoutCustomerRef, setCheckoutCustomerRef] = useState("");
@@ -92,8 +101,12 @@ export default function PublicSite() {
   const currentSettings = siteSettings ?? fallbackSiteSettings;
   const learnerName = currentUser?.display_name || currentUser?.username || "";
   const speechSupported = canUseBrowserSpeech();
+  const activeView: PublicView = resolvePublicView(currentHash);
+  const classifications = classificationResult?.items ?? [];
+  const classificationTotal = classificationResult?.total ?? 0;
   const speakTimerRef = useRef<number | null>(null);
   const speechTokenRef = useRef(0);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -129,6 +142,68 @@ export default function PublicSite() {
     applyMetaTag("keywords", currentSettings.seo_keywords);
     applyIconLink(currentSettings.site_icon);
   }, [currentSettings]);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setCurrentHash(getCurrentHash());
+    };
+
+    handleHashChange();
+    window.addEventListener("hashchange", handleHashChange);
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const targetId = currentHash.replace(/^#/, "");
+    window.requestAnimationFrame(() => {
+      if (!targetId || targetId === "home" || targetId === "profile" || targetId === "account") {
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        return;
+      }
+
+      const targetElement = document.getElementById(targetId);
+      if (targetElement) {
+        targetElement.scrollIntoView({ block: "start" });
+        return;
+      }
+
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+  }, [activeView, currentHash]);
+
+  useEffect(() => {
+    setAccountMenuOpen(false);
+  }, [currentHash]);
+
+  useEffect(() => {
+    if (!accountMenuOpen) {
+      return;
+    }
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (!(event.target instanceof Node)) {
+        return;
+      }
+      if (!accountMenuRef.current?.contains(event.target)) {
+        setAccountMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setAccountMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleDocumentClick);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [accountMenuOpen]);
 
   useEffect(() => {
     if (!session?.access_token) {
@@ -176,37 +251,50 @@ export default function PublicSite() {
 
   useEffect(() => {
     let active = true;
+    setLoadingClassifications(true);
+    setClassificationError("");
 
     api
-      .getClassifications(subjectKey)
-      .then((items) => {
+      .getClassifications({
+        subjectKey,
+        page: classificationPage,
+        pageSize: publicClassificationPageSize,
+      })
+      .then((result) => {
         if (!active) {
           return;
         }
-        setClassifications(items);
+        setClassificationResult(result);
       })
       .catch((err: Error) => {
         if (!active) {
           return;
         }
-        setError(err.message);
+        setClassificationError(err.message);
+      })
+      .finally(() => {
+        if (!active) {
+          return;
+        }
+        setLoadingClassifications(false);
       });
 
     return () => {
       active = false;
     };
-  }, [subjectKey]);
+  }, [classificationPage, subjectKey]);
 
   useEffect(() => {
-    if (!classification || classifications.length === 0) {
+    if (!classificationResult) {
       return;
     }
-    if (classifications.some((item) => item.name === classification)) {
+
+    const totalPages = Math.max(1, Math.ceil(classificationResult.total / Math.max(classificationResult.page_size, 1)));
+    if (classificationPage <= totalPages) {
       return;
     }
-    setClassification("");
-    setPage(1);
-  }, [classification, classifications]);
+    setClassificationPage(totalPages);
+  }, [classificationPage, classificationResult]);
 
   useEffect(() => {
     let active = true;
@@ -316,14 +404,15 @@ export default function PublicSite() {
   useEffect(() => {
     window.localStorage.setItem(
       publicUIStateStorageKey,
-      JSON.stringify({
-        subjectKey,
-        classification,
-        query,
-        page,
-      }),
+        JSON.stringify({
+          subjectKey,
+          classification,
+          classificationPage,
+          query,
+          page,
+        }),
     );
-  }, [classification, page, query, subjectKey]);
+  }, [classification, classificationPage, page, query, subjectKey]);
 
   useEffect(() => {
     if (!checkoutPlan || checkoutOrder || !currentUser) {
@@ -519,6 +608,7 @@ export default function PublicSite() {
     } catch {
       // Ignore logout request failures and clear local session anyway.
     } finally {
+      setAccountMenuOpen(false);
       clearLearnerSession();
       setSession(null);
       setCurrentUser(null);
@@ -579,10 +669,21 @@ export default function PublicSite() {
     return subjects.find((item) => item.key === key)?.name ?? key;
   };
 
+  const profileIntroTitle = currentUser ? "你的学习账号与会员安排" : "先注册学习账号，再开始持续学习";
+  const profileIntroDescription = currentUser
+    ? `你好，${learnerName}。这里集中放你的账号信息、购买入口和后续学习安排，后面扩展更多学科内容时也继续使用这一套学习身份。`
+    : "先注册一个学习账号，后面不管是购买会员、切换设备继续学，还是扩展到其他学科内容，学习记录都会跟着你的账号一起保存。";
+  const selectedSubjectLabel = formatSubjectLabel(subjectKey);
+  const classificationOnCurrentPage = classification === "" || classifications.some((item) => item.name === classification);
+  const classificationOptions: ClassificationStat[] =
+    classification !== "" && !classifications.some((item) => item.name === classification)
+      ? [{ name: classification, count: 0 }, ...classifications]
+      : classifications;
+
   return (
     <div className="site-shell">
       <header className="site-header">
-        <div className="site-brand">
+        <a className="site-brand" href="#home">
           <span className="site-logo">
             {currentSettings.site_icon ? (
               <img alt={`${currentSettings.site_name} 图标`} className="site-logo-image" src={currentSettings.site_icon} />
@@ -594,155 +695,148 @@ export default function PublicSite() {
             <strong>{currentSettings.site_name}</strong>
             <p>{currentSettings.site_tagline}</p>
           </div>
-        </div>
+        </a>
         <nav className="site-topnav">
           <a href="#catalog">词库学习</a>
           <a href="#plans">会员方案</a>
         </nav>
         <div className="site-header-actions">
-          <a className="secondary-button site-account-link" href="#account">
-            {currentUser ? "学习账号" : "注册 / 登录"}
-          </a>
-          <a className="primary-button site-header-buy" href="#plans">
-            购买会员
-          </a>
           {currentUser ? (
-            <div className="site-account-chip">
-              <div className="site-account-meta">
-                <strong>{learnerName}</strong>
-                <span>{currentUser.username}</span>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </header>
-
-      <div className="site-main">
-        <aside className="site-sidebar">
-          <section className="sidebar-card">
-            <h3>选择学习科目</h3>
-            <label className="form-field">
-              <span>正在学习</span>
-              <select
-                value={subjectKey}
-                onChange={(event) => {
-                  setSubjectKey(event.target.value);
-                  setClassification("");
-                  setPage(1);
-                }}
-              >
-                {subjects.map((subject) => (
-                  <option key={subject.key} value={subject.key}>
-                    {subject.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="form-field">
-              <span>搜索内容</span>
-              <input
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setPage(1);
-                }}
-                placeholder="搜索英文单词或中文释义"
-              />
-            </label>
-          </section>
-
-          <section className="sidebar-card">
-            <h3>场景分类</h3>
-            <div className="sidebar-list">
+            <div className="site-account-menu" ref={accountMenuRef}>
               <button
-                className={classification === "" ? "sidebar-link sidebar-link-active" : "sidebar-link"}
+                aria-controls="site-account-dropdown"
+                aria-expanded={accountMenuOpen}
+                aria-haspopup="menu"
+                className={accountMenuOpen ? "site-account-trigger site-account-trigger-open" : "site-account-trigger"}
                 onClick={() => {
-                  setClassification("");
-                  setPage(1);
+                  setAccountMenuOpen((current) => !current);
                 }}
                 type="button"
               >
-                全部分类
-                <span>{formatCount(words?.total ?? 0)}</span>
+                <div className="site-account-meta">
+                  <strong>{learnerName}</strong>
+                  <span>{currentUser.username}</span>
+                </div>
+                <span aria-hidden="true" className="site-account-caret" />
               </button>
-              {classifications.map((item) => (
-                <button
-                  className={classification === item.name ? "sidebar-link sidebar-link-active" : "sidebar-link"}
-                  key={item.name}
-                  onClick={() => {
-                    setClassification(item.name);
-                    setPage(1);
-                  }}
-                  type="button"
-                >
-                  {item.name}
-                  <span>{formatCount(item.count)}</span>
-                </button>
-              ))}
-            </div>
-          </section>
 
-          <section className="sidebar-card">
-            <h3>学习概况</h3>
-            <dl className="metric-list">
-              <div>
-                <dt>科目数量</dt>
-                <dd>{stats?.subject_count ?? 0}</dd>
-              </div>
-              <div>
-                <dt>词汇数量</dt>
-                <dd>{formatCount(stats?.word_count ?? 0)}</dd>
-              </div>
-              <div>
-                <dt>场景分类</dt>
-                <dd>{stats?.classification_count ?? 0}</dd>
-              </div>
-              <div>
-                <dt>年级维度</dt>
-                <dd>{stats?.grade_count ?? 0}</dd>
-              </div>
-            </dl>
-            <p className="sidebar-note">{currentSettings.footer_text}</p>
-          </section>
-        </aside>
-
-        <main className="site-content">
-          <section className="content-card hero-card">
-            <div>
-              <p className="section-eyebrow">{currentSettings.seo_headline || "英语高频词学习"}</p>
-              <h1>{currentSettings.hero_title}</h1>
-              <p>{currentSettings.hero_description}</p>
+              {accountMenuOpen ? (
+                <div className="site-account-dropdown" id="site-account-dropdown" role="menu">
+                  <div className="site-account-dropdown-header">
+                    <strong>{learnerName}</strong>
+                    <span>{currentUser.username}</span>
+                  </div>
+                  <div className="site-account-dropdown-links">
+                    <a
+                      className="site-account-dropdown-link"
+                      href="#profile"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                      }}
+                      role="menuitem"
+                    >
+                      进入个人中心
+                    </a>
+                    <a
+                      className="site-account-dropdown-link"
+                      href="#catalog"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                      }}
+                      role="menuitem"
+                    >
+                      返回词库学习
+                    </a>
+                    <a
+                      className="site-account-dropdown-link"
+                      href="#plans"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                      }}
+                      role="menuitem"
+                    >
+                      开通 / 续费会员
+                    </a>
+                    <button
+                      className="site-account-dropdown-link site-account-dropdown-link-danger"
+                      onClick={() => {
+                        void handleLogout();
+                      }}
+                      role="menuitem"
+                      type="button"
+                    >
+                      退出登录
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
-            <div className="hero-summary">
-              <div>
-                <strong>{formatCount(stats?.word_count ?? 0)}</strong>
-                <span>已收录单词</span>
-              </div>
-              <div>
-                <strong>{formatCount(classifications.length)}</strong>
-                <span>场景分类</span>
-              </div>
-              <div>
-                <strong>{formatCount(plans.length)}</strong>
-                <span>会员方案</span>
-              </div>
-            </div>
-          </section>
+          ) : (
+            <>
+              <a className="secondary-button site-account-link" href="#profile">
+                登录 / 注册
+              </a>
+              <a className="primary-button site-header-buy" href="#plans">
+                购买会员
+              </a>
+            </>
+          )}
+        </div>
+      </header>
 
-          <section className="content-card" id="account">
-            <div className="section-header">
-              <div>
-                <p className="section-eyebrow">学习账号</p>
-                <h2>{currentUser ? "你的学习账号" : "注册后再开始系统学习"}</h2>
+      {activeView === "profile" ? (
+        <div className="site-main site-main-profile">
+          <main className="site-content profile-page">
+            <section className="content-card profile-hero-card" id="profile">
+              <div className="section-header profile-hero-header">
+                <div>
+                  <p className="section-eyebrow">个人中心</p>
+                  <h1>{profileIntroTitle}</h1>
+                  <p className="helper-text">{profileIntroDescription}</p>
+                </div>
+                <div className="button-row">
+                  <a className="secondary-button" href="#catalog">
+                    去词库学习
+                  </a>
+                  <a className="primary-button" href="#plans">
+                    查看会员方案
+                  </a>
+                </div>
               </div>
-            </div>
 
-            <div className="account-panel-grid">
-              <div className="account-panel-summary">
+              <div className="profile-overview">
+                <div>
+                  <strong>{currentUser ? learnerName || currentUser.username : "未登录"}</strong>
+                  <span>{currentUser ? "当前学习身份" : "登录后可保存学习记录"}</span>
+                </div>
+                <div>
+                  <strong>{currentUser ? "可正常学习" : "等待注册 / 登录"}</strong>
+                  <span>账号状态</span>
+                </div>
+                <div>
+                  <strong>{selectedSubjectLabel}</strong>
+                  <span>当前学习科目</span>
+                </div>
+                <div>
+                  <strong>{plans.length > 0 ? `${plans.length} 种可选方案` : "暂未上架方案"}</strong>
+                  <span>会员购买入口</span>
+                </div>
+              </div>
+            </section>
+
+            <div className="profile-grid">
+              <section className="content-card profile-card">
+                <div className="section-header">
+                  <div>
+                    <p className="section-eyebrow">账号概览</p>
+                    <h2>{currentUser ? "学习资料和权益都跟着这个账号走" : "先准备好你的学习账号"}</h2>
+                  </div>
+                </div>
+
                 {currentUser ? (
                   <>
                     <p className="helper-text">
-                      你好，{learnerName}。你的购买记录、会员权益和后续学习进度都会绑定到这个账号，后续继续补充其他学科内容时也可以共用这一套学习身份。
+                      你的购买记录、会员权益和后续学习进度都会绑定到这个账号，后续继续补充其他学科内容时也可以共用这一套学习身份。
                     </p>
                     <dl className="metric-list">
                       <div>
@@ -754,26 +848,27 @@ export default function PublicSite() {
                         <dd>{currentUser.display_name || "-"}</dd>
                       </div>
                       <div>
-                        <dt>购买入口</dt>
-                        <dd>
-                          <a href="#plans">查看方案</a>
-                        </dd>
+                        <dt>注册时间</dt>
+                        <dd>{formatDateTime(currentUser.created_at)}</dd>
+                      </div>
+                      <div>
+                        <dt>当前学习科目</dt>
+                        <dd>{selectedSubjectLabel}</dd>
                       </div>
                     </dl>
-                    <p className="helper-text">如果你准备开通会员，可以直接从顶部导航或下方会员方案模块进入购买。</p>
                     <div className="button-row">
                       <a className="primary-button" href="#plans">
                         去看会员方案
                       </a>
-                      <button className="secondary-button" onClick={handleLogout} type="button">
-                        退出登录
-                      </button>
+                      <a className="secondary-button" href="#catalog">
+                        返回词库学习
+                      </a>
                     </div>
                   </>
                 ) : (
                   <>
                     <p className="helper-text">
-                      先注册一个学习账号，后面不管是购买会员、切换设备继续学，还是扩展到其他科目内容，学习记录都会跟着你的账号一起保存。
+                      注册之后，购买会员、切换设备继续学、后续增加其他科目内容，都会继续沿用同一个学习账号，不用重复建立新的学习身份。
                     </p>
                     <div className="tag-list">
                       <span className="tag">购买记录跟账号绑定</span>
@@ -798,9 +893,16 @@ export default function PublicSite() {
                     </div>
                   </>
                 )}
-              </div>
+              </section>
 
-              <div className="account-panel-form">
+              <section className="content-card profile-card">
+                <div className="section-header">
+                  <div>
+                    <p className="section-eyebrow">{currentUser ? "会员与服务" : authMode === "register" ? "注册账号" : "账号登录"}</p>
+                    <h2>{currentUser ? "购买后的权益会自动关联到你的账号" : authMode === "register" ? "填写资料，马上开始学习" : "输入账号信息，继续上次学习"}</h2>
+                  </div>
+                </div>
+
                 {!currentUser ? (
                   <form className="setup-form" onSubmit={handleSubmitAuth}>
                     <label className="form-field">
@@ -890,147 +992,338 @@ export default function PublicSite() {
                           ? "登录中..."
                           : authMode === "register"
                             ? "注册并开始学习"
-                            : "进入学习账号"}
+                            : "进入个人中心"}
                     </button>
                   </form>
                 ) : (
-                  <div className="account-panel-service">
+                  <div className="profile-card-body">
                     {authNotice ? <div className="feedback-banner feedback-success">{authNotice}</div> : null}
                     {authError ? <div className="feedback-banner feedback-error">{authError}</div> : null}
                     <div className="feedback-banner">
                       购买会员后，后台会直接把会员状态和有效期关联到账号 <strong>{currentUser.username}</strong>，你在前台继续学习时就能一直使用同一个账号。
                     </div>
+                    <p className="helper-text">
+                      如果你准备开通会员，可以从顶部导航、这里的按钮，或者会员方案页面进入购买；付款完成后，这个账号就是后续所有学习记录的承接入口。
+                    </p>
+                    <div className="button-row">
+                      <a className="primary-button" href="#plans">
+                        立即购买会员
+                      </a>
+                      <a className="secondary-button" href="#catalog">
+                        返回词库学习
+                      </a>
+                    </div>
                   </div>
                 )}
-              </div>
-            </div>
-          </section>
-
-          <section className="content-card" id="catalog">
-            <div className="section-header">
-              <div>
-                <p className="section-eyebrow">词库学习</p>
-                <h2>{classification || "全部单词"}</h2>
-                <p className="helper-text word-pronounce-tip">
-                  {speechSupported
-                    ? "点击单词即可调用浏览器朗读英文发音，再点一次同一个单词可停止。"
-                    : "当前浏览器暂不支持朗读功能，建议换用支持语音合成的现代浏览器。"}
-                </p>
-              </div>
-              <PagerControls
-                page={page}
-                total={words?.total ?? 0}
-                pageSize={words?.page_size ?? publicPageSize}
-                onChange={setPage}
-              />
+              </section>
             </div>
 
-            {error ? <div className="feedback-banner feedback-error">{error}</div> : null}
-            {loadingWords ? <div className="feedback-banner">正在加载学习内容...</div> : null}
+            <section className="content-card profile-card">
+              <div className="section-header">
+                <div>
+                  <p className="section-eyebrow">学习概况</p>
+                  <h2>当前词库与学习方向一目了然</h2>
+                </div>
+              </div>
+              <dl className="metric-list">
+                <div>
+                  <dt>科目数量</dt>
+                  <dd>{stats?.subject_count ?? 0}</dd>
+                </div>
+                <div>
+                  <dt>词汇数量</dt>
+                  <dd>{formatCount(stats?.word_count ?? 0)}</dd>
+                </div>
+                <div>
+                  <dt>场景分类</dt>
+                  <dd>{stats?.classification_count ?? 0}</dd>
+                </div>
+                <div>
+                  <dt>年级维度</dt>
+                  <dd>{stats?.grade_count ?? 0}</dd>
+                </div>
+              </dl>
+              <p className="helper-text">{currentSettings.footer_text}</p>
+            </section>
 
-            <div className="word-table-wrap">
-              <table className="word-table">
-                <thead>
-                  <tr>
-                    <th>单词</th>
-                    <th>释义</th>
-                    <th>场景</th>
-                    <th>音标</th>
-                    <th>来源</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(words?.items ?? []).map((word) => (
-                    <tr key={`${word.id}-${word.term}`}>
-                      <td>
-                        <button
-                          aria-pressed={speakingTerm === word.term}
-                          className={
-                            speakingTerm === word.term
-                              ? "word-term-button word-term-button-active"
-                              : "word-term-button"
-                          }
-                          disabled={!speechSupported}
-                          onClick={() => handleSpeakWord(word.term)}
-                          title={speechSupported ? `点击朗读 ${word.term}` : "当前浏览器暂不支持朗读"}
-                          type="button"
-                        >
-                          <span>{word.term}</span>
-                          <small>{speakingTerm === word.term ? "朗读中" : "点读"}</small>
-                        </button>
-                        {word.explanation ? <p>{word.explanation}</p> : null}
-                      </td>
-                      <td>{word.translation || "-"}</td>
-                      <td>{word.classification || "-"}</td>
-                      <td>{word.phonetics || "-"}</td>
-                      <td>{word.source || "-"}</td>
-                    </tr>
+            <section className="content-card" id="plans">
+              <div className="section-header">
+                <div>
+                  <p className="section-eyebrow">会员方案</p>
+                  <h2>选择更适合你的学习节奏</h2>
+                </div>
+              </div>
+
+              <div className="plan-table">
+                {plans.map((plan) => (
+                  <article className="plan-row" key={plan.key}>
+                    <div>
+                      <div className="plan-row-header">
+                        <h3>{plan.name}</h3>
+                        {plan.recommended ? <span className="pill pill-primary">推荐选择</span> : null}
+                      </div>
+                      <p
+                        className="plan-row-meta"
+                        data-billing-label={plan.billing_mode === "monthly" ? "按月会员" : "一次性买断"}
+                        data-payment-channels={formatPaymentChannels(plan.payment_channels)}
+                      >
+                        {plan.billing_mode}
+                      </p>
+                      <p>{plan.description}</p>
+                      <div className="tag-list">
+                        {plan.features.map((feature) => (
+                          <span className="tag" key={feature}>
+                            {feature}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="plan-row-side">
+                      <strong>{formatPrice(plan.price_cents)}</strong>
+                      <button className="primary-button" onClick={() => openCheckout(plan)} type="button">
+                        立即购买
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="content-card profile-card">
+              <div className="section-header">
+                <div>
+                  <p className="section-eyebrow">学习建议</p>
+                  <h2>先学会用得上的，再慢慢学得更广</h2>
+                </div>
+              </div>
+              <p className="helper-text">
+                {currentSettings.seo_description}
+                {currentSettings.contact_email ? ` 如需合作或内容支持，可联系：${currentSettings.contact_email}` : ""}
+              </p>
+            </section>
+          </main>
+        </div>
+      ) : (
+        <div className="site-main">
+          <aside className="site-sidebar">
+            <section className="sidebar-card">
+              <h3>选择学习科目</h3>
+              <label className="form-field">
+                <span>正在学习</span>
+                <select
+                  value={subjectKey}
+                  onChange={(event) => {
+                    setSubjectKey(event.target.value);
+                    setClassification("");
+                    setClassificationPage(1);
+                    setPage(1);
+                  }}
+                >
+                  {subjects.map((subject) => (
+                    <option key={subject.key} value={subject.key}>
+                      {subject.name}
+                    </option>
                   ))}
-                </tbody>
-              </table>
-              {!loadingWords && (words?.items ?? []).length === 0 ? (
-                <div className="feedback-banner">当前筛选条件下还没有匹配内容，换个关键词试试看。</div>
+                </select>
+              </label>
+            </section>
+
+            <section className="sidebar-card">
+              <h3>场景分类</h3>
+              {classification !== "" && !classificationOnCurrentPage ? (
+                <div className="sidebar-selection-note">当前正在学习：{classification}</div>
               ) : null}
-            </div>
-          </section>
-
-          <section className="content-card" id="plans">
-            <div className="section-header">
-              <div>
-                <p className="section-eyebrow">会员方案</p>
-                <h2>选择更适合你的学习节奏</h2>
+              <div className="sidebar-list">
+                <button
+                  className={classification === "" ? "sidebar-link sidebar-link-active" : "sidebar-link"}
+                  onClick={() => {
+                    setClassification("");
+                    setPage(1);
+                  }}
+                  type="button"
+                >
+                  全部分类
+                  <span>{formatCount(classificationTotal)}</span>
+                </button>
+                {classifications.map((item) => (
+                  <button
+                    className={classification === item.name ? "sidebar-link sidebar-link-active" : "sidebar-link"}
+                    key={item.name}
+                    onClick={() => {
+                      setClassification(item.name);
+                      setPage(1);
+                    }}
+                    type="button"
+                  >
+                    {item.name}
+                    <span>{formatCount(item.count)}</span>
+                  </button>
+                ))}
               </div>
-            </div>
+              {classificationError ? <div className="sidebar-feedback">{classificationError}</div> : null}
+              {loadingClassifications ? <div className="sidebar-feedback">正在加载分类...</div> : null}
+              <div className="sidebar-pagination">
+                <PagerControls
+                  className="pager-compact"
+                  disabled={loadingClassifications}
+                  page={classificationPage}
+                  total={classificationTotal}
+                  pageSize={classificationResult?.page_size ?? publicClassificationPageSize}
+                  onChange={setClassificationPage}
+                />
+              </div>
+            </section>
 
-            <div className="plan-table">
-              {plans.map((plan) => (
-                <article className="plan-row" key={plan.key}>
-                  <div>
-                    <div className="plan-row-header">
-                      <h3>{plan.name}</h3>
-                      {plan.recommended ? <span className="pill pill-primary">推荐选择</span> : null}
-                    </div>
-                    <p
-                      className="plan-row-meta"
-                      data-billing-label={plan.billing_mode === "monthly" ? "按月会员" : "一次性买断"}
-                      data-payment-channels={formatPaymentChannels(plan.payment_channels)}
+          </aside>
+
+          <main className="site-content">
+            <section className="content-card hero-card">
+              <div>
+                <p className="section-eyebrow">{currentSettings.seo_headline || "英语高频词学习"}</p>
+                <h1>{currentSettings.hero_title}</h1>
+                <p>{currentSettings.hero_description}</p>
+              </div>
+              <div className="hero-summary">
+                <div>
+                  <strong>{formatCount(stats?.word_count ?? 0)}</strong>
+                  <span>已收录单词</span>
+                </div>
+                <div>
+                  <strong>{formatCount(classificationTotal)}</strong>
+                  <span>场景分类</span>
+                </div>
+                <div>
+                  <strong>{formatCount(plans.length)}</strong>
+                  <span>会员方案</span>
+                </div>
+              </div>
+            </section>
+
+            <section className="content-card" id="catalog">
+              <div className="section-header">
+                <div>
+                  <p className="section-eyebrow">词库学习</p>
+                  <h2>{classification || "全部单词"}</h2>
+                  <p className="helper-text word-pronounce-tip">
+                    {speechSupported
+                      ? "点击单词即可调用浏览器朗读英文发音，再点一次同一个单词可停止。"
+                      : "当前浏览器暂不支持朗读功能，建议换用支持语音合成的现代浏览器。"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="section-toolbar catalog-toolbar">
+                <div className="catalog-toolbar-fields">
+                  <label className="form-field catalog-toolbar-field">
+                    <span>场景分类</span>
+                    <select
+                      value={classification}
+                      onChange={(event) => {
+                        setClassification(event.target.value);
+                        setPage(1);
+                      }}
                     >
-                      {plan.billing_mode}
-                    </p>
-                    <p>{plan.description}</p>
-                    <div className="tag-list">
-                      {plan.features.map((feature) => (
-                        <span className="tag" key={feature}>
-                          {feature}
-                        </span>
+                      <option value="">全部分类</option>
+                      {classificationOptions.map((item) => (
+                        <option key={item.name} value={item.name}>
+                          {item.name}
+                        </option>
                       ))}
-                    </div>
-                  </div>
-                  <div className="plan-row-side">
-                    <strong>{formatPrice(plan.price_cents)}</strong>
-                    <button className="primary-button" onClick={() => openCheckout(plan)} type="button">
-                      立即购买
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
+                    </select>
+                  </label>
 
-          <section className="content-card">
-            <div className="section-header">
-              <div>
-                <p className="section-eyebrow">学习建议</p>
-                <h2>先学会用得上的，再慢慢学得更广</h2>
+                  <label className="form-field catalog-toolbar-field catalog-toolbar-search">
+                    <span>搜索单词内容</span>
+                    <input
+                      value={query}
+                      onChange={(event) => {
+                        setQuery(event.target.value);
+                        setPage(1);
+                      }}
+                      placeholder="输入英文单词、中文释义或相关关键词"
+                    />
+                  </label>
+                </div>
+
+                <div className="catalog-toolbar-meta">
+                  <span>当前共 {formatCount(words?.total ?? 0)} 条内容</span>
+                  {(classification || query.trim()) && (
+                    <button
+                      className="secondary-button small-button"
+                      onClick={() => {
+                        setClassification("");
+                        setQuery("");
+                        setPage(1);
+                      }}
+                      type="button"
+                    >
+                      清空筛选
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-            <p className="helper-text">
-              {currentSettings.seo_description}
-              {currentSettings.contact_email ? ` 如需合作或内容支持，可联系：${currentSettings.contact_email}` : ""}
-            </p>
-          </section>
-        </main>
-      </div>
+
+              {error ? <div className="feedback-banner feedback-error">{error}</div> : null}
+              {loadingWords ? <div className="feedback-banner">正在加载学习内容...</div> : null}
+
+              <div className="word-table-wrap">
+                <table className="word-table">
+                  <thead>
+                    <tr>
+                      <th>单词</th>
+                      <th>释义</th>
+                      <th>场景</th>
+                      <th>音标</th>
+                      <th>来源</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(words?.items ?? []).map((word) => (
+                      <tr key={`${word.id}-${word.term}`}>
+                        <td>
+                          <button
+                            aria-pressed={speakingTerm === word.term}
+                            className={
+                              speakingTerm === word.term
+                                ? "word-term-button word-term-button-active"
+                                : "word-term-button"
+                            }
+                            disabled={!speechSupported}
+                            onClick={() => handleSpeakWord(word.term)}
+                            title={speechSupported ? `点击朗读 ${word.term}` : "当前浏览器暂不支持朗读"}
+                            type="button"
+                          >
+                            <span>{word.term}</span>
+                            <small>{speakingTerm === word.term ? "朗读中" : "点读"}</small>
+                          </button>
+                          {word.explanation ? <p>{word.explanation}</p> : null}
+                        </td>
+                        <td>{word.translation || "-"}</td>
+                        <td>{word.classification || "-"}</td>
+                        <td>{word.phonetics || "-"}</td>
+                        <td>{word.source || "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!loadingWords && (words?.items ?? []).length === 0 ? (
+                  <div className="feedback-banner">当前筛选条件下还没有匹配内容，换个关键词试试看。</div>
+                ) : null}
+              </div>
+
+              <div className="catalog-pagination">
+                <PagerControls
+                  page={page}
+                  total={words?.total ?? 0}
+                  pageSize={words?.page_size ?? publicPageSize}
+                  onChange={setPage}
+                />
+              </div>
+            </section>
+
+          </main>
+        </div>
+      )}
 
       {checkoutPlan ? (
         <div
@@ -1166,14 +1459,17 @@ function PagerControls(props: {
   total: number;
   pageSize: number;
   onChange: (page: number) => void;
+  className?: string;
+  disabled?: boolean;
 }) {
   const totalPages = Math.max(1, Math.ceil(props.total / Math.max(props.pageSize, 1)));
+  const pagerClassName = props.className ? `pager ${props.className}` : "pager";
 
   return (
-    <div className="pager">
+    <div className={pagerClassName}>
       <button
         className="secondary-button small-button"
-        disabled={props.page <= 1}
+        disabled={props.disabled || props.page <= 1}
         onClick={() => props.onChange(Math.max(1, props.page - 1))}
         type="button"
       >
@@ -1184,7 +1480,7 @@ function PagerControls(props: {
       </span>
       <button
         className="secondary-button small-button"
-        disabled={props.page >= totalPages}
+        disabled={props.disabled || props.page >= totalPages}
         onClick={() => props.onChange(Math.min(totalPages, props.page + 1))}
         type="button"
       >
@@ -1248,6 +1544,20 @@ function formatDateTime(value: string) {
     return "-";
   }
   return date.toLocaleString("zh-CN");
+}
+
+function getCurrentHash() {
+  if (typeof window === "undefined") {
+    return "#home";
+  }
+  return window.location.hash || "#home";
+}
+
+function resolvePublicView(hash: string): PublicView {
+  if (hash === "#profile" || hash === "#account" || hash === "#plans") {
+    return "profile";
+  }
+  return "home";
 }
 
 function canUseBrowserSpeech() {

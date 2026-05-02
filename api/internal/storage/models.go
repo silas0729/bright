@@ -99,8 +99,8 @@ type Grade struct {
 type Word struct {
 	ID          uint64 `gorm:"primaryKey"`
 	LegacyID    int64  `gorm:"index"`
-	SubjectID   uint   `gorm:"not null;index"`
-	CategoryID  *uint  `gorm:"index"`
+	SubjectID   uint   `gorm:"not null;index;index:idx_words_subject_category,priority:1"`
+	CategoryID  *uint  `gorm:"index;index:idx_words_subject_category,priority:2"`
 	GradeID     *uint  `gorm:"index"`
 	Term        string `gorm:"size:180;not null;index"`
 	Translation string `gorm:"size:255;index"`
@@ -115,6 +115,15 @@ type Word struct {
 	Subject  Subject   `gorm:"foreignKey:SubjectID"`
 	Category *Category `gorm:"foreignKey:CategoryID"`
 	Grade    *Grade    `gorm:"foreignKey:GradeID"`
+}
+
+type ClassificationSummary struct {
+	ID        uint   `gorm:"primaryKey"`
+	SubjectID uint   `gorm:"not null;index;uniqueIndex:idx_subject_classification_name,priority:1"`
+	Name      string `gorm:"size:120;not null;uniqueIndex:idx_subject_classification_name,priority:2"`
+	WordCount int64  `gorm:"not null;default:0;index"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type Plan struct {
@@ -288,6 +297,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&Category{},
 		&Grade{},
 		&Word{},
+		&ClassificationSummary{},
 		&Plan{},
 		&AdminUser{},
 		&AdminRole{},

@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useDeferredValue, useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 
 import {
   api,
@@ -8,7 +8,9 @@ import {
   type AdminSetupStatus,
   type AdminUser,
   type CaptchaChallenge,
+  type Category,
   type CatalogStats,
+  type Grade,
   type PagedAdminUsers,
   type PagedCategories,
   type PagedGrades,
@@ -22,6 +24,7 @@ import {
   type Subject,
   type SubscriptionStatus,
   type WechatPayConfig,
+  type Word,
 } from "./api";
 
 const adminPageSize = 10;
@@ -29,6 +32,7 @@ const adminSessionStorageKey = "brights_admin_session";
 const adminUIStateStorageKey = "brights_admin_ui_state";
 
 type AdminSection = "dashboard" | "import" | "catalog" | "site" | "payments" | "memberships" | "learners" | "admins";
+type ContentEditModal = "subject" | "category" | "grade" | "word" | null;
 
 const defaultSiteForm: SiteSetting = {
   site_name: "Brights 英语单词学习站",
@@ -98,6 +102,7 @@ export default function AdminPortal() {
   const [busyAction, setBusyAction] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [activeSection, setActiveSection] = useState<AdminSection>(persistedUIState.activeSection ?? "dashboard");
+  const [contentEditModal, setContentEditModal] = useState<ContentEditModal>(null);
 
   const [setupForm, setSetupForm] = useState({
     username: "",
@@ -121,23 +126,44 @@ export default function AdminPortal() {
     replace: true,
   });
   const [subjectForm, setSubjectForm] = useState({
+    id: 0,
     key: "",
     name: "",
     description: "",
+    sort: "0",
     featured: false,
   });
   const [categoryForm, setCategoryForm] = useState({
+    id: 0,
     subjectKey: "english",
     kind: "topic",
     key: "",
     name: "",
     description: "",
+    sort: "0",
+    enabled: true,
   });
   const [gradeForm, setGradeForm] = useState({
+    id: 0,
     key: "",
     name: "",
     stage: "general",
     description: "",
+    sort: "0",
+    enabled: true,
+  });
+  const [wordEditor, setWordEditor] = useState({
+    id: 0,
+    legacyId: "",
+    subjectKey: "english",
+    classification: "",
+    gradeId: "",
+    term: "",
+    translation: "",
+    source: "",
+    phonetics: "",
+    explanation: "",
+    isVIP: false,
   });
   const [siteForm, setSiteForm] = useState<SiteSetting>(defaultSiteForm);
   const [siteIconPickerKey, setSiteIconPickerKey] = useState(0);
@@ -583,6 +609,10 @@ export default function AdminPortal() {
       ...current,
       subjectKey: hasSubject(current.subjectKey) ? current.subjectKey : defaultSubjectKey,
     }));
+    setWordEditor((current) => ({
+      ...current,
+      subjectKey: hasSubject(current.subjectKey) ? current.subjectKey : defaultSubjectKey,
+    }));
   }, [subjectFilter, subjects]);
 
   useEffect(() => {
@@ -836,30 +866,53 @@ export default function AdminPortal() {
     }
   }
 
-  async function handleCreateSubject(event: FormEvent<HTMLFormElement>) {
+  async function handleSaveSubject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) {
       return;
     }
+    const nextSort = Number.parseInt(subjectForm.sort, 10) || 0;
+    const previousKey = subjectForm.id > 0 ? subjects.find((item) => item.id === subjectForm.id)?.key ?? subjectForm.key : "";
+
     setBusyAction("subject");
     setDataError("");
     setNotice("");
     try {
-      await api.adminCreateSubject(token, {
+      const payload = {
         key: subjectForm.key,
         name: subjectForm.name,
         description: subjectForm.description,
-        sort: 0,
+        sort: nextSort,
         featured: subjectForm.featured,
-      });
-      setSubjectForm({
-        key: "",
-        name: "",
-        description: "",
-        featured: false,
-      });
+      };
+
+      const saved =
+        subjectForm.id > 0
+          ? await api.adminUpdateSubject(token, subjectForm.id, payload)
+          : await api.adminCreateSubject(token, payload);
+
+      if (previousKey && subjectFilter === previousKey) {
+        setSubjectFilter(saved.key);
+      }
+      setImportForm((current) => ({
+        ...current,
+        subjectKey: current.subjectKey === previousKey ? saved.key : current.subjectKey,
+      }));
+      setCategoryForm((current) => ({
+        ...current,
+        subjectKey: current.subjectKey === previousKey ? saved.key : current.subjectKey,
+      }));
+      setWordEditor((current) => ({
+        ...current,
+        subjectKey: current.subjectKey === previousKey ? saved.key : current.subjectKey,
+      }));
+
+      resetSubjectEditor();
+      if (contentEditModal === "subject") {
+        setContentEditModal(null);
+      }
       setReloadKey((current) => current + 1);
-      setNotice("学习科目已创建。");
+      setNotice(subjectForm.id > 0 ? "学习科目已更新。" : "学习科目已创建。");
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -867,33 +920,38 @@ export default function AdminPortal() {
     }
   }
 
-  async function handleCreateCategory(event: FormEvent<HTMLFormElement>) {
+  async function handleSaveCategory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) {
       return;
     }
+    const nextSort = Number.parseInt(categoryForm.sort, 10) || 0;
     setBusyAction("category");
     setDataError("");
     setNotice("");
     try {
-      await api.adminCreateCategory(token, {
+      const payload = {
         subject_key: categoryForm.subjectKey || subjectFilter || "english",
         kind: categoryForm.kind,
         key: categoryForm.key,
         name: categoryForm.name,
         description: categoryForm.description,
-        sort: 0,
-        enabled: true,
-      });
-      setCategoryForm((current) => ({
-        ...current,
-        key: "",
-        name: "",
-        description: "",
-      }));
-      setCategoryPage(1);
+        sort: nextSort,
+        enabled: categoryForm.enabled,
+      };
+
+      if (categoryForm.id > 0) {
+        await api.adminUpdateCategory(token, categoryForm.id, payload);
+      } else {
+        await api.adminCreateCategory(token, payload);
+      }
+
+      resetCategoryEditor();
+      if (contentEditModal === "category") {
+        setContentEditModal(null);
+      }
       setReloadKey((current) => current + 1);
-      setNotice("内容分组已创建。");
+      setNotice(categoryForm.id > 0 ? "内容分组已更新。" : "内容分组已创建。");
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -901,32 +959,79 @@ export default function AdminPortal() {
     }
   }
 
-  async function handleCreateGrade(event: FormEvent<HTMLFormElement>) {
+  async function handleSaveGrade(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) {
       return;
     }
+    const nextSort = Number.parseInt(gradeForm.sort, 10) || 0;
     setBusyAction("grade");
     setDataError("");
     setNotice("");
     try {
-      await api.adminCreateGrade(token, {
+      const payload = {
         key: gradeForm.key,
         name: gradeForm.name,
         stage: gradeForm.stage,
         description: gradeForm.description,
-        sort: 0,
-        enabled: true,
-      });
-      setGradeForm({
-        key: "",
-        name: "",
-        stage: "general",
-        description: "",
-      });
-      setGradePage(1);
+        sort: nextSort,
+        enabled: gradeForm.enabled,
+      };
+
+      if (gradeForm.id > 0) {
+        await api.adminUpdateGrade(token, gradeForm.id, payload);
+      } else {
+        await api.adminCreateGrade(token, payload);
+      }
+
+      resetGradeEditor();
+      if (contentEditModal === "grade") {
+        setContentEditModal(null);
+      }
       setReloadKey((current) => current + 1);
-      setNotice("学习阶段已创建。");
+      setNotice(gradeForm.id > 0 ? "学习阶段已更新。" : "学习阶段已创建。");
+    } catch (err) {
+      setDataError((err as Error).message);
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function handleSaveWord(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+
+    setBusyAction("word");
+    setDataError("");
+    setNotice("");
+    try {
+      const payload = {
+        legacy_id: Number.parseInt(wordEditor.legacyId, 10) || 0,
+        subject_key: wordEditor.subjectKey || subjectFilter || "english",
+        classification: wordEditor.classification.trim(),
+        grade_id: wordEditor.gradeId ? Number.parseInt(wordEditor.gradeId, 10) : null,
+        term: wordEditor.term,
+        translation: wordEditor.translation,
+        source: wordEditor.source,
+        phonetics: wordEditor.phonetics,
+        explanation: wordEditor.explanation,
+        is_vip: wordEditor.isVIP,
+      };
+
+      if (wordEditor.id > 0) {
+        await api.adminUpdateWord(token, wordEditor.id, payload);
+      } else {
+        await api.adminCreateWord(token, payload);
+      }
+
+      resetWordEditor();
+      if (contentEditModal === "word") {
+        setContentEditModal(null);
+      }
+      setReloadKey((current) => current + 1);
+      setNotice(wordEditor.id > 0 ? "单词内容已更新。" : "单词内容已新增。");
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -1307,6 +1412,90 @@ export default function AdminPortal() {
     setActiveSection("payments");
   }
 
+  function startEditSubject(subject: Subject) {
+    setSubjectForm({
+      id: subject.id ?? 0,
+      key: subject.key,
+      name: subject.name,
+      description: subject.description,
+      sort: String(subject.sort ?? 0),
+      featured: subject.featured,
+    });
+    setNotice(`已载入科目「${subject.name}」，修改后保存即可生效。`);
+    setDataError("");
+    setContentEditModal("subject");
+  }
+
+  function startEditCategory(item: Category) {
+    setCategoryForm({
+      id: item.id,
+      subjectKey: item.subject_key || subjectFilter || "english",
+      kind: item.kind,
+      key: item.key,
+      name: item.name,
+      description: item.description,
+      sort: String(item.sort ?? 0),
+      enabled: item.enabled,
+    });
+    setNotice(`已载入内容分组「${item.name}」，修改后保存即可生效。`);
+    setDataError("");
+    setContentEditModal("category");
+  }
+
+  function startEditGrade(item: Grade) {
+    setGradeForm({
+      id: item.id,
+      key: item.key,
+      name: item.name,
+      stage: item.stage || "general",
+      description: item.description,
+      sort: String(item.sort ?? 0),
+      enabled: item.enabled,
+    });
+    setNotice(`已载入学习阶段「${item.name}」，修改后保存即可生效。`);
+    setDataError("");
+    setContentEditModal("grade");
+  }
+
+  function startEditWord(item: Word) {
+    setWordEditor({
+      id: item.id,
+      legacyId: item.legacy_id ? String(item.legacy_id) : "",
+      subjectKey: item.subject_key || subjectFilter || "english",
+      classification: item.category_id ? item.classification : "",
+      gradeId: item.grade_id ? String(item.grade_id) : "",
+      term: item.term,
+      translation: item.translation || "",
+      source: item.source || "",
+      phonetics: item.phonetics || "",
+      explanation: item.explanation || "",
+      isVIP: Boolean(item.is_vip),
+    });
+    setNotice(`已载入单词「${item.term}」，修改后保存即可生效。`);
+    setDataError("");
+    setContentEditModal("word");
+  }
+
+  function closeContentEditModal() {
+    switch (contentEditModal) {
+      case "subject":
+        resetSubjectEditor();
+        break;
+      case "category":
+        resetCategoryEditor();
+        break;
+      case "grade":
+        resetGradeEditor();
+        break;
+      case "word":
+        resetWordEditor();
+        break;
+      default:
+        break;
+    }
+    setContentEditModal(null);
+  }
+
   function startEditLearner(item: AdminLearnerUser) {
     setLearnerEditor({
       id: item.id,
@@ -1344,6 +1533,58 @@ export default function AdminPortal() {
       sort: String(role.sort),
     });
     setActiveSection("admins");
+  }
+
+  function resetSubjectEditor() {
+    setSubjectForm({
+      id: 0,
+      key: "",
+      name: "",
+      description: "",
+      sort: "0",
+      featured: false,
+    });
+  }
+
+  function resetCategoryEditor() {
+    setCategoryForm({
+      id: 0,
+      subjectKey: subjectFilter || subjects[0]?.key || "english",
+      kind: "topic",
+      key: "",
+      name: "",
+      description: "",
+      sort: "0",
+      enabled: true,
+    });
+  }
+
+  function resetGradeEditor() {
+    setGradeForm({
+      id: 0,
+      key: "",
+      name: "",
+      stage: "general",
+      description: "",
+      sort: "0",
+      enabled: true,
+    });
+  }
+
+  function resetWordEditor() {
+    setWordEditor({
+      id: 0,
+      legacyId: "",
+      subjectKey: subjectFilter || subjects[0]?.key || "english",
+      classification: "",
+      gradeId: "",
+      term: "",
+      translation: "",
+      source: "",
+      phonetics: "",
+      explanation: "",
+      isVIP: false,
+    });
   }
 
   function resetPlanEditor() {
@@ -1758,7 +1999,7 @@ export default function AdminPortal() {
 
                 <article className="content-card">
                   <h2>新增学习科目</h2>
-                  <form className="setup-form" onSubmit={handleCreateSubject}>
+                  <form className="setup-form" onSubmit={handleSaveSubject}>
                     <label className="form-field">
                       <span>科目编码</span>
                       <input
@@ -1777,6 +2018,17 @@ export default function AdminPortal() {
                           setSubjectForm((current) => ({ ...current, name: event.target.value }));
                         }}
                         placeholder="英语高频词汇"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>显示顺序</span>
+                      <input
+                        inputMode="numeric"
+                        value={subjectForm.sort}
+                        onChange={(event) => {
+                          setSubjectForm((current) => ({ ...current, sort: event.target.value }));
+                        }}
+                        placeholder="0"
                       />
                     </label>
                     <label className="form-field">
@@ -1799,15 +2051,20 @@ export default function AdminPortal() {
                       />
                       <span>前台优先展示这个科目</span>
                     </label>
-                    <button className="primary-button" disabled={busyAction === "subject"} type="submit">
-                      新增科目
-                    </button>
+                    <div className="button-row">
+                      <button className="primary-button" disabled={busyAction === "subject"} type="submit">
+                        {busyAction === "subject" ? "保存中..." : "新增科目"}
+                      </button>
+                      <button className="secondary-button" onClick={resetSubjectEditor} type="button">
+                        清空表单
+                      </button>
+                    </div>
                   </form>
                 </article>
 
                 <article className="content-card">
                   <h2>新增内容分组</h2>
-                  <form className="setup-form" onSubmit={handleCreateCategory}>
+                  <form className="setup-form" onSubmit={handleSaveCategory}>
                     <label className="form-field">
                       <span>归属科目</span>
                       <select
@@ -1853,6 +2110,34 @@ export default function AdminPortal() {
                         placeholder="旅行场景"
                       />
                     </label>
+                    <div className="form-grid-two">
+                      <label className="form-field">
+                        <span>显示顺序</span>
+                        <input
+                          inputMode="numeric"
+                          value={categoryForm.sort}
+                          onChange={(event) => {
+                            setCategoryForm((current) => ({ ...current, sort: event.target.value }));
+                          }}
+                          placeholder="0"
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>当前状态</span>
+                        <select
+                          value={categoryForm.enabled ? "enabled" : "disabled"}
+                          onChange={(event) => {
+                            setCategoryForm((current) => ({
+                              ...current,
+                              enabled: event.target.value === "enabled",
+                            }));
+                          }}
+                        >
+                          <option value="enabled">启用</option>
+                          <option value="disabled">停用</option>
+                        </select>
+                      </label>
+                    </div>
                     <label className="form-field">
                       <span>分组说明</span>
                       <textarea
@@ -1863,15 +2148,20 @@ export default function AdminPortal() {
                         }}
                       />
                     </label>
-                    <button className="primary-button" disabled={busyAction === "category"} type="submit">
-                      新增分组
-                    </button>
+                    <div className="button-row">
+                      <button className="primary-button" disabled={busyAction === "category"} type="submit">
+                        {busyAction === "category" ? "保存中..." : "新增分组"}
+                      </button>
+                      <button className="secondary-button" onClick={resetCategoryEditor} type="button">
+                        清空表单
+                      </button>
+                    </div>
                   </form>
                 </article>
 
                 <article className="content-card">
                   <h2>新增学习阶段</h2>
-                  <form className="setup-form" onSubmit={handleCreateGrade}>
+                  <form className="setup-form" onSubmit={handleSaveGrade}>
                     <label className="form-field">
                       <span>阶段编码</span>
                       <input
@@ -1902,6 +2192,34 @@ export default function AdminPortal() {
                         placeholder="junior"
                       />
                     </label>
+                    <div className="form-grid-two">
+                      <label className="form-field">
+                        <span>显示顺序</span>
+                        <input
+                          inputMode="numeric"
+                          value={gradeForm.sort}
+                          onChange={(event) => {
+                            setGradeForm((current) => ({ ...current, sort: event.target.value }));
+                          }}
+                          placeholder="0"
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>当前状态</span>
+                        <select
+                          value={gradeForm.enabled ? "enabled" : "disabled"}
+                          onChange={(event) => {
+                            setGradeForm((current) => ({
+                              ...current,
+                              enabled: event.target.value === "enabled",
+                            }));
+                          }}
+                        >
+                          <option value="enabled">启用</option>
+                          <option value="disabled">停用</option>
+                        </select>
+                      </label>
+                    </div>
                     <label className="form-field">
                       <span>阶段说明</span>
                       <textarea
@@ -1912,9 +2230,14 @@ export default function AdminPortal() {
                         }}
                       />
                     </label>
-                    <button className="primary-button" disabled={busyAction === "grade"} type="submit">
-                      新增阶段
-                    </button>
+                    <div className="button-row">
+                      <button className="primary-button" disabled={busyAction === "grade"} type="submit">
+                        {busyAction === "grade" ? "保存中..." : "新增阶段"}
+                      </button>
+                      <button className="secondary-button" onClick={resetGradeEditor} type="button">
+                        清空表单
+                      </button>
+                    </div>
                   </form>
                 </article>
               </div>
@@ -1929,8 +2252,10 @@ export default function AdminPortal() {
                       <tr>
                         <th>科目名称</th>
                         <th>科目编码</th>
+                        <th>显示顺序</th>
                         <th>前台优先展示</th>
                         <th>科目说明</th>
+                        <th>操作</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1938,8 +2263,14 @@ export default function AdminPortal() {
                         <tr key={subject.key}>
                           <td>{subject.name}</td>
                           <td>{subject.key}</td>
+                          <td>{subject.sort}</td>
                           <td>{subject.featured ? "是" : "否"}</td>
                           <td>{subject.description || "-"}</td>
+                          <td>
+                            <button className="secondary-button small-button" onClick={() => startEditSubject(subject)} type="button">
+                              编辑
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1959,6 +2290,141 @@ export default function AdminPortal() {
                 </div>
               </div>
 
+              <article className="content-card">
+                <h2>手动新增单词内容</h2>
+                <form className="setup-form" onSubmit={handleSaveWord}>
+                  <div className="form-grid-two">
+                    <label className="form-field">
+                      <span>所属科目</span>
+                      <select
+                        value={wordEditor.subjectKey}
+                        onChange={(event) => {
+                          setWordEditor((current) => ({ ...current, subjectKey: event.target.value }));
+                        }}
+                      >
+                        {subjects.map((subject) => (
+                          <option key={subject.key} value={subject.key}>
+                            {subject.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="form-field">
+                      <span>原始导入编号</span>
+                      <input
+                        inputMode="numeric"
+                        value={wordEditor.legacyId}
+                        onChange={(event) => {
+                          setWordEditor((current) => ({ ...current, legacyId: event.target.value }));
+                        }}
+                        placeholder="可留空"
+                      />
+                    </label>
+                  </div>
+                  <div className="form-grid-two">
+                    <label className="form-field">
+                      <span>英文单词</span>
+                      <input
+                        value={wordEditor.term}
+                        onChange={(event) => {
+                          setWordEditor((current) => ({ ...current, term: event.target.value }));
+                        }}
+                        placeholder="boarding pass"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>中文释义</span>
+                      <input
+                        value={wordEditor.translation}
+                        onChange={(event) => {
+                          setWordEditor((current) => ({ ...current, translation: event.target.value }));
+                        }}
+                        placeholder="登机牌"
+                      />
+                    </label>
+                  </div>
+                  <div className="form-grid-two">
+                    <label className="form-field">
+                      <span>内容分组</span>
+                      <input
+                        value={wordEditor.classification}
+                        onChange={(event) => {
+                          setWordEditor((current) => ({ ...current, classification: event.target.value }));
+                        }}
+                        placeholder="旅行常用英语单词"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>学习阶段</span>
+                      <select
+                        value={wordEditor.gradeId}
+                        onChange={(event) => {
+                          setWordEditor((current) => ({ ...current, gradeId: event.target.value }));
+                        }}
+                      >
+                        <option value="">暂不设置</option>
+                        {grades?.items.map((grade) => (
+                          <option key={grade.id} value={String(grade.id)}>
+                            {grade.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="form-grid-two">
+                    <label className="form-field">
+                      <span>来源备注</span>
+                      <input
+                        value={wordEditor.source}
+                        onChange={(event) => {
+                          setWordEditor((current) => ({ ...current, source: event.target.value }));
+                        }}
+                        placeholder="CSV 导入 / 运营补充"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>音标</span>
+                      <input
+                        value={wordEditor.phonetics}
+                        onChange={(event) => {
+                          setWordEditor((current) => ({ ...current, phonetics: event.target.value }));
+                        }}
+                        placeholder="/ˈbɔːrdɪŋ pæs/"
+                      />
+                    </label>
+                  </div>
+                  <label className="form-field">
+                    <span>补充说明</span>
+                    <textarea
+                      rows={3}
+                      value={wordEditor.explanation}
+                      onChange={(event) => {
+                        setWordEditor((current) => ({ ...current, explanation: event.target.value }));
+                      }}
+                      placeholder="这里可以记录例句、适用场景或运营备注。"
+                    />
+                  </label>
+                  <label className="checkbox-field">
+                    <input
+                      checked={wordEditor.isVIP}
+                      onChange={(event) => {
+                        setWordEditor((current) => ({ ...current, isVIP: event.target.checked }));
+                      }}
+                      type="checkbox"
+                    />
+                    <span>设为会员专享内容</span>
+                  </label>
+                  <div className="button-row">
+                    <button className="primary-button" disabled={busyAction === "word"} type="submit">
+                      {busyAction === "word" ? "保存中..." : "新增单词"}
+                    </button>
+                    <button className="secondary-button" onClick={resetWordEditor} type="button">
+                      清空表单
+                    </button>
+                  </div>
+                </form>
+              </article>
+
               <div className="table-section">
                 <div className="section-toolbar">
                   <h2>词库内容列表</h2>
@@ -1973,13 +2439,16 @@ export default function AdminPortal() {
                   />
                 </div>
                 <DataTable
-                  columns={["单词", "释义", "内容分组", "来源", "音标"]}
+                  columns={["单词", "释义", "内容分组", "来源", "音标", "操作"]}
                   rows={(words?.items ?? []).map((item) => [
                     item.term,
                     item.translation || "-",
-                    item.classification || "-",
+                    item.category_id ? item.classification : "未分类",
                     item.source || "-",
                     item.phonetics || "-",
+                    <button className="secondary-button small-button" onClick={() => startEditWord(item)} type="button">
+                      编辑
+                    </button>,
                   ])}
                   emptyText="当前还没有符合条件的词库内容。"
                 />
@@ -2005,12 +2474,16 @@ export default function AdminPortal() {
                   />
                 </div>
                 <DataTable
-                  columns={["名称", "分组编码", "所属科目", "分组类型"]}
+                  columns={["名称", "分组编码", "所属科目", "分组类型", "状态", "操作"]}
                   rows={(categories?.items ?? []).map((item) => [
                     item.name,
                     item.key,
-                    formatSubjectLabel(item.subject_key ?? ""),
+                    formatSubjectLabel(item.subject_key || ""),
                     item.kind,
+                    item.enabled ? "启用" : "停用",
+                    <button className="secondary-button small-button" onClick={() => startEditCategory(item)} type="button">
+                      编辑
+                    </button>,
                   ])}
                   emptyText="当前还没有符合条件的内容分组。"
                 />
@@ -2036,12 +2509,15 @@ export default function AdminPortal() {
                   />
                 </div>
                 <DataTable
-                  columns={["名称", "编码", "阶段类型", "启用"]}
+                  columns={["名称", "编码", "阶段类型", "启用", "操作"]}
                   rows={(grades?.items ?? []).map((item) => [
                     item.name,
                     item.key,
                     item.stage || "-",
                     item.enabled ? "是" : "否",
+                    <button className="secondary-button small-button" onClick={() => startEditGrade(item)} type="button">
+                      编辑
+                    </button>,
                   ])}
                   emptyText="当前还没有符合条件的学习阶段。"
                 />
@@ -3404,6 +3880,410 @@ export default function AdminPortal() {
               </article>
             </section>
           ) : null}
+
+          {contentEditModal ? (
+            <div className="admin-edit-modal-backdrop" onClick={closeContentEditModal} role="presentation">
+              <section
+                aria-labelledby="content-edit-modal-title"
+                aria-modal="true"
+                className="admin-edit-modal"
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
+                role="dialog"
+              >
+                <div className="admin-edit-modal-header">
+                  <div>
+                    <p className="section-eyebrow">当前页编辑</p>
+                    <h2 id="content-edit-modal-title">
+                      {contentEditModal === "subject" ? "编辑学习科目" : null}
+                      {contentEditModal === "category" ? "编辑内容分组" : null}
+                      {contentEditModal === "grade" ? "编辑学习阶段" : null}
+                      {contentEditModal === "word" ? "编辑单词内容" : null}
+                    </h2>
+                  </div>
+                  <button className="secondary-button small-button" onClick={closeContentEditModal} type="button">
+                    关闭
+                  </button>
+                </div>
+
+                {contentEditModal === "subject" ? (
+                  <form className="setup-form admin-edit-modal-form" onSubmit={handleSaveSubject}>
+                    <label className="form-field">
+                      <span>科目编码</span>
+                      <input
+                        value={subjectForm.key}
+                        onChange={(event) => {
+                          setSubjectForm((current) => ({ ...current, key: event.target.value }));
+                        }}
+                        placeholder="english"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>前台显示名称</span>
+                      <input
+                        value={subjectForm.name}
+                        onChange={(event) => {
+                          setSubjectForm((current) => ({ ...current, name: event.target.value }));
+                        }}
+                        placeholder="英语高频词汇"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>显示顺序</span>
+                      <input
+                        inputMode="numeric"
+                        value={subjectForm.sort}
+                        onChange={(event) => {
+                          setSubjectForm((current) => ({ ...current, sort: event.target.value }));
+                        }}
+                        placeholder="0"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>科目简介</span>
+                      <textarea
+                        rows={3}
+                        value={subjectForm.description}
+                        onChange={(event) => {
+                          setSubjectForm((current) => ({ ...current, description: event.target.value }));
+                        }}
+                      />
+                    </label>
+                    <label className="checkbox-field">
+                      <input
+                        checked={subjectForm.featured}
+                        onChange={(event) => {
+                          setSubjectForm((current) => ({ ...current, featured: event.target.checked }));
+                        }}
+                        type="checkbox"
+                      />
+                      <span>前台优先展示这个科目</span>
+                    </label>
+                    <div className="button-row">
+                      <button className="primary-button" disabled={busyAction === "subject"} type="submit">
+                        {busyAction === "subject" ? "保存中..." : "保存科目"}
+                      </button>
+                      <button className="secondary-button" onClick={closeContentEditModal} type="button">
+                        取消
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+
+                {contentEditModal === "category" ? (
+                  <form className="setup-form admin-edit-modal-form" onSubmit={handleSaveCategory}>
+                    <label className="form-field">
+                      <span>归属科目</span>
+                      <select
+                        value={categoryForm.subjectKey}
+                        onChange={(event) => {
+                          setCategoryForm((current) => ({ ...current, subjectKey: event.target.value }));
+                        }}
+                      >
+                        {subjects.map((subject) => (
+                          <option key={subject.key} value={subject.key}>
+                            {subject.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="form-field">
+                      <span>分组类型</span>
+                      <input
+                        value={categoryForm.kind}
+                        onChange={(event) => {
+                          setCategoryForm((current) => ({ ...current, kind: event.target.value }));
+                        }}
+                        placeholder="topic"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>分组编码</span>
+                      <input
+                        value={categoryForm.key}
+                        onChange={(event) => {
+                          setCategoryForm((current) => ({ ...current, key: event.target.value }));
+                        }}
+                        placeholder="travel"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>前台显示名称</span>
+                      <input
+                        value={categoryForm.name}
+                        onChange={(event) => {
+                          setCategoryForm((current) => ({ ...current, name: event.target.value }));
+                        }}
+                        placeholder="旅行场景"
+                      />
+                    </label>
+                    <div className="form-grid-two">
+                      <label className="form-field">
+                        <span>显示顺序</span>
+                        <input
+                          inputMode="numeric"
+                          value={categoryForm.sort}
+                          onChange={(event) => {
+                            setCategoryForm((current) => ({ ...current, sort: event.target.value }));
+                          }}
+                          placeholder="0"
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>当前状态</span>
+                        <select
+                          value={categoryForm.enabled ? "enabled" : "disabled"}
+                          onChange={(event) => {
+                            setCategoryForm((current) => ({
+                              ...current,
+                              enabled: event.target.value === "enabled",
+                            }));
+                          }}
+                        >
+                          <option value="enabled">启用</option>
+                          <option value="disabled">停用</option>
+                        </select>
+                      </label>
+                    </div>
+                    <label className="form-field">
+                      <span>分组说明</span>
+                      <textarea
+                        rows={3}
+                        value={categoryForm.description}
+                        onChange={(event) => {
+                          setCategoryForm((current) => ({ ...current, description: event.target.value }));
+                        }}
+                      />
+                    </label>
+                    <div className="button-row">
+                      <button className="primary-button" disabled={busyAction === "category"} type="submit">
+                        {busyAction === "category" ? "保存中..." : "保存分组"}
+                      </button>
+                      <button className="secondary-button" onClick={closeContentEditModal} type="button">
+                        取消
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+
+                {contentEditModal === "grade" ? (
+                  <form className="setup-form admin-edit-modal-form" onSubmit={handleSaveGrade}>
+                    <label className="form-field">
+                      <span>阶段编码</span>
+                      <input
+                        value={gradeForm.key}
+                        onChange={(event) => {
+                          setGradeForm((current) => ({ ...current, key: event.target.value }));
+                        }}
+                        placeholder="junior-1"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>阶段名称</span>
+                      <input
+                        value={gradeForm.name}
+                        onChange={(event) => {
+                          setGradeForm((current) => ({ ...current, name: event.target.value }));
+                        }}
+                        placeholder="初一"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>阶段类型</span>
+                      <input
+                        value={gradeForm.stage}
+                        onChange={(event) => {
+                          setGradeForm((current) => ({ ...current, stage: event.target.value }));
+                        }}
+                        placeholder="junior"
+                      />
+                    </label>
+                    <div className="form-grid-two">
+                      <label className="form-field">
+                        <span>显示顺序</span>
+                        <input
+                          inputMode="numeric"
+                          value={gradeForm.sort}
+                          onChange={(event) => {
+                            setGradeForm((current) => ({ ...current, sort: event.target.value }));
+                          }}
+                          placeholder="0"
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>当前状态</span>
+                        <select
+                          value={gradeForm.enabled ? "enabled" : "disabled"}
+                          onChange={(event) => {
+                            setGradeForm((current) => ({
+                              ...current,
+                              enabled: event.target.value === "enabled",
+                            }));
+                          }}
+                        >
+                          <option value="enabled">启用</option>
+                          <option value="disabled">停用</option>
+                        </select>
+                      </label>
+                    </div>
+                    <label className="form-field">
+                      <span>阶段说明</span>
+                      <textarea
+                        rows={3}
+                        value={gradeForm.description}
+                        onChange={(event) => {
+                          setGradeForm((current) => ({ ...current, description: event.target.value }));
+                        }}
+                      />
+                    </label>
+                    <div className="button-row">
+                      <button className="primary-button" disabled={busyAction === "grade"} type="submit">
+                        {busyAction === "grade" ? "保存中..." : "保存阶段"}
+                      </button>
+                      <button className="secondary-button" onClick={closeContentEditModal} type="button">
+                        取消
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+
+                {contentEditModal === "word" ? (
+                  <form className="setup-form admin-edit-modal-form" onSubmit={handleSaveWord}>
+                    <div className="form-grid-two">
+                      <label className="form-field">
+                        <span>所属科目</span>
+                        <select
+                          value={wordEditor.subjectKey}
+                          onChange={(event) => {
+                            setWordEditor((current) => ({ ...current, subjectKey: event.target.value }));
+                          }}
+                        >
+                          {subjects.map((subject) => (
+                            <option key={subject.key} value={subject.key}>
+                              {subject.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="form-field">
+                        <span>原始导入编号</span>
+                        <input
+                          inputMode="numeric"
+                          value={wordEditor.legacyId}
+                          onChange={(event) => {
+                            setWordEditor((current) => ({ ...current, legacyId: event.target.value }));
+                          }}
+                          placeholder="可留空"
+                        />
+                      </label>
+                    </div>
+                    <div className="form-grid-two">
+                      <label className="form-field">
+                        <span>英文单词</span>
+                        <input
+                          value={wordEditor.term}
+                          onChange={(event) => {
+                            setWordEditor((current) => ({ ...current, term: event.target.value }));
+                          }}
+                          placeholder="boarding pass"
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>中文释义</span>
+                        <input
+                          value={wordEditor.translation}
+                          onChange={(event) => {
+                            setWordEditor((current) => ({ ...current, translation: event.target.value }));
+                          }}
+                          placeholder="登机牌"
+                        />
+                      </label>
+                    </div>
+                    <div className="form-grid-two">
+                      <label className="form-field">
+                        <span>内容分组</span>
+                        <input
+                          value={wordEditor.classification}
+                          onChange={(event) => {
+                            setWordEditor((current) => ({ ...current, classification: event.target.value }));
+                          }}
+                          placeholder="旅行常用英语单词"
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>学习阶段</span>
+                        <select
+                          value={wordEditor.gradeId}
+                          onChange={(event) => {
+                            setWordEditor((current) => ({ ...current, gradeId: event.target.value }));
+                          }}
+                        >
+                          <option value="">暂不设置</option>
+                          {grades?.items.map((grade) => (
+                            <option key={grade.id} value={String(grade.id)}>
+                              {grade.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="form-grid-two">
+                      <label className="form-field">
+                        <span>来源备注</span>
+                        <input
+                          value={wordEditor.source}
+                          onChange={(event) => {
+                            setWordEditor((current) => ({ ...current, source: event.target.value }));
+                          }}
+                          placeholder="CSV 导入 / 运营补充"
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>音标</span>
+                        <input
+                          value={wordEditor.phonetics}
+                          onChange={(event) => {
+                            setWordEditor((current) => ({ ...current, phonetics: event.target.value }));
+                          }}
+                          placeholder="/ˈbɔːrdɪŋ pæs/"
+                        />
+                      </label>
+                    </div>
+                    <label className="form-field">
+                      <span>补充说明</span>
+                      <textarea
+                        rows={3}
+                        value={wordEditor.explanation}
+                        onChange={(event) => {
+                          setWordEditor((current) => ({ ...current, explanation: event.target.value }));
+                        }}
+                        placeholder="这里可以记录例句、适用场景或运营备注。"
+                      />
+                    </label>
+                    <label className="checkbox-field">
+                      <input
+                        checked={wordEditor.isVIP}
+                        onChange={(event) => {
+                          setWordEditor((current) => ({ ...current, isVIP: event.target.checked }));
+                        }}
+                        type="checkbox"
+                      />
+                      <span>设为会员专享内容</span>
+                    </label>
+                    <div className="button-row">
+                      <button className="primary-button" disabled={busyAction === "word"} type="submit">
+                        {busyAction === "word" ? "保存中..." : "保存单词"}
+                      </button>
+                      <button className="secondary-button" onClick={closeContentEditModal} type="button">
+                        取消
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+              </section>
+            </div>
+          ) : null}
         </main>
       </div>
     </div>
@@ -3420,7 +4300,7 @@ function SummaryCard(props: { label: string; value: string; help: string }) {
   );
 }
 
-function DataTable(props: { columns: string[]; rows: string[][]; emptyText: string }) {
+function DataTable(props: { columns: string[]; rows: ReactNode[][]; emptyText: string }) {
   if (props.rows.length === 0) {
     return <div className="feedback-banner">{props.emptyText}</div>;
   }

@@ -59,6 +59,13 @@ export interface PagedWords {
   page_size: number;
 }
 
+export interface PagedClassificationStats {
+  items: ClassificationStat[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 export interface PagedCategories {
   items: Category[];
   total: number;
@@ -331,7 +338,25 @@ export interface CreateSubjectInput {
   featured: boolean;
 }
 
+export interface UpdateSubjectInput {
+  key: string;
+  name: string;
+  description: string;
+  sort: number;
+  featured: boolean;
+}
+
 export interface CreateCategoryInput {
+  subject_key: string;
+  kind: string;
+  key: string;
+  name: string;
+  description: string;
+  sort: number;
+  enabled: boolean;
+}
+
+export interface UpdateCategoryInput {
   subject_key: string;
   kind: string;
   key: string;
@@ -348,6 +373,43 @@ export interface CreateGradeInput {
   description: string;
   sort: number;
   enabled: boolean;
+}
+
+export interface UpdateGradeInput {
+  key: string;
+  name: string;
+  stage: string;
+  description: string;
+  sort: number;
+  enabled: boolean;
+}
+
+export interface CreateWordInput {
+  legacy_id?: number;
+  subject_key: string;
+  classification?: string;
+  category_name?: string;
+  grade_id?: number | null;
+  term: string;
+  translation: string;
+  source: string;
+  phonetics: string;
+  explanation: string;
+  is_vip: boolean;
+}
+
+export interface UpdateWordInput {
+  legacy_id?: number;
+  subject_key: string;
+  classification?: string;
+  category_name?: string;
+  grade_id?: number | null;
+  term: string;
+  translation: string;
+  source: string;
+  phonetics: string;
+  explanation: string;
+  is_vip: boolean;
 }
 
 export interface CreateAdminUserInput {
@@ -439,10 +501,13 @@ export const api = {
   getStats() {
     return request<CatalogStats>("/api/v1/stats");
   },
-  getClassifications(subjectKey: string) {
-    return request<ClassificationStat[]>(
-      `/api/v1/classifications?subject=${encodeURIComponent(subjectKey)}`,
-    );
+  getClassifications(params: { subjectKey: string; page: number; pageSize: number }) {
+    const search = new URLSearchParams({
+      subject: params.subjectKey,
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    return request<PagedClassificationStats>(`/api/v1/classifications?${search.toString()}`);
   },
   getWords(params: {
     subjectKey: string;
@@ -692,6 +757,13 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+  adminUpdateSubject(token: string, id: number, payload: UpdateSubjectInput) {
+    return request<Subject>(`/api/v1/admin/subjects/${id}`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
   adminCreateCategory(token: string, payload: CreateCategoryInput) {
     return request<Category>("/api/v1/admin/categories", {
       method: "POST",
@@ -699,9 +771,37 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+  adminUpdateCategory(token: string, id: number, payload: UpdateCategoryInput) {
+    return request<Category>(`/api/v1/admin/categories/${id}`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
   adminCreateGrade(token: string, payload: CreateGradeInput) {
     return request<Grade>("/api/v1/admin/grades", {
       method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  adminUpdateGrade(token: string, id: number, payload: UpdateGradeInput) {
+    return request<Grade>(`/api/v1/admin/grades/${id}`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  adminCreateWord(token: string, payload: CreateWordInput) {
+    return request<Word>("/api/v1/admin/words", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  adminUpdateWord(token: string, id: number, payload: UpdateWordInput) {
+    return request<Word>(`/api/v1/admin/words/${id}`, {
+      method: "PUT",
       headers: authHeaders(token),
       body: JSON.stringify(payload),
     });

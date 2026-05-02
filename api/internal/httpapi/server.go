@@ -93,9 +93,13 @@ func (s *Server) Routes() http.Handler {
 	admin.Use(s.authRequired())
 	admin.POST("/import/local", s.permissionRequired("catalog.write"), s.handleImportLocal)
 	admin.POST("/subjects", s.permissionRequired("subject.write"), s.handleCreateSubject)
+	admin.PUT("/subjects/:id", s.permissionRequired("subject.write"), s.handleUpdateSubject)
 	admin.POST("/categories", s.permissionRequired("catalog.write"), s.handleCreateCategory)
+	admin.PUT("/categories/:id", s.permissionRequired("catalog.write"), s.handleUpdateCategory)
 	admin.POST("/grades", s.permissionRequired("grade.write"), s.handleCreateGrade)
+	admin.PUT("/grades/:id", s.permissionRequired("grade.write"), s.handleUpdateGrade)
 	admin.POST("/words", s.permissionRequired("catalog.write"), s.handleCreateWord)
+	admin.PUT("/words/:id", s.permissionRequired("catalog.write"), s.handleUpdateWord)
 	admin.POST("/plans", s.permissionRequired("plan.write"), s.handleCreatePlan)
 	admin.PUT("/plans/:id", s.permissionRequired("plan.write"), s.handleUpdatePlan)
 	admin.DELETE("/plans/:id", s.permissionRequired("plan.write"), s.handleDeletePlan)
@@ -130,7 +134,13 @@ func (s *Server) handleStats(c *gin.Context) {
 }
 
 func (s *Server) handleClassifications(c *gin.Context) {
-	items, err := s.service.ListClassificationStats(c.Request.Context(), c.Query("subject"))
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "8"))
+	items, err := s.service.ListClassificationStatsPaged(c.Request.Context(), domain.ClassificationStatFilter{
+		SubjectKey: c.Query("subject"),
+		Page:       page,
+		PageSize:   pageSize,
+	})
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, err)
 		return
@@ -489,6 +499,25 @@ func (s *Server) handleCreateSubject(c *gin.Context) {
 	c.JSON(http.StatusCreated, item)
 }
 
+func (s *Server) handleUpdateSubject(c *gin.Context) {
+	subjectID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || subjectID == 0 {
+		writeError(c, http.StatusBadRequest, domainError("invalid subject id"))
+		return
+	}
+	var input domain.UpdateSubjectInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	item, err := s.service.UpdateSubject(c.Request.Context(), uint(subjectID), input)
+	if err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, item)
+}
+
 func (s *Server) handleCreateCategory(c *gin.Context) {
 	var input domain.CreateCategoryInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -501,6 +530,25 @@ func (s *Server) handleCreateCategory(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, item)
+}
+
+func (s *Server) handleUpdateCategory(c *gin.Context) {
+	categoryID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || categoryID == 0 {
+		writeError(c, http.StatusBadRequest, domainError("invalid category id"))
+		return
+	}
+	var input domain.UpdateCategoryInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	item, err := s.service.UpdateCategory(c.Request.Context(), uint(categoryID), input)
+	if err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, item)
 }
 
 func (s *Server) handleCreateGrade(c *gin.Context) {
@@ -517,6 +565,25 @@ func (s *Server) handleCreateGrade(c *gin.Context) {
 	c.JSON(http.StatusCreated, item)
 }
 
+func (s *Server) handleUpdateGrade(c *gin.Context) {
+	gradeID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || gradeID == 0 {
+		writeError(c, http.StatusBadRequest, domainError("invalid grade id"))
+		return
+	}
+	var input domain.UpdateGradeInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	item, err := s.service.UpdateGrade(c.Request.Context(), uint(gradeID), input)
+	if err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, item)
+}
+
 func (s *Server) handleCreateWord(c *gin.Context) {
 	var input domain.CreateWordInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -529,6 +596,25 @@ func (s *Server) handleCreateWord(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, item)
+}
+
+func (s *Server) handleUpdateWord(c *gin.Context) {
+	wordID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || wordID == 0 {
+		writeError(c, http.StatusBadRequest, domainError("invalid word id"))
+		return
+	}
+	var input domain.UpdateWordInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	item, err := s.service.UpdateWord(c.Request.Context(), wordID, input)
+	if err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, item)
 }
 
 func (s *Server) handleCreatePlan(c *gin.Context) {
