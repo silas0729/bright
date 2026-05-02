@@ -1,0 +1,8 @@
+api/.cache/
+api/bin/
+api/*.db
+api/*.db-journal
+web/node_modules/
+web/dist/
+/brights_202605020108.csv
+/XiaozhiMCP

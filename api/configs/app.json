@@ -1,0 +1,37 @@
+{
+  "app": {
+    "addr": ":8080"
+  },
+  "auth": {
+    "issuer": "brights-admin",
+    "jwt_secret": "ChangeMeJWTSecret",
+    "access_token_ttl_minutes": 720
+  },
+  "database": {
+    "driver": "mysql",
+    "host": "192.168.3.182",
+    "port": 3306,
+    "name": "brigtreact",
+    "username": "brigtreact",
+    "password": "brigtreact",
+    "charset": "utf8mb4",
+    "parse_time": true,
+    "loc": "Local",
+    "auto_create_database": true
+  },
+  "bootstrap": {
+    "super_admin": {
+      "enabled": false,
+      "username": "",
+      "password": "",
+      "display_name": "Site Super Admin"
+    }
+  },
+  "import": {
+    "enabled": false,
+    "subject_key": "english",
+    "data_file": "",
+    "replace": true,
+    "only_if_empty": true
+  }
+}
