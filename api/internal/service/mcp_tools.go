@@ -13,10 +13,6 @@ import (
 
 func (s *Service) SyncDefaultMCPToolConfigs(ctx context.Context) error {
 	definitions := domain.DefaultMCPToolDefinitions()
-	if len(definitions) == 0 {
-		return nil
-	}
-
 	return s.db.WithContext(ctx).Transaction(func(tx *gormDBShim) error {
 		for _, definition := range definitions {
 			toolName := normalizeToolName(definition.Name)
@@ -54,7 +50,7 @@ func (s *Service) SyncDefaultMCPToolConfigs(ctx context.Context) error {
 				return err
 			}
 		}
-		return nil
+		return s.syncAPIConfigMCPToolConfigsTx(tx)
 	})
 }
 
@@ -148,6 +144,67 @@ func toMCPToolConfig(model storage.MCPToolConfig) domain.MCPToolConfig {
 		CreatedAt:          model.CreatedAt,
 		UpdatedAt:          model.UpdatedAt,
 	}
+}
+
+func (s *Service) syncAPIConfigMCPToolConfigsTx(tx *gormDBShim) error {
+	var configs []storage.APIConfig
+	if err := tx.Find(&configs).Error; err != nil {
+		return err
+	}
+
+	activeNames := make(map[string]struct{}, len(configs))
+	for _, config := range configs {
+		resolvedToolName := resolvedAPIConfigToolName(config)
+		if strings.TrimSpace(resolvedToolName) == "" {
+			continue
+		}
+		activeNames[resolvedToolName] = struct{}{}
+
+		var model storage.MCPToolConfig
+		err := tx.Where("tool_name = ?", resolvedToolName).First(&model).Error
+		switch {
+		case err == nil:
+			model.Title = strings.TrimSpace(config.Name)
+			model.Description = strings.TrimSpace(config.Description)
+			model.Category = normalizeToolCategory(config.Category)
+			model.SourceType = apiConfigSourceType
+			if !config.IsActive {
+				model.IsEnabled = false
+			}
+			if err := tx.Save(&model).Error; err != nil {
+				return err
+			}
+		case errors.Is(err, recordNotFoundShim):
+			model = storage.MCPToolConfig{
+				ToolName:           resolvedToolName,
+				Title:              strings.TrimSpace(config.Name),
+				Description:        strings.TrimSpace(config.Description),
+				Category:           normalizeToolCategory(config.Category),
+				SourceType:         apiConfigSourceType,
+				IsEnabled:          config.IsActive,
+				RequiresMembership: false,
+			}
+			if err := tx.Create(&model).Error; err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
+
+	var orphaned []storage.MCPToolConfig
+	if err := tx.Where("source_type = ?", apiConfigSourceType).Find(&orphaned).Error; err != nil {
+		return err
+	}
+	for _, item := range orphaned {
+		if _, exists := activeNames[item.ToolName]; exists {
+			continue
+		}
+		if err := tx.Delete(&item).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func normalizeToolName(value string) string {

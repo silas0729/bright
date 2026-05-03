@@ -127,6 +127,12 @@ func (s *Server) HandleInfo(c *gin.Context) {
 
 	exampleSubject := firstNonEmpty(strings.TrimSpace(c.Query("subject")), "english")
 	websocketURL := fmt.Sprintf("%s://%s/mcp?subject=%s&token={learner_access_token}", scheme, host, exampleSubject)
+	session, err := s.authenticateOptionalRequest(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	toolItems := s.tools(c.Request.Context(), session)
 
 	c.JSON(http.StatusOK, gin.H{
 		"name":             serverName,
@@ -135,12 +141,19 @@ func (s *Server) HandleInfo(c *gin.Context) {
 		"websocketPath":    "/mcp",
 		"websocketURL":     websocketURL,
 		"availableMethods": []string{"initialize", "ping", "tools/list", "tools/call"},
-		"tools":            s.tools(c.Request.Context(), nil),
+		"toolCount":        len(toolItems),
+		"tools":            toolItems,
 		"auth": gin.H{
-			"mode":               "learner_bearer_or_query_token",
-			"queryTokenParam":    "token",
-			"querySubjectParam":  "subject",
-			"requiresMembership": true,
+			"mode":                  "learner_bearer_or_query_token",
+			"queryTokenParam":       "token",
+			"querySubjectParam":     "subject",
+			"tokenOptionalForInfo":  true,
+			"requiresMembership":    true,
+		},
+		"viewer": gin.H{
+			"isAuthenticated": session != nil && strings.TrimSpace(session.Username) != "",
+			"username":        firstNonEmpty(session.Username, ""),
+			"subjectKey":      firstNonEmpty(session.SubjectKey, exampleSubject),
 		},
 		"examples": gin.H{
 			"headerAuthURL": websocketURL[:strings.LastIndex(websocketURL, "&token=")],
@@ -283,6 +296,7 @@ type Session struct {
 	Username   string
 	SubjectKey string
 	Token      string
+	HTTPBaseURL string
 }
 
 func (s *Server) authenticateRequest(c *gin.Context) (Session, error) {
@@ -306,7 +320,24 @@ func (s *Server) authenticateRequest(c *gin.Context) (Session, error) {
 		Username:   claims.Username,
 		SubjectKey: strings.TrimSpace(subjectKey),
 		Token:      token,
+		HTTPBaseURL: requestHTTPBaseURL(c.Request),
 	}, nil
+}
+
+func (s *Server) authenticateOptionalRequest(c *gin.Context) (*Session, error) {
+	subjectKey := firstNonEmpty(c.Query("subject"), c.Query("subject_key"))
+	token := tokenFromRequest(c.Request)
+	if token == "" {
+		return &Session{
+			SubjectKey:  strings.TrimSpace(subjectKey),
+			HTTPBaseURL: requestHTTPBaseURL(c.Request),
+		}, nil
+	}
+	session, err := s.authenticateRequest(c)
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
 }
 
 func sessionForToolCall(session Session, req CallToolRequest) Session {
@@ -543,6 +574,8 @@ func (s *Server) tools(ctx context.Context, session *Session) []Tool {
 			OutputSchema: toolResultSchema,
 		},
 	}
+	tools = append(tools, xiaomiBuiltinTools()...)
+	tools = append(tools, s.dynamicAPITools(ctx, session)...)
 
 	configMap, err := s.service.GetMCPToolConfigMap(ctx)
 	if err != nil {
@@ -550,11 +583,12 @@ func (s *Server) tools(ctx context.Context, session *Session) []Tool {
 	}
 
 	hasMembership := false
-	if session != nil {
+	if session != nil && strings.TrimSpace(session.Username) != "" && strings.TrimSpace(session.SubjectKey) != "" {
 		if allowed, accessErr := s.subjectMembershipAccess(ctx, *session); accessErr == nil {
 			hasMembership = allowed
 		}
 	}
+	hasSession := session != nil && strings.TrimSpace(session.Username) != ""
 
 	items := make([]Tool, 0, len(tools))
 	for _, tool := range tools {
@@ -577,10 +611,13 @@ func (s *Server) tools(ctx context.Context, session *Session) []Tool {
 		if !tool.Enabled {
 			continue
 		}
-		if session == nil || strings.TrimSpace(session.SubjectKey) == "" || strings.TrimSpace(session.Username) == "" {
-			tool.CanUse = !tool.RequiresMembership
-		} else {
-			tool.CanUse = !tool.RequiresMembership || hasMembership
+		switch {
+		case toolRequiresAuthenticatedSession(tool) && !hasSession:
+			tool.CanUse = false
+		case tool.RequiresMembership:
+			tool.CanUse = hasMembership
+		default:
+			tool.CanUse = true
 		}
 		items = append(items, tool)
 	}
@@ -663,7 +700,7 @@ func (s *Server) callTool(ctx context.Context, session Session, req CallToolRequ
 			PageSize:      intArg(req.Arguments, "page_size", 10),
 			LearnerUserID: session.UserID,
 		})
-		return newToolResult(canonicalName, data, err)
+		return knowledgeBaseToolResult(canonicalName, data, err)
 	case "list_my_payment_orders":
 		data, err := s.service.ListLearnerPaymentOrders(ctx, session.Username, domain.PaymentOrderFilter{
 			SubjectKey: stringArg(req.Arguments, "subject_key", session.SubjectKey),
@@ -686,6 +723,12 @@ func (s *Server) callTool(ctx context.Context, session Session, req CallToolRequ
 		data, err := s.service.GetInviteSummary(ctx, session.UserID)
 		return newToolResult(canonicalName, data, err)
 	default:
+		if result, handled, err := s.handleXiaomiTool(ctx, session, req); handled {
+			return result, err
+		}
+		if result, handled, err := s.callDynamicAPITool(ctx, session, req); handled {
+			return result, err
+		}
 		return CallToolResult{}, fmt.Errorf("unknown tool: %s", req.Name)
 	}
 }
@@ -753,6 +796,52 @@ func formatToolText(toolName string, data interface{}) string {
 	}
 }
 
+func knowledgeBaseToolResult(toolName string, data domain.PagedKnowledgeBaseChunks, err error) (CallToolResult, error) {
+	if err != nil {
+		return CallToolResult{}, err
+	}
+	hits := make([]map[string]interface{}, 0, len(data.Items))
+	for _, item := range data.Items {
+		hits = append(hits, map[string]interface{}{
+			"document_id":         item.DocumentID,
+			"document_title":      item.DocumentTitle,
+			"source_file_name":    item.SourceFileName,
+			"source_type":         item.SourceType,
+			"source_label":        firstNonEmpty(item.SourceFileName, item.DocumentTitle, item.Title),
+			"chunk_index":         item.ChunkIndex,
+			"snippet":             item.Snippet,
+			"highlighted_snippet": firstNonEmpty(item.HighlightedSnippet, item.Snippet),
+			"status":              item.Status,
+		})
+	}
+	payload := map[string]interface{}{
+		"success": true,
+		"tool":    toolName,
+		"result": map[string]interface{}{
+			"items":     data.Items,
+			"hits":      hits,
+			"total":     data.Total,
+			"page":      data.Page,
+			"page_size": data.PageSize,
+		},
+	}
+	text := formatToolText(toolName, data)
+	if text == "" {
+		formatted, formatErr := json.MarshalIndent(payload, "", "  ")
+		if formatErr != nil {
+			return CallToolResult{}, formatErr
+		}
+		text = string(formatted)
+	}
+	return CallToolResult{
+		StructuredContent: payload,
+		Content: []Content{{
+			Type: "text",
+			Text: text,
+		}},
+	}, nil
+}
+
 func normalizeArguments(value interface{}) (map[string]interface{}, error) {
 	switch typed := value.(type) {
 	case nil:
@@ -803,6 +892,23 @@ func canonicalToolName(name string) string {
 		return "get_invite_summary"
 	default:
 		return strings.TrimSpace(name)
+	}
+}
+
+func toolRequiresAuthenticatedSession(tool Tool) bool {
+	if strings.EqualFold(strings.TrimSpace(tool.SourceType), "api_config_personal") {
+		return true
+	}
+	switch canonicalToolName(tool.Name) {
+	case "list_my_payment_orders", "list_my_memberships", "get_invite_summary",
+		"xiaomi_get_devices", "xiaomi_extract_tokens", "xiaomi_miot_prop_get", "xiaomi_miot_prop_set",
+		"xiaomi_miot_action", "xiaomi_miot_prop_get_batch", "xiaomi_find_device", "xiaomi_control_device",
+		"list_mijia_homes", "get_mijia_devices", "get_device_status", "control_device", "get_device_spec",
+		"mijia_list_devices", "mijia_get_caps", "mijia_switch_set", "mijia_sensor_get",
+		"mijia_position_set", "mijia_action_call", "mijia_hvac_set":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -886,4 +992,22 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func requestHTTPBaseURL(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if forwarded := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Proto"), ",")[0]); forwarded != "" {
+		scheme = forwarded
+	}
+	host := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Host"), ",")[0])
+	if host == "" {
+		host = strings.TrimSpace(r.Host)
+	}
+	if host == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s://%s", scheme, host)
 }

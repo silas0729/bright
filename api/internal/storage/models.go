@@ -312,6 +312,53 @@ type MCPToolConfig struct {
 	UpdatedAt          time.Time
 }
 
+type APIConfig struct {
+	ID                uint   `gorm:"primaryKey"`
+	Name              string `gorm:"size:255;not null"`
+	ToolName          string `gorm:"column:tool_name;size:120;index"`
+	URL               string `gorm:"size:1000;not null"`
+	Method            string `gorm:"size:16;not null;default:GET"`
+	Category          string `gorm:"size:80;index"`
+	CategoryColor     string `gorm:"size:24"`
+	Icon              string `gorm:"size:80"`
+	Description       string `gorm:"type:text"`
+	Headers           string `gorm:"type:text"`
+	Body              string `gorm:"type:text"`
+	Parameters        string `gorm:"type:text"`
+	IsActive          bool   `gorm:"column:is_active;not null;default:true;index"`
+	IsPublic          bool   `gorm:"column:is_public;not null;default:false;index"`
+	AllowAdminPublish bool   `gorm:"column:allow_admin_publish;not null;default:false;index"`
+	OwnerLearnerUserID *uint `gorm:"index"`
+	OwnerAdminUserID  *uint  `gorm:"index"`
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+type XiaomiConfig struct {
+	ID            uint   `gorm:"primaryKey"`
+	LearnerUserID uint   `gorm:"not null;uniqueIndex"`
+	Username      string `gorm:"size:255"`
+	XiaomiUserID  string `gorm:"size:80"`
+	Server        string `gorm:"size:16;not null;default:cn"`
+	Ssecurity     string `gorm:"type:text"`
+	ServiceToken  string `gorm:"type:text"`
+	DeviceList    string `gorm:"type:longtext"`
+	IsActive      bool   `gorm:"not null;default:false;index"`
+	LastSyncAt    *time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+type MiotSpecCache struct {
+	ID        uint   `gorm:"primaryKey"`
+	Model     string `gorm:"size:180;uniqueIndex;not null"`
+	SpecJSON  string `gorm:"type:longtext;not null"`
+	ETag      string `gorm:"size:255"`
+	FetchedAt *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 func Open(driverName, dsn string, autoCreateDatabase bool) (*gorm.DB, error) {
 	gormConfig := &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
@@ -356,6 +403,9 @@ func AutoMigrate(db *gorm.DB) error {
 		&KnowledgeBaseDocument{},
 		&KnowledgeBaseChunk{},
 		&MCPToolConfig{},
+		&APIConfig{},
+		&XiaomiConfig{},
+		&MiotSpecCache{},
 	)
 }
 

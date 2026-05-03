@@ -32,6 +32,7 @@ const publicSessionStorageKey = "brights_public_session";
 
 type AuthMode = "login" | "register";
 type PublicView = "home" | "profile" | "mcp";
+type ProfileWorkspaceTab = "overview" | "memberships" | "orders" | "invite" | "knowledge-base" | "plans" | "insights";
 type NoticeDialogTone = "info" | "success" | "error";
 
 type NoticeDialogState = {
@@ -148,12 +149,22 @@ export default function PublicSite() {
   const learnerAccessToken = session?.access_token ?? "";
   const speechSupported = canUseBrowserSpeech();
   const activeView: PublicView = resolvePublicView(currentHash);
+  const currentProfileTab: ProfileWorkspaceTab = resolveProfileWorkspaceTab(currentHash);
   const classifications = classificationResult?.items ?? [];
   const classificationTotal = classificationResult?.total ?? 0;
   const speakTimerRef = useRef<number | null>(null);
   const speechTokenRef = useRef(0);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const checkoutNoticeKeyRef = useRef("");
+  const profileTabItems: Array<{ key: ProfileWorkspaceTab; label: string; helper: string; href: string; count?: number }> = [
+    { key: "overview", label: "账号总览", helper: currentUser ? "资料与权益" : "登录与注册", href: "#profile" },
+    { key: "memberships", label: "会员记录", helper: "状态与有效期", href: "#profile-memberships", count: membershipHistory?.total ?? 0 },
+    { key: "orders", label: "购买记录", helper: "订单与支付", href: "#profile-orders", count: paymentOrders?.total ?? 0 },
+    { key: "invite", label: "邀请好友", helper: "邀请码与转化", href: "#profile-invite", count: Number(inviteSummary?.invited_count ?? 0) },
+    { key: "knowledge-base", label: "我的知识库", helper: "上传与文档", href: "#profile-knowledge-base", count: knowledgeBaseDocuments?.total ?? 0 },
+    { key: "plans", label: "会员方案", helper: "购买与续费", href: "#plans", count: plans.length },
+    { key: "insights", label: "学习概况", helper: "词库与建议", href: "#profile-insights" },
+  ];
 
   useEffect(() => {
     let active = true;
@@ -1061,11 +1072,56 @@ export default function PublicSite() {
     });
   };
 
-  const profileIntroTitle = currentUser ? "你的学习账号与会员安排" : "先注册学习账号，再开始持续学习";
+  const profileIntroTitle = currentUser ? "学习账号中心" : "先登录学习账号";
   const profileIntroDescription = currentUser
-    ? `你好，${learnerName}。这里集中放你的账号信息、购买入口和后续学习安排，后面扩展更多学科内容时也继续使用这一套学习身份。`
-    : "先注册一个学习账号，后面不管是购买会员、切换设备继续学，还是扩展到其他学科内容，学习记录都会跟着你的账号一起保存。";
+    ? "账号、会员、订单、邀请和知识库都按分区整理好了，下面直接切换查看。"
+    : "登录后就能统一管理学习记录、会员购买、订单和个人知识库。";
   const selectedSubjectLabel = formatSubjectLabel(subjectKey);
+  const profileOverviewSnapshotItems: Array<{ label: string; value: string; note: string }> = currentUser
+    ? [
+        {
+          label: "当前账号",
+          value: learnerName || currentUser.username,
+          note: "学习记录与购买信息都会绑定到这个账号",
+        },
+        {
+          label: "会员状态",
+          value: membershipBadgeText,
+          note: membershipExpiryText || "去会员方案页签开通或续费",
+        },
+        {
+          label: "当前科目",
+          value: selectedSubjectLabel,
+          note: "当前浏览与学习入口都会跟着这个学科切换",
+        },
+        {
+          label: "可选方案",
+          value: plans.length > 0 ? `${plans.length} 种方案` : "暂无方案",
+          note: "支持按需购买、续费和升级",
+        },
+      ]
+    : [
+        {
+          label: "当前状态",
+          value: "未登录",
+          note: "先登录后再保存学习记录和购买信息",
+        },
+        {
+          label: "学习账号",
+          value: "待创建",
+          note: "注册后可跨设备继续学习",
+        },
+        {
+          label: "会员权益",
+          value: "未开通",
+          note: "开通后会自动绑定到你的学习账号",
+        },
+        {
+          label: "当前科目",
+          value: selectedSubjectLabel,
+          note: "先浏览词库，再决定是否开通会员",
+        },
+      ];
   const classificationOnCurrentPage = classification === "" || classifications.some((item) => item.name === classification);
   const classificationOptions: ClassificationStat[] =
     classification !== "" && !classifications.some((item) => item.name === classification)
@@ -1258,706 +1314,722 @@ export default function PublicSite() {
       {activeView === "profile" ? (
         <div className="site-main site-main-profile">
           <main className="site-content profile-page">
-            <section className="content-card profile-hero-card" id="profile">
-              <div className="section-header profile-hero-header">
-                <div>
-                  <p className="section-eyebrow">个人中心</p>
-                  <h1>{profileIntroTitle}</h1>
-                  <p className="helper-text">{profileIntroDescription}</p>
-                </div>
-                <div className="button-row">
-                  <a className="secondary-button" href="#catalog">
-                    去词库学习
-                  </a>
-                  <a className="primary-button" href="#plans">
-                    查看会员方案
-                  </a>
-                </div>
-              </div>
+            <nav className="profile-tabbar" aria-label="个人中心导航" id="profile">
+              {profileTabItems.map((item) => (
+                <a
+                  className={currentProfileTab === item.key ? "profile-tab-link profile-tab-link-active" : "profile-tab-link"}
+                  href={item.href}
+                  key={item.key}
+                >
+                  <span>{item.label}</span>
+                  <small>{item.helper}</small>
+                  {item.count !== undefined ? <em>{formatCount(item.count)}</em> : null}
+                </a>
+              ))}
+            </nav>
 
-              <div className="profile-overview">
-                <div>
-                  <strong>{currentUser ? learnerName || currentUser.username : "未登录"}</strong>
-                  <span>{currentUser ? "当前学习身份" : "登录后可保存学习记录"}</span>
-                </div>
-                <div>
-                  <strong>{currentUser ? "可正常学习" : "等待注册 / 登录"}</strong>
-                  <span>账号状态</span>
-                </div>
-                <div>
-                  <strong>{selectedSubjectLabel}</strong>
-                  <span>当前学习科目</span>
-                </div>
-                <div>
-                  <strong>{plans.length > 0 ? `${plans.length} 种可选方案` : "暂未上架方案"}</strong>
-                  <span>会员购买入口</span>
-                </div>
-              </div>
-              {currentUser ? (
-                <div className={hasActiveMembership ? "membership-highlight-card membership-highlight-card-active" : "membership-highlight-card"}>
-                  <div className="membership-highlight-head">
-                    <span className={hasActiveMembership ? "site-membership-badge site-membership-badge-active" : "site-membership-badge"}>
-                      {membershipBadgeText}
-                    </span>
-                    <strong>{selectedSubjectLabel}</strong>
+            {currentProfileTab === "overview" ? (
+              <section className="content-card profile-page-header">
+                <div className="profile-page-heading">
+                  <div>
+                    <p className="section-eyebrow">个人中心</p>
+                    <h1>{profileIntroTitle}</h1>
+                    <p className="helper-text">{profileIntroDescription}</p>
                   </div>
-                  <p>{hasActiveMembership ? (membershipExpiryText || "当前会员为长期有效。") : "当前账号还没有生效中的会员权益。"}</p>
+                  <div className="button-row">
+                    <a className="secondary-button" href="#catalog">
+                      去词库学习
+                    </a>
+                    <a className="primary-button" href="#plans">
+                      查看会员方案
+                    </a>
+                  </div>
+                </div>
+                <p className="profile-page-caption">通过下方分区切换账号总览、会员记录、购买记录、邀请好友、知识库和学习概况。</p>
+              </section>
+            ) : null}
+
+            <div className="profile-workbench">
+              {currentProfileTab === "overview" ? (
+                <div className="profile-panel-stack">
+                  <div className="profile-snapshot-grid">
+                    {profileOverviewSnapshotItems.map((item) => (
+                      <article className="profile-snapshot-card" key={item.label}>
+                        <span>{item.label}</span>
+                        <strong>{item.value}</strong>
+                        <small>{item.note}</small>
+                      </article>
+                    ))}
+                  </div>
+                  <div className="profile-grid">
+                    <section className="content-card profile-card profile-panel-card">
+                      <div className="section-header">
+                        <div>
+                          <p className="section-eyebrow">账号概览</p>
+                          <h2>{currentUser ? "学习资料和权益都跟着这个账号走" : "先准备好你的学习账号"}</h2>
+                        </div>
+                      </div>
+
+                      {currentUser ? (
+                        <>
+                          <p className="helper-text">
+                            你的购买记录、会员权益和后续学习进度都会绑定到这个账号，后续继续补充其他学科内容时也可以共用这一套学习身份。
+                          </p>
+                          <dl className="metric-list">
+                            <div>
+                              <dt>学习账号</dt>
+                              <dd>{currentUser.username}</dd>
+                            </div>
+                            <div>
+                              <dt>会员状态</dt>
+                              <dd>
+                                <span className={hasActiveMembership ? "site-membership-badge site-membership-badge-active" : "site-membership-badge"}>
+                                  {membershipBadgeText}
+                                </span>
+                              </dd>
+                            </div>
+                            {membershipExpiryText ? (
+                              <div>
+                                <dt>会员到期</dt>
+                                <dd>{membershipExpiryText.replace("有效期至 ", "")}</dd>
+                              </div>
+                            ) : null}
+                            <div>
+                              <dt>账号昵称</dt>
+                              <dd>{currentUser.display_name || "-"}</dd>
+                            </div>
+                            <div>
+                              <dt>注册时间</dt>
+                              <dd>{formatDateTime(currentUser.created_at)}</dd>
+                            </div>
+                            <div>
+                              <dt>当前学习科目</dt>
+                              <dd>{selectedSubjectLabel}</dd>
+                            </div>
+                          </dl>
+                          <div className="button-row">
+                            <a className="primary-button" href="#plans">
+                              去看会员方案
+                            </a>
+                            <a className="secondary-button" href="#catalog">
+                              返回词库学习
+                            </a>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="helper-text">
+                            注册之后，购买会员、切换设备继续学、后续增加其他科目内容，都会继续沿用同一个学习账号，不用重复建立新的学习身份。
+                          </p>
+                          <div className="tag-list">
+                            <span className="tag">购买记录跟账号绑定</span>
+                            <span className="tag">会员权益自动发放</span>
+                            <span className="tag">后续学习进度可持续保留</span>
+                          </div>
+                          <div className="button-row">
+                            <button
+                              className={authMode === "register" ? "primary-button small-button" : "secondary-button small-button"}
+                              onClick={() => setAuthMode("register")}
+                              type="button"
+                            >
+                              注册账号
+                            </button>
+                            <button
+                              className={authMode === "login" ? "primary-button small-button" : "secondary-button small-button"}
+                              onClick={() => setAuthMode("login")}
+                              type="button"
+                            >
+                              已有账号登录
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </section>
+
+                    <section className="content-card profile-card profile-panel-card">
+                      <div className="section-header">
+                        <div>
+                          <p className="section-eyebrow">{currentUser ? "会员与服务" : authMode === "register" ? "注册账号" : "账号登录"}</p>
+                          <h2>{currentUser ? "购买后的权益会自动关联到你的账号" : authMode === "register" ? "填写资料，马上开始学习" : "输入账号信息，继续上次学习"}</h2>
+                        </div>
+                      </div>
+
+                      {!currentUser ? (
+                        <form className="setup-form" onSubmit={handleSubmitAuth}>
+                          <label className="form-field">
+                            <span>学习账号</span>
+                            <input
+                              value={authForm.username}
+                              onChange={(event) => {
+                                setAuthForm((current) => ({ ...current, username: event.target.value }));
+                              }}
+                              placeholder="例如：xiaoming"
+                            />
+                          </label>
+                          {authMode === "register" ? (
+                            <label className="form-field">
+                              <span>昵称</span>
+                              <input
+                                value={authForm.displayName}
+                                onChange={(event) => {
+                                  setAuthForm((current) => ({ ...current, displayName: event.target.value }));
+                                }}
+                                placeholder="例如：小明"
+                              />
+                            </label>
+                          ) : null}
+                          {authMode === "register" ? (
+                            <label className="form-field">
+                              <span>邀请码</span>
+                              <input
+                                value={authForm.inviteCode}
+                                onChange={(event) => {
+                                  setAuthForm((current) => ({ ...current, inviteCode: event.target.value }));
+                                }}
+                                placeholder="有邀请码可填写，没有可留空"
+                              />
+                            </label>
+                          ) : null}
+                          <label className="form-field">
+                            <span>登录密码</span>
+                            <input
+                              type="password"
+                              value={authForm.password}
+                              onChange={(event) => {
+                                setAuthForm((current) => ({ ...current, password: event.target.value }));
+                              }}
+                              placeholder="至少 8 位"
+                            />
+                          </label>
+                          {authMode === "register" ? (
+                            <label className="form-field">
+                              <span>确认密码</span>
+                              <input
+                                type="password"
+                                value={authForm.confirmPassword}
+                                onChange={(event) => {
+                                  setAuthForm((current) => ({ ...current, confirmPassword: event.target.value }));
+                                }}
+                                placeholder="请再输入一次密码"
+                              />
+                            </label>
+                          ) : null}
+                          <div className="form-grid-two">
+                            <label className="form-field">
+                              <span>图形验证码</span>
+                              <input
+                                value={authCaptchaAnswer}
+                                onChange={(event) => {
+                                  setAuthCaptchaAnswer(event.target.value);
+                                }}
+                                placeholder="请输入图中的字符"
+                              />
+                            </label>
+                            <div className="form-field">
+                              <span>验证码图片</span>
+                              <div className="button-row">
+                                <img
+                                  alt="图形验证码"
+                                  className="captcha-image"
+                                  src={authCaptcha?.image_data || ""}
+                                />
+                                <button
+                                  className="secondary-button small-button"
+                                  disabled={authCaptchaLoading}
+                                  onClick={() => {
+                                    void refreshAuthCaptcha(authMode);
+                                  }}
+                                  type="button"
+                                >
+                                  {authCaptchaLoading ? "刷新中..." : "换一张"}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          <button className="primary-button" disabled={authBusy !== ""} type="submit">
+                            {authBusy === "register"
+                              ? "注册中..."
+                              : authBusy === "login"
+                                ? "登录中..."
+                                : authMode === "register"
+                                  ? "注册并开始学习"
+                                  : "进入个人中心"}
+                          </button>
+                        </form>
+                      ) : (
+                        <div className="profile-card-body">
+                          <div className={hasActiveMembership ? "feedback-banner feedback-success membership-summary-banner" : "feedback-banner membership-summary-banner"}>
+                            <div className="membership-summary-banner-head">
+                              <span className={hasActiveMembership ? "site-membership-badge site-membership-badge-active" : "site-membership-badge"}>
+                                {membershipBadgeText}
+                              </span>
+                              <strong>{currentMembership ? subscriptionStatusLabel(currentMembership.status) : "未开通"}</strong>
+                            </div>
+                            <p>
+                              {hasActiveMembership
+                                ? membershipExpiryText
+                                  ? `你当前是按月会员，${membershipExpiryText}。`
+                                  : "你当前会员权益已生效，当前为长期有效。"
+                                : "当前账号还没有生效中的会员权益，购买后会自动关联到你的学习账号。"}
+                            </p>
+                          </div>
+                          <div className="feedback-banner">
+                            购买会员后，后台会直接把会员状态和有效期关联到账号 <strong>{currentUser.username}</strong>，你在前台继续学习时就能一直使用同一个账号。
+                          </div>
+                          <p className="helper-text">
+                            如果你准备开通会员，可以从顶部导航、这里的按钮，或者会员方案页面进入购买；付款完成后，这个账号就是后续所有学习记录的承接入口。
+                          </p>
+                          <div className="button-row">
+                            <a className="primary-button" href="#plans">
+                              立即购买会员
+                            </a>
+                            <a className="secondary-button" href="#catalog">
+                              返回词库学习
+                            </a>
+                          </div>
+                        </div>
+                      )}
+                    </section>
+                  </div>
                 </div>
               ) : null}
-            </section>
 
-            <div className="profile-grid">
-              <section className="content-card profile-card">
-                <div className="section-header">
-                  <div>
-                    <p className="section-eyebrow">账号概览</p>
-                    <h2>{currentUser ? "学习资料和权益都跟着这个账号走" : "先准备好你的学习账号"}</h2>
+              {currentProfileTab === "memberships" ? (
+                <section className="content-card profile-card profile-panel-card" id="profile-memberships">
+                  <div className="section-header">
+                    <div>
+                      <p className="section-eyebrow">会员记录</p>
+                      <h2>按月会员到期时间和历史权益都在这里</h2>
+                    </div>
                   </div>
-                </div>
-
-                {currentUser ? (
-                  <>
-                    <p className="helper-text">
-                      你的购买记录、会员权益和后续学习进度都会绑定到这个账号，后续继续补充其他学科内容时也可以共用这一套学习身份。
-                    </p>
-                    <dl className="metric-list">
-                      <div>
-                        <dt>学习账号</dt>
-                        <dd>{currentUser.username}</dd>
+                  {currentUser ? (
+                    <>
+                      <div className="feedback-banner">
+                        当前学科：<strong>{selectedSubjectLabel}</strong>
+                        {membershipExpiryText ? `，${membershipExpiryText}` : "，当前没有生效中的到期时间。"}
                       </div>
-                      <div>
-                        <dt>会员状态</dt>
-                        <dd>
-                          <span className={hasActiveMembership ? "site-membership-badge site-membership-badge-active" : "site-membership-badge"}>
-                            {membershipBadgeText}
-                          </span>
-                        </dd>
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>方案</th>
+                              <th>状态</th>
+                              <th>学科</th>
+                              <th>有效期至</th>
+                              <th>开通时间</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(membershipHistory?.items ?? []).map((item) => (
+                              <tr key={item.id}>
+                                <td>{item.plan_key || "-"}</td>
+                                <td>
+                                  <span className={`pill ${subscriptionStatusClass(item.status)}`}>
+                                    {subscriptionStatusLabel(item.status)}
+                                  </span>
+                                </td>
+                                <td>{formatSubjectLabel(item.subject_key)}</td>
+                                <td>{item.current_period_end ? formatDateTime(item.current_period_end) : "长期有效"}</td>
+                                <td>{item.started_at ? formatDateTime(item.started_at) : "-"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                      {membershipExpiryText ? (
-                        <div>
-                          <dt>会员到期</dt>
-                          <dd>{membershipExpiryText.replace("有效期至 ", "")}</dd>
-                        </div>
+                      {(membershipHistory?.items ?? []).length === 0 ? (
+                        <div className="feedback-banner">当前还没有会员记录，购买后会自动同步到这里。</div>
                       ) : null}
-                      <div>
-                        <dt>账号昵称</dt>
-                        <dd>{currentUser.display_name || "-"}</dd>
-                      </div>
-                      <div>
-                        <dt>注册时间</dt>
-                        <dd>{formatDateTime(currentUser.created_at)}</dd>
-                      </div>
-                      <div>
-                        <dt>当前学习科目</dt>
-                        <dd>{selectedSubjectLabel}</dd>
-                      </div>
-                    </dl>
-                    <div className="button-row">
-                      <a className="primary-button" href="#plans">
-                        去看会员方案
-                      </a>
-                      <a className="secondary-button" href="#catalog">
-                        返回词库学习
-                      </a>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="helper-text">
-                      注册之后，购买会员、切换设备继续学、后续增加其他科目内容，都会继续沿用同一个学习账号，不用重复建立新的学习身份。
-                    </p>
-                    <div className="tag-list">
-                      <span className="tag">购买记录跟账号绑定</span>
-                      <span className="tag">会员权益自动发放</span>
-                      <span className="tag">后续学习进度可持续保留</span>
-                    </div>
-                    <div className="button-row">
-                      <button
-                        className={authMode === "register" ? "primary-button small-button" : "secondary-button small-button"}
-                        onClick={() => setAuthMode("register")}
-                        type="button"
-                      >
-                        注册账号
-                      </button>
-                      <button
-                        className={authMode === "login" ? "primary-button small-button" : "secondary-button small-button"}
-                        onClick={() => setAuthMode("login")}
-                        type="button"
-                      >
-                        已有账号登录
-                      </button>
-                    </div>
-                  </>
-                )}
-              </section>
+                      <PagerControls
+                        onChange={setMembershipHistoryPage}
+                        page={membershipHistory?.page ?? membershipHistoryPage}
+                        pageSize={membershipHistory?.page_size ?? profilePageSize}
+                        total={membershipHistory?.total ?? 0}
+                      />
+                    </>
+                  ) : (
+                    <div className="feedback-banner">登录后可查看会员开通状态、按月到期时间和历史权益记录。</div>
+                  )}
+                </section>
+              ) : null}
 
-              <section className="content-card profile-card">
-                <div className="section-header">
-                  <div>
-                    <p className="section-eyebrow">{currentUser ? "会员与服务" : authMode === "register" ? "注册账号" : "账号登录"}</p>
-                    <h2>{currentUser ? "购买后的权益会自动关联到你的账号" : authMode === "register" ? "填写资料，马上开始学习" : "输入账号信息，继续上次学习"}</h2>
+              {currentProfileTab === "orders" ? (
+                <section className="content-card profile-card profile-panel-card" id="profile-orders">
+                  <div className="section-header">
+                    <div>
+                      <p className="section-eyebrow">购买记录</p>
+                      <h2>充值、下单和支付结果一目了然</h2>
+                    </div>
                   </div>
-                </div>
+                  {currentUser ? (
+                    <>
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>订单号</th>
+                              <th>方案</th>
+                              <th>金额</th>
+                              <th>状态</th>
+                              <th>支付时间</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(paymentOrders?.items ?? []).map((item) => (
+                              <tr key={item.order_no}>
+                                <td>{item.order_no}</td>
+                                <td>{item.description || item.plan_key}</td>
+                                <td>{formatPrice(item.amount_cents)}</td>
+                                <td>
+                                  <span className={`pill ${paymentStatusClass(item.status)}`}>{paymentStatusLabel(item.status)}</span>
+                                </td>
+                                <td>{item.paid_at ? formatDateTime(item.paid_at) : item.created_at ? formatDateTime(item.created_at) : "-"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {(paymentOrders?.items ?? []).length === 0 ? (
+                        <div className="feedback-banner">当前还没有购买记录，支付成功后会自动显示在这里。</div>
+                      ) : null}
+                      <PagerControls
+                        onChange={setOrderHistoryPage}
+                        page={paymentOrders?.page ?? orderHistoryPage}
+                        pageSize={paymentOrders?.page_size ?? profilePageSize}
+                        total={paymentOrders?.total ?? 0}
+                      />
+                    </>
+                  ) : (
+                    <div className="feedback-banner">登录后可查看充值和会员购买记录。</div>
+                  )}
+                </section>
+              ) : null}
 
-                {!currentUser ? (
-                  <form className="setup-form" onSubmit={handleSubmitAuth}>
-                    <label className="form-field">
-                      <span>学习账号</span>
-                      <input
-                        value={authForm.username}
-                        onChange={(event) => {
-                          setAuthForm((current) => ({ ...current, username: event.target.value }));
-                        }}
-                        placeholder="例如：xiaoming"
+              {currentProfileTab === "invite" ? (
+                <section className="content-card profile-card profile-panel-card" id="profile-invite">
+                  <div className="section-header">
+                    <div>
+                      <p className="section-eyebrow">邀请好友</p>
+                      <h2>邀请码、邀请统计和转化记录集中查看</h2>
+                    </div>
+                    {currentUser ? (
+                      <div className="button-row">
+                        <button className="secondary-button small-button" onClick={() => void handleCopyInviteCode()} type="button">
+                          复制邀请码
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                  {currentUser ? (
+                    <>
+                      <div className="profile-overview">
+                        <div>
+                          <strong>{inviteSummary?.invite_code || currentUser.invite_code || "-"}</strong>
+                          <span>我的邀请码</span>
+                        </div>
+                        <div>
+                          <strong>{formatCount(Number(inviteSummary?.invited_count ?? 0))}</strong>
+                          <span>已邀请人数</span>
+                        </div>
+                        <div>
+                          <strong>{formatCount(Number(inviteSummary?.paid_invite_count ?? 0))}</strong>
+                          <span>已付费人数</span>
+                        </div>
+                        <div>
+                          <strong>{formatPrice(inviteSummary?.total_recharge_cents ?? 0)}</strong>
+                          <span>累计邀请充值</span>
+                        </div>
+                      </div>
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>好友账号</th>
+                              <th>显示名称</th>
+                              <th>注册时间</th>
+                              <th>付费次数</th>
+                              <th>累计充值</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(inviteSummary?.items ?? []).map((item) => (
+                              <tr key={item.user_id}>
+                                <td>{item.username}</td>
+                                <td>{item.display_name || "-"}</td>
+                                <td>{formatDateTime(item.created_at)}</td>
+                                <td>{formatCount(item.paid_order_count)}</td>
+                                <td>{formatPrice(item.total_recharge_cents)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {(inviteSummary?.items ?? []).length === 0 ? (
+                        <div className="feedback-banner">分享邀请码后，你邀请注册的用户和他们的付费记录会显示在这里。</div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="feedback-banner">登录后可查看邀请码、邀请人数和累计充值统计。</div>
+                  )}
+                </section>
+              ) : null}
+
+              {currentProfileTab === "knowledge-base" ? (
+                <section className="content-card profile-card profile-panel-card" id="profile-knowledge-base">
+                  <div className="section-header">
+                    <div>
+                      <p className="section-eyebrow">我的知识库</p>
+                      <h2>上传文本、Markdown、CSV、Excel 作为你自己的 MCP 私有知识库</h2>
+                    </div>
+                  </div>
+                  {currentUser ? (
+                    <>
+                      <div className="profile-grid">
+                        <form className="setup-form" onSubmit={handleSubmitKnowledgeBase}>
+                          <label className="form-field">
+                            <span>选择知识库文件</span>
+                            <label className={`upload-picker ${knowledgeBaseForm.file ? "upload-picker-ready" : ""}`}>
+                              <input
+                                accept=".txt,.md,.csv,.xlsx"
+                                className="upload-picker-input"
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0] ?? null;
+                                  setKnowledgeBaseForm((current) => ({
+                                    ...current,
+                                    file,
+                                    fileName: file?.name ?? "",
+                                    title: current.title || (file?.name ? file.name.replace(/\.[^.]+$/, "") : ""),
+                                  }));
+                                }}
+                                type="file"
+                              />
+                              <div className="upload-picker-main">
+                                <div className="upload-picker-meta">
+                                  <strong>{knowledgeBaseForm.fileName || "点击选择要上传的知识库文件"}</strong>
+                                  <span>
+                                    {knowledgeBaseForm.file
+                                      ? `文件大小 ${formatFileSize(knowledgeBaseForm.file.size)}，上传后仅当前账号和对应 MCP 检索可见`
+                                      : "支持 TXT、Markdown、CSV、Excel，上传后会自动切片用于检索"}
+                                  </span>
+                                </div>
+                                <span className="upload-picker-action">{knowledgeBaseForm.file ? "重新选择" : "选择文件"}</span>
+                              </div>
+                            </label>
+                          </label>
+                          <div className="upload-hint-list">
+                            <span className="tag">私有知识库</span>
+                            <span className="tag">支持 TXT / Markdown</span>
+                            <span className="tag">支持 CSV / Excel</span>
+                            <span className="tag">支持 MCP 检索</span>
+                          </div>
+                          <label className="form-field">
+                            <span>文档标题</span>
+                            <input
+                              value={knowledgeBaseForm.title}
+                              onChange={(event) => {
+                                setKnowledgeBaseForm((current) => ({ ...current, title: event.target.value }));
+                              }}
+                              placeholder="例如：我的产品知识库"
+                            />
+                          </label>
+                          <div className="feedback-banner">
+                            当前将上传到 <strong>{selectedSubjectLabel}</strong> 学科下，管理员也能在后台区分公共知识库和你的私有知识库。
+                          </div>
+                          <button className="primary-button" disabled={profileBusyAction === "knowledge-base-upload"} type="submit">
+                            {profileBusyAction === "knowledge-base-upload" ? "上传处理中..." : "上传到我的知识库"}
+                          </button>
+                        </form>
+
+                        <div className="profile-card-body">
+                          <div className="feedback-banner feedback-success">
+                            你的个人知识库上传后，会自动参与开放接口与 MCP 工具的检索，但不会暴露给其他普通用户。
+                          </div>
+                          <ul className="detail-list">
+                            <li>支持上传管理员公共知识库之外的个人资料，适合整理自己的文档、表格和说明。</li>
+                            <li>停用后不会参与检索；删除后文档和切片都会一起移除。</li>
+                            <li>知识库检索结果会返回命中片段和文档来源，方便定位答案来自哪份文档。</li>
+                          </ul>
+                        </div>
+                      </div>
+
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>我的知识库文档</h2>
+                          <p className="helper-text">这里只展示当前账号上传的私有知识库文档。</p>
+                        </div>
+                        <input
+                          className="toolbar-search"
+                          onChange={(event) => {
+                            setKnowledgeBaseQuery(event.target.value);
+                            setKnowledgeBasePage(1);
+                          }}
+                          placeholder="搜索标题或文件名"
+                          value={knowledgeBaseQuery}
+                        />
+                      </div>
+
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>标题</th>
+                              <th>文件名</th>
+                              <th>格式</th>
+                              <th>状态</th>
+                              <th>片段数</th>
+                              <th>更新时间</th>
+                              <th>操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(knowledgeBaseDocuments?.items ?? []).map((item) => {
+                              const statusBusy = profileBusyAction === `knowledge-base-status-${item.id}`;
+                              const deleteBusy = profileBusyAction === `knowledge-base-delete-${item.id}`;
+                              return (
+                                <tr key={item.id}>
+                                  <td>{item.title}</td>
+                                  <td>{item.source_file_name}</td>
+                                  <td>{item.source_type}</td>
+                                  <td>
+                                    <span className={item.status === "active" ? "pill pill-success" : "pill pill-muted"}>
+                                      {item.status === "active" ? "启用中" : "已停用"}
+                                    </span>
+                                  </td>
+                                  <td>{formatCount(item.chunk_count)}</td>
+                                  <td>{formatDateTime(item.updated_at)}</td>
+                                  <td>
+                                    <div className="button-row">
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={statusBusy || deleteBusy}
+                                        onClick={() => void handleToggleKnowledgeBaseDocument(item)}
+                                        type="button"
+                                      >
+                                        {statusBusy ? "处理中..." : item.status === "active" ? "停用" : "启用"}
+                                      </button>
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={statusBusy || deleteBusy}
+                                        onClick={() => void handleDeleteKnowledgeBaseDocument(item)}
+                                        type="button"
+                                      >
+                                        {deleteBusy ? "删除中..." : "删除"}
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      {(knowledgeBaseDocuments?.items ?? []).length === 0 ? (
+                        <div className="feedback-banner">当前还没有上传个人知识库文件，先上传一份文本或表格试试。</div>
+                      ) : null}
+                      <PagerControls
+                        onChange={setKnowledgeBasePage}
+                        page={knowledgeBaseDocuments?.page ?? knowledgeBasePage}
+                        pageSize={knowledgeBaseDocuments?.page_size ?? profilePageSize}
+                        total={knowledgeBaseDocuments?.total ?? 0}
                       />
-                    </label>
-                    {authMode === "register" ? (
-                      <label className="form-field">
-                        <span>昵称</span>
-                        <input
-                          value={authForm.displayName}
-                          onChange={(event) => {
-                            setAuthForm((current) => ({ ...current, displayName: event.target.value }));
-                          }}
-                          placeholder="例如：小明"
-                        />
-                      </label>
-                    ) : null}
-                    {authMode === "register" ? (
-                      <label className="form-field">
-                        <span>邀请码</span>
-                        <input
-                          value={authForm.inviteCode}
-                          onChange={(event) => {
-                            setAuthForm((current) => ({ ...current, inviteCode: event.target.value }));
-                          }}
-                          placeholder="有邀请码可填写，没有可留空"
-                        />
-                      </label>
-                    ) : null}
-                    <label className="form-field">
-                      <span>登录密码</span>
-                      <input
-                        type="password"
-                        value={authForm.password}
-                        onChange={(event) => {
-                          setAuthForm((current) => ({ ...current, password: event.target.value }));
-                        }}
-                        placeholder="至少 8 位"
-                      />
-                    </label>
-                    {authMode === "register" ? (
-                      <label className="form-field">
-                        <span>确认密码</span>
-                        <input
-                          type="password"
-                          value={authForm.confirmPassword}
-                          onChange={(event) => {
-                            setAuthForm((current) => ({ ...current, confirmPassword: event.target.value }));
-                          }}
-                          placeholder="请再输入一次密码"
-                        />
-                      </label>
-                    ) : null}
-                    <div className="form-grid-two">
-                      <label className="form-field">
-                        <span>图形验证码</span>
-                        <input
-                          value={authCaptchaAnswer}
-                          onChange={(event) => {
-                            setAuthCaptchaAnswer(event.target.value);
-                          }}
-                          placeholder="请输入图中的字符"
-                        />
-                      </label>
-                      <div className="form-field">
-                        <span>验证码图片</span>
-                        <div className="button-row">
-                          <img
-                            alt="图形验证码"
-                            className="captcha-image"
-                            src={authCaptcha?.image_data || ""}
-                          />
-                          <button
-                            className="secondary-button small-button"
-                            disabled={authCaptchaLoading}
-                            onClick={() => {
-                              void refreshAuthCaptcha(authMode);
-                            }}
-                            type="button"
+                    </>
+                  ) : (
+                    <div className="feedback-banner">登录后可上传你自己的知识库文件，并在 MCP 工具中按会员权限调用。</div>
+                  )}
+                </section>
+              ) : null}
+
+              {currentProfileTab === "plans" ? (
+                <section className="content-card profile-card profile-panel-card" id="plans">
+                  <div className="section-header">
+                    <div>
+                      <p className="section-eyebrow">会员方案</p>
+                      <h2>选择更适合你的学习节奏</h2>
+                    </div>
+                  </div>
+
+                  <div className="plan-table">
+                    {plans.map((plan) => (
+                      <article className="plan-row" key={plan.key}>
+                        <div>
+                          <div className="plan-row-header">
+                            <h3>{plan.name}</h3>
+                            {plan.recommended ? <span className="pill pill-primary">推荐选择</span> : null}
+                          </div>
+                          <p
+                            className="plan-row-meta"
+                            data-billing-label={plan.billing_mode === "monthly" ? "按月会员" : "一次性买断"}
+                            data-payment-channels={formatPaymentChannels(plan.payment_channels)}
                           >
-                            {authCaptchaLoading ? "刷新中..." : "换一张"}
+                            {plan.billing_mode}
+                          </p>
+                          <p>{plan.description}</p>
+                          <div className="tag-list">
+                            {plan.features.map((feature) => (
+                              <span className="tag" key={feature}>
+                                {feature}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="plan-row-side">
+                          <strong>{formatPrice(plan.price_cents)}</strong>
+                          <button className="primary-button" onClick={() => openCheckout(plan)} type="button">
+                            立即购买
                           </button>
                         </div>
-                      </div>
-                    </div>
-                    <button className="primary-button" disabled={authBusy !== ""} type="submit">
-                      {authBusy === "register"
-                        ? "注册中..."
-                        : authBusy === "login"
-                          ? "登录中..."
-                          : authMode === "register"
-                            ? "注册并开始学习"
-                            : "进入个人中心"}
-                    </button>
-                  </form>
-                ) : (
-                  <div className="profile-card-body">
-                    <div className={hasActiveMembership ? "feedback-banner feedback-success membership-summary-banner" : "feedback-banner membership-summary-banner"}>
-                      <div className="membership-summary-banner-head">
-                        <span className={hasActiveMembership ? "site-membership-badge site-membership-badge-active" : "site-membership-badge"}>
-                          {membershipBadgeText}
-                        </span>
-                        <strong>{currentMembership ? subscriptionStatusLabel(currentMembership.status) : "\u672a\u5f00\u901a"}</strong>
-                      </div>
-                      <p>
-                        {hasActiveMembership
-                          ? membershipExpiryText
-                            ? `你当前是按月会员，${membershipExpiryText}。`
-                            : "你当前会员权益已生效，当前为长期有效。"
-                          : "当前账号还没有生效中的会员权益，购买后会自动关联到你的学习账号。"}
-                      </p>
-                    </div>
-                    <div className="feedback-banner">
-                      购买会员后，后台会直接把会员状态和有效期关联到账号 <strong>{currentUser.username}</strong>，你在前台继续学习时就能一直使用同一个账号。
-                    </div>
-                    <p className="helper-text">
-                      如果你准备开通会员，可以从顶部导航、这里的按钮，或者会员方案页面进入购买；付款完成后，这个账号就是后续所有学习记录的承接入口。
-                    </p>
-                    <div className="button-row">
-                      <a className="primary-button" href="#plans">
-                        立即购买会员
-                      </a>
-                      <a className="secondary-button" href="#catalog">
-                        返回词库学习
-                      </a>
-                    </div>
+                      </article>
+                    ))}
                   </div>
-                )}
-              </section>
-            </div>
+                </section>
+              ) : null}
 
-            <div className="profile-grid">
-              <section className="content-card profile-card" id="profile-memberships">
-                <div className="section-header">
-                  <div>
-                    <p className="section-eyebrow">会员记录</p>
-                    <h2>按月会员到期时间和历史权益都在这里</h2>
-                  </div>
-                </div>
-                {currentUser ? (
-                  <>
-                    <div className="feedback-banner">
-                      当前学科：<strong>{selectedSubjectLabel}</strong>
-                      {membershipExpiryText ? `，${membershipExpiryText}` : "，当前没有生效中的到期时间。"}
-                    </div>
-                    <div className="table-wrap">
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>方案</th>
-                            <th>状态</th>
-                            <th>学科</th>
-                            <th>有效期至</th>
-                            <th>开通时间</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(membershipHistory?.items ?? []).map((item) => (
-                            <tr key={item.id}>
-                              <td>{item.plan_key || "-"}</td>
-                              <td>
-                                <span className={`pill ${subscriptionStatusClass(item.status)}`}>
-                                  {subscriptionStatusLabel(item.status)}
-                                </span>
-                              </td>
-                              <td>{formatSubjectLabel(item.subject_key)}</td>
-                              <td>{item.current_period_end ? formatDateTime(item.current_period_end) : "长期有效"}</td>
-                              <td>{item.started_at ? formatDateTime(item.started_at) : "-"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    {(membershipHistory?.items ?? []).length === 0 ? (
-                      <div className="feedback-banner">当前还没有会员记录，购买后会自动同步到这里。</div>
-                    ) : null}
-                    <PagerControls
-                      onChange={setMembershipHistoryPage}
-                      page={membershipHistory?.page ?? membershipHistoryPage}
-                      pageSize={membershipHistory?.page_size ?? profilePageSize}
-                      total={membershipHistory?.total ?? 0}
-                    />
-                  </>
-                ) : (
-                  <div className="feedback-banner">登录后可查看会员开通状态、按月到期时间和历史权益记录。</div>
-                )}
-              </section>
-
-              <section className="content-card profile-card" id="profile-orders">
-                <div className="section-header">
-                  <div>
-                    <p className="section-eyebrow">购买记录</p>
-                    <h2>充值、下单和支付结果一目了然</h2>
-                  </div>
-                </div>
-                {currentUser ? (
-                  <>
-                    <div className="table-wrap">
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>订单号</th>
-                            <th>方案</th>
-                            <th>金额</th>
-                            <th>状态</th>
-                            <th>支付时间</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(paymentOrders?.items ?? []).map((item) => (
-                            <tr key={item.order_no}>
-                              <td>{item.order_no}</td>
-                              <td>{item.description || item.plan_key}</td>
-                              <td>{formatPrice(item.amount_cents)}</td>
-                              <td>
-                                <span className={`pill ${paymentStatusClass(item.status)}`}>{paymentStatusLabel(item.status)}</span>
-                              </td>
-                              <td>{item.paid_at ? formatDateTime(item.paid_at) : item.created_at ? formatDateTime(item.created_at) : "-"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    {(paymentOrders?.items ?? []).length === 0 ? (
-                      <div className="feedback-banner">当前还没有购买记录，支付成功后会自动显示在这里。</div>
-                    ) : null}
-                    <PagerControls
-                      onChange={setOrderHistoryPage}
-                      page={paymentOrders?.page ?? orderHistoryPage}
-                      pageSize={paymentOrders?.page_size ?? profilePageSize}
-                      total={paymentOrders?.total ?? 0}
-                    />
-                  </>
-                ) : (
-                  <div className="feedback-banner">登录后可查看充值和会员购买记录。</div>
-                )}
-              </section>
-            </div>
-
-            <section className="content-card profile-card" id="profile-invite">
-              <div className="section-header">
-                <div>
-                  <p className="section-eyebrow">邀请好友</p>
-                  <h2>邀请码、邀请统计和转化记录集中查看</h2>
-                </div>
-                {currentUser ? (
-                  <div className="button-row">
-                    <button className="secondary-button small-button" onClick={() => void handleCopyInviteCode()} type="button">
-                      复制邀请码
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-              {currentUser ? (
-                <>
-                  <div className="profile-overview">
-                    <div>
-                      <strong>{inviteSummary?.invite_code || currentUser.invite_code || "-"}</strong>
-                      <span>我的邀请码</span>
-                    </div>
-                    <div>
-                      <strong>{formatCount(Number(inviteSummary?.invited_count ?? 0))}</strong>
-                      <span>已邀请人数</span>
-                    </div>
-                    <div>
-                      <strong>{formatCount(Number(inviteSummary?.paid_invite_count ?? 0))}</strong>
-                      <span>已付费人数</span>
-                    </div>
-                    <div>
-                      <strong>{formatPrice(inviteSummary?.total_recharge_cents ?? 0)}</strong>
-                      <span>累计邀请充值</span>
-                    </div>
-                  </div>
-                  <div className="table-wrap">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>好友账号</th>
-                          <th>显示名称</th>
-                          <th>注册时间</th>
-                          <th>付费次数</th>
-                          <th>累计充值</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(inviteSummary?.items ?? []).map((item) => (
-                          <tr key={item.user_id}>
-                            <td>{item.username}</td>
-                            <td>{item.display_name || "-"}</td>
-                            <td>{formatDateTime(item.created_at)}</td>
-                            <td>{formatCount(item.paid_order_count)}</td>
-                            <td>{formatPrice(item.total_recharge_cents)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {(inviteSummary?.items ?? []).length === 0 ? (
-                    <div className="feedback-banner">分享邀请码后，你邀请注册的用户和他们的付费记录会显示在这里。</div>
-                  ) : null}
-                </>
-              ) : (
-                <div className="feedback-banner">登录后可查看邀请码、邀请人数和累计充值统计。</div>
-              )}
-            </section>
-
-            <section className="content-card profile-card" id="profile-knowledge-base">
-              <div className="section-header">
-                <div>
-                  <p className="section-eyebrow">我的知识库</p>
-                  <h2>上传文本、Markdown、CSV、Excel 作为你自己的 MCP 私有知识库</h2>
-                </div>
-              </div>
-              {currentUser ? (
-                <>
+              {currentProfileTab === "insights" ? (
+                <div className="profile-panel-stack" id="profile-insights">
                   <div className="profile-grid">
-                    <form className="setup-form" onSubmit={handleSubmitKnowledgeBase}>
-                      <label className="form-field">
-                        <span>选择知识库文件</span>
-                        <label className={`upload-picker ${knowledgeBaseForm.file ? "upload-picker-ready" : ""}`}>
-                          <input
-                            accept=".txt,.md,.csv,.xlsx"
-                            className="upload-picker-input"
-                            onChange={(event) => {
-                              const file = event.target.files?.[0] ?? null;
-                              setKnowledgeBaseForm((current) => ({
-                                ...current,
-                                file,
-                                fileName: file?.name ?? "",
-                                title: current.title || (file?.name ? file.name.replace(/\.[^.]+$/, "") : ""),
-                              }));
-                            }}
-                            type="file"
-                          />
-                          <div className="upload-picker-main">
-                            <div className="upload-picker-meta">
-                              <strong>{knowledgeBaseForm.fileName || "点击选择要上传的知识库文件"}</strong>
-                              <span>
-                                {knowledgeBaseForm.file
-                                  ? `文件大小 ${formatFileSize(knowledgeBaseForm.file.size)}，上传后仅当前账号和对应 MCP 检索可见`
-                                  : "支持 TXT、Markdown、CSV、Excel，上传后会自动切片用于检索"}
-                              </span>
-                            </div>
-                            <span className="upload-picker-action">{knowledgeBaseForm.file ? "重新选择" : "选择文件"}</span>
-                          </div>
-                        </label>
-                      </label>
-                      <div className="upload-hint-list">
-                        <span className="tag">私有知识库</span>
-                        <span className="tag">支持 TXT / Markdown</span>
-                        <span className="tag">支持 CSV / Excel</span>
-                        <span className="tag">支持 MCP 检索</span>
+                    <section className="content-card profile-card profile-panel-card">
+                      <div className="section-header">
+                        <div>
+                          <p className="section-eyebrow">学习概况</p>
+                          <h2>当前词库与学习方向一目了然</h2>
+                        </div>
                       </div>
-                      <label className="form-field">
-                        <span>文档标题</span>
-                        <input
-                          value={knowledgeBaseForm.title}
-                          onChange={(event) => {
-                            setKnowledgeBaseForm((current) => ({ ...current, title: event.target.value }));
-                          }}
-                          placeholder="例如：我的产品知识库"
-                        />
-                      </label>
-                      <div className="feedback-banner">
-                        当前将上传到 <strong>{selectedSubjectLabel}</strong> 学科下，管理员也能在后台区分公共知识库和你的私有知识库。
+                      <dl className="metric-list">
+                        <div>
+                          <dt>科目数量</dt>
+                          <dd>{stats?.subject_count ?? 0}</dd>
+                        </div>
+                        <div>
+                          <dt>词汇数量</dt>
+                          <dd>{formatCount(stats?.word_count ?? 0)}</dd>
+                        </div>
+                        <div>
+                          <dt>场景分类</dt>
+                          <dd>{stats?.classification_count ?? 0}</dd>
+                        </div>
+                        <div>
+                          <dt>年级维度</dt>
+                          <dd>{stats?.grade_count ?? 0}</dd>
+                        </div>
+                      </dl>
+                      <p className="helper-text">{currentSettings.footer_text}</p>
+                    </section>
+
+                    <section className="content-card profile-card profile-panel-card">
+                      <div className="section-header">
+                        <div>
+                          <p className="section-eyebrow">学习建议</p>
+                          <h2>先学会用得上的，再慢慢学得更广</h2>
+                        </div>
                       </div>
-                      <button className="primary-button" disabled={profileBusyAction === "knowledge-base-upload"} type="submit">
-                        {profileBusyAction === "knowledge-base-upload" ? "上传处理中..." : "上传到我的知识库"}
-                      </button>
-                    </form>
-
-                    <div className="profile-card-body">
-                      <div className="feedback-banner feedback-success">
-                        你的个人知识库上传后，会自动参与开放接口与 MCP 工具的检索，但不会暴露给其他普通用户。
-                      </div>
-                      <ul className="detail-list">
-                        <li>支持上传管理员公共知识库之外的个人资料，适合整理自己的文档、表格和说明。</li>
-                        <li>停用后不会参与检索；删除后文档和切片都会一起移除。</li>
-                        <li>知识库检索结果会返回命中片段和文档来源，方便定位答案来自哪份文档。</li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  <div className="section-toolbar">
-                    <div>
-                      <h2>我的知识库文档</h2>
-                      <p className="helper-text">这里只展示当前账号上传的私有知识库文档。</p>
-                    </div>
-                    <input
-                      className="toolbar-search"
-                      onChange={(event) => {
-                        setKnowledgeBaseQuery(event.target.value);
-                        setKnowledgeBasePage(1);
-                      }}
-                      placeholder="搜索标题或文件名"
-                      value={knowledgeBaseQuery}
-                    />
-                  </div>
-
-                  <div className="table-wrap">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>标题</th>
-                          <th>文件名</th>
-                          <th>格式</th>
-                          <th>状态</th>
-                          <th>片段数</th>
-                          <th>更新时间</th>
-                          <th>操作</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(knowledgeBaseDocuments?.items ?? []).map((item) => {
-                          const statusBusy = profileBusyAction === `knowledge-base-status-${item.id}`;
-                          const deleteBusy = profileBusyAction === `knowledge-base-delete-${item.id}`;
-                          return (
-                            <tr key={item.id}>
-                              <td>{item.title}</td>
-                              <td>{item.source_file_name}</td>
-                              <td>{item.source_type}</td>
-                              <td>
-                                <span className={item.status === "active" ? "pill pill-success" : "pill pill-muted"}>
-                                  {item.status === "active" ? "启用中" : "已停用"}
-                                </span>
-                              </td>
-                              <td>{formatCount(item.chunk_count)}</td>
-                              <td>{formatDateTime(item.updated_at)}</td>
-                              <td>
-                                <div className="button-row">
-                                  <button
-                                    className="secondary-button small-button"
-                                    disabled={statusBusy || deleteBusy}
-                                    onClick={() => void handleToggleKnowledgeBaseDocument(item)}
-                                    type="button"
-                                  >
-                                    {statusBusy ? "处理中..." : item.status === "active" ? "停用" : "启用"}
-                                  </button>
-                                  <button
-                                    className="secondary-button small-button"
-                                    disabled={statusBusy || deleteBusy}
-                                    onClick={() => void handleDeleteKnowledgeBaseDocument(item)}
-                                    type="button"
-                                  >
-                                    {deleteBusy ? "删除中..." : "删除"}
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  {(knowledgeBaseDocuments?.items ?? []).length === 0 ? (
-                    <div className="feedback-banner">当前还没有上传个人知识库文件，先上传一份文本或表格试试。</div>
-                  ) : null}
-                  <PagerControls
-                    onChange={setKnowledgeBasePage}
-                    page={knowledgeBaseDocuments?.page ?? knowledgeBasePage}
-                    pageSize={knowledgeBaseDocuments?.page_size ?? profilePageSize}
-                    total={knowledgeBaseDocuments?.total ?? 0}
-                  />
-                </>
-              ) : (
-                <div className="feedback-banner">登录后可上传你自己的知识库文件，并在 MCP 工具中按会员权限调用。</div>
-              )}
-            </section>
-
-            <section className="content-card profile-card">
-              <div className="section-header">
-                <div>
-                  <p className="section-eyebrow">学习概况</p>
-                  <h2>当前词库与学习方向一目了然</h2>
-                </div>
-              </div>
-              <dl className="metric-list">
-                <div>
-                  <dt>科目数量</dt>
-                  <dd>{stats?.subject_count ?? 0}</dd>
-                </div>
-                <div>
-                  <dt>词汇数量</dt>
-                  <dd>{formatCount(stats?.word_count ?? 0)}</dd>
-                </div>
-                <div>
-                  <dt>场景分类</dt>
-                  <dd>{stats?.classification_count ?? 0}</dd>
-                </div>
-                <div>
-                  <dt>年级维度</dt>
-                  <dd>{stats?.grade_count ?? 0}</dd>
-                </div>
-              </dl>
-              <p className="helper-text">{currentSettings.footer_text}</p>
-            </section>
-
-            <section className="content-card" id="plans">
-              <div className="section-header">
-                <div>
-                  <p className="section-eyebrow">会员方案</p>
-                  <h2>选择更适合你的学习节奏</h2>
-                </div>
-              </div>
-
-              <div className="plan-table">
-                {plans.map((plan) => (
-                  <article className="plan-row" key={plan.key}>
-                    <div>
-                      <div className="plan-row-header">
-                        <h3>{plan.name}</h3>
-                        {plan.recommended ? <span className="pill pill-primary">推荐选择</span> : null}
-                      </div>
-                      <p
-                        className="plan-row-meta"
-                        data-billing-label={plan.billing_mode === "monthly" ? "按月会员" : "一次性买断"}
-                        data-payment-channels={formatPaymentChannels(plan.payment_channels)}
-                      >
-                        {plan.billing_mode}
+                      <p className="helper-text">
+                        {currentSettings.seo_description}
+                        {currentSettings.contact_email ? ` 如需合作或内容支持，可联系：${currentSettings.contact_email}` : ""}
                       </p>
-                      <p>{plan.description}</p>
-                      <div className="tag-list">
-                        {plan.features.map((feature) => (
-                          <span className="tag" key={feature}>
-                            {feature}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="plan-row-side">
-                      <strong>{formatPrice(plan.price_cents)}</strong>
-                      <button className="primary-button" onClick={() => openCheckout(plan)} type="button">
-                        立即购买
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-
-            <section className="content-card profile-card">
-              <div className="section-header">
-                <div>
-                  <p className="section-eyebrow">学习建议</p>
-                  <h2>先学会用得上的，再慢慢学得更广</h2>
+                    </section>
+                  </div>
                 </div>
-              </div>
-              <p className="helper-text">
-                {currentSettings.seo_description}
-                {currentSettings.contact_email ? ` 如需合作或内容支持，可联系：${currentSettings.contact_email}` : ""}
-              </p>
-            </section>
+              ) : null}
+            </div>
           </main>
         </div>
       ) : activeView === "mcp" ? (
@@ -2559,6 +2631,25 @@ function resolvePublicView(hash: string): PublicView {
     return "profile";
   }
   return "home";
+}
+
+function resolveProfileWorkspaceTab(hash: string): ProfileWorkspaceTab {
+  switch (hash) {
+    case "#profile-memberships":
+      return "memberships";
+    case "#profile-orders":
+      return "orders";
+    case "#profile-invite":
+      return "invite";
+    case "#profile-knowledge-base":
+      return "knowledge-base";
+    case "#plans":
+      return "plans";
+    case "#profile-insights":
+      return "insights";
+    default:
+      return "overview";
+  }
 }
 
 function canUseBrowserSpeech() {
