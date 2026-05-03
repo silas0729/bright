@@ -48,6 +48,8 @@ type Word struct {
 	Source         string `json:"source,omitempty"`
 	Phonetics      string `json:"phonetics,omitempty"`
 	Explanation    string `json:"explanation,omitempty"`
+	DefaultLevel      string `json:"default_level,omitempty"`
+	DefaultDifficulty string `json:"default_difficulty,omitempty"`
 	IsVIP          bool   `json:"is_vip"`
 }
 
@@ -338,6 +340,8 @@ type CreateWordInput struct {
 	Source         string `json:"source"`
 	Phonetics      string `json:"phonetics"`
 	Explanation    string `json:"explanation"`
+	DefaultLevel      string `json:"default_level"`
+	DefaultDifficulty string `json:"default_difficulty"`
 	IsVIP          bool   `json:"is_vip"`
 }
 
@@ -354,6 +358,8 @@ type UpdateWordInput struct {
 	Source         string `json:"source"`
 	Phonetics      string `json:"phonetics"`
 	Explanation    string `json:"explanation"`
+	DefaultLevel      string `json:"default_level"`
+	DefaultDifficulty string `json:"default_difficulty"`
 	IsVIP          bool   `json:"is_vip"`
 }
 

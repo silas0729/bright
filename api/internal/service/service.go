@@ -1256,17 +1256,25 @@ func (s *Service) CreateWord(ctx context.Context, input domain.CreateWordInput) 
 	}
 
 	model := storage.Word{
-		LegacyID:    input.LegacyID,
-		SubjectID:   subject.ID,
-		CategoryID:  categoryID,
-		GradeID:     gradeID,
-		Term:        term,
-		Translation: strings.TrimSpace(input.Translation),
-		SourceLabel: strings.TrimSpace(input.Source),
-		Phonetics:   strings.TrimSpace(input.Phonetics),
-		Explanation: strings.TrimSpace(input.Explanation),
-		IsVIP:       input.IsVIP,
-		Status:      "published",
+		LegacyID:          input.LegacyID,
+		SubjectID:         subject.ID,
+		CategoryID:        categoryID,
+		GradeID:           gradeID,
+		Term:              term,
+		Translation:       strings.TrimSpace(input.Translation),
+		SourceLabel:       strings.TrimSpace(input.Source),
+		Phonetics:         strings.TrimSpace(input.Phonetics),
+		Explanation:       strings.TrimSpace(input.Explanation),
+		DefaultLevel:      learningLevelBeginner,
+		DefaultDifficulty: learningDifficultyMedium,
+		IsVIP:             input.IsVIP,
+		Status:            "published",
+	}
+	if model.DefaultLevel, err = normalizeLearningLevel(input.DefaultLevel); err != nil {
+		return domain.Word{}, err
+	}
+	if model.DefaultDifficulty, err = normalizeLearningDifficulty(input.DefaultDifficulty); err != nil {
+		return domain.Word{}, err
 	}
 
 	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -1368,6 +1376,16 @@ func (s *Service) UpdateWord(ctx context.Context, id uint64, input domain.Update
 	model.SourceLabel = strings.TrimSpace(input.Source)
 	model.Phonetics = strings.TrimSpace(input.Phonetics)
 	model.Explanation = strings.TrimSpace(input.Explanation)
+	defaultLevel, err := normalizeLearningLevel(input.DefaultLevel)
+	if err != nil {
+		return domain.Word{}, err
+	}
+	defaultDifficulty, err := normalizeLearningDifficulty(input.DefaultDifficulty)
+	if err != nil {
+		return domain.Word{}, err
+	}
+	model.DefaultLevel = defaultLevel
+	model.DefaultDifficulty = defaultDifficulty
 	model.IsVIP = input.IsVIP
 
 	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -1957,15 +1975,17 @@ func toGrade(model storage.Grade) domain.Grade {
 
 func toWord(model storage.Word) domain.Word {
 	item := domain.Word{
-		ID:          model.ID,
-		LegacyID:    model.LegacyID,
-		SubjectID:   model.SubjectID,
-		Term:        model.Term,
-		Translation: model.Translation,
-		Source:      model.SourceLabel,
-		Phonetics:   model.Phonetics,
-		Explanation: model.Explanation,
-		IsVIP:       model.IsVIP,
+		ID:                model.ID,
+		LegacyID:          model.LegacyID,
+		SubjectID:         model.SubjectID,
+		Term:              model.Term,
+		Translation:       model.Translation,
+		Source:            model.SourceLabel,
+		Phonetics:         model.Phonetics,
+		Explanation:       model.Explanation,
+		DefaultLevel:      model.DefaultLevel,
+		DefaultDifficulty: model.DefaultDifficulty,
+		IsVIP:             model.IsVIP,
 	}
 	if model.Subject.ID > 0 {
 		item.SubjectKey = model.Subject.Key

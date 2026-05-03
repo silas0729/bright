@@ -24,14 +24,16 @@ const (
 )
 
 type learningWordSnapshot struct {
-	ID             uint64 `gorm:"column:id"`
-	SubjectKey     string `gorm:"column:subject_key"`
-	Term           string `gorm:"column:term"`
-	Translation    string `gorm:"column:translation"`
-	Classification string `gorm:"column:classification"`
-	SourceLabel    string `gorm:"column:source_label"`
-	Phonetics      string `gorm:"column:phonetics"`
-	Explanation    string `gorm:"column:explanation"`
+	ID                uint64 `gorm:"column:id"`
+	SubjectKey        string `gorm:"column:subject_key"`
+	Term              string `gorm:"column:term"`
+	Translation       string `gorm:"column:translation"`
+	Classification    string `gorm:"column:classification"`
+	SourceLabel       string `gorm:"column:source_label"`
+	Phonetics         string `gorm:"column:phonetics"`
+	Explanation       string `gorm:"column:explanation"`
+	DefaultLevel      string `gorm:"column:default_level"`
+	DefaultDifficulty string `gorm:"column:default_difficulty"`
 }
 
 func (s *Service) ListLearnerWordProgress(
@@ -135,8 +137,8 @@ func (s *Service) SaveLearnerWordProgress(
 			LearnerUserID: learnerID,
 			WordID:        input.WordID,
 			SubjectKey:    snapshot.SubjectKey,
-			Level:         learningLevelBeginner,
-			Difficulty:    learningDifficultyMedium,
+			Level:         snapshot.DefaultLevel,
+			Difficulty:    snapshot.DefaultDifficulty,
 		}
 	case err != nil:
 		return domain.LearnerWordProgress{}, err
@@ -199,8 +201,8 @@ func (s *Service) ReviewLearnerWord(
 				LearnerUserID: learnerID,
 				WordID:        input.WordID,
 				SubjectKey:    snapshot.SubjectKey,
-				Level:         learningLevelBeginner,
-				Difficulty:    learningDifficultyMedium,
+				Level:         snapshot.DefaultLevel,
+				Difficulty:    snapshot.DefaultDifficulty,
 			}
 		case err != nil:
 			return err
@@ -210,11 +212,11 @@ func (s *Service) ReviewLearnerWord(
 			model.SubjectKey = snapshot.SubjectKey
 		}
 
-		level, err := normalizeLearningLevel(firstNonEmpty(input.Level, model.Level, learningLevelBeginner))
+		level, err := normalizeLearningLevel(firstNonEmpty(input.Level, model.Level, snapshot.DefaultLevel, learningLevelBeginner))
 		if err != nil {
 			return err
 		}
-		difficulty, err := normalizeLearningDifficulty(firstNonEmpty(input.Difficulty, model.Difficulty, learningDifficultyMedium))
+		difficulty, err := normalizeLearningDifficulty(firstNonEmpty(input.Difficulty, model.Difficulty, snapshot.DefaultDifficulty, learningDifficultyMedium))
 		if err != nil {
 			return err
 		}
@@ -467,6 +469,7 @@ func (s *Service) findLearningWordSnapshot(ctx context.Context, wordID uint64) (
 		Select(
 			"words.id, subjects.subject_key, words.term, words.translation, "+
 				"words.source_label AS source_label, words.phonetics, words.explanation, "+
+				"words.default_level, words.default_difficulty, "+
 				"COALESCE(categories.name, 'Unclassified') AS classification",
 		).
 		Joins("JOIN subjects ON subjects.id = words.subject_id").
@@ -480,6 +483,8 @@ func (s *Service) findLearningWordSnapshot(ctx context.Context, wordID uint64) (
 		return learningWordSnapshot{}, errors.New("word does not exist")
 	}
 	snapshot.SubjectKey = normalizeKey(snapshot.SubjectKey)
+	snapshot.DefaultLevel = normalizeLearningLevelOrDefault(snapshot.DefaultLevel)
+	snapshot.DefaultDifficulty = normalizeLearningDifficultyOrDefault(snapshot.DefaultDifficulty)
 	return snapshot, nil
 }
 
@@ -511,6 +516,7 @@ func (s *Service) learningWordSnapshotMap(
 		Select(
 			"words.id, subjects.subject_key, words.term, words.translation, "+
 				"words.source_label AS source_label, words.phonetics, words.explanation, "+
+				"words.default_level, words.default_difficulty, "+
 				"COALESCE(categories.name, 'Unclassified') AS classification",
 		).
 		Joins("JOIN subjects ON subjects.id = words.subject_id").
@@ -521,6 +527,8 @@ func (s *Service) learningWordSnapshotMap(
 	}
 	for _, item := range items {
 		item.SubjectKey = normalizeKey(item.SubjectKey)
+		item.DefaultLevel = normalizeLearningLevelOrDefault(item.DefaultLevel)
+		item.DefaultDifficulty = normalizeLearningDifficultyOrDefault(item.DefaultDifficulty)
 		result[item.ID] = item
 	}
 	return result, nil
@@ -569,6 +577,14 @@ func normalizeLearningLevel(value string) (string, error) {
 	}
 }
 
+func normalizeLearningLevelOrDefault(value string) string {
+	level, err := normalizeLearningLevel(value)
+	if err != nil {
+		return learningLevelBeginner
+	}
+	return level
+}
+
 func normalizeLearningDifficulty(value string) (string, error) {
 	switch strings.TrimSpace(strings.ToLower(value)) {
 	case "", learningDifficultyMedium:
@@ -580,6 +596,14 @@ func normalizeLearningDifficulty(value string) (string, error) {
 	default:
 		return "", errors.New("learning difficulty must be easy, medium, or hard")
 	}
+}
+
+func normalizeLearningDifficultyOrDefault(value string) string {
+	difficulty, err := normalizeLearningDifficulty(value)
+	if err != nil {
+		return learningDifficultyMedium
+	}
+	return difficulty
 }
 
 func learningNextLevel(current string, remembered bool, consecutiveCorrect int) string {

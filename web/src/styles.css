@@ -2708,99 +2708,83 @@ textarea {
 
 .toolbar-search {
   min-width: 240px;
+  width: min(100%, 280px);
 }
 
 .import-workbench {
   display: grid;
-  gap: 20px;
+  gap: 16px;
 }
 
 .import-tabbar {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  padding: 4px;
-  border: 1px solid rgba(216, 226, 238, 0.9);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: var(--shadow-card);
-}
-
-.import-tabbar::-webkit-scrollbar {
-  height: 8px;
-}
-
-.import-tabbar::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(84, 99, 118, 0.28);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid rgba(216, 226, 238, 0.95);
+  border-radius: 18px;
+  background: #ffffff;
 }
 
 .import-tab-button {
-  display: grid;
-  flex: 0 0 auto;
-  gap: 6px;
-  min-width: 154px;
-  padding: 16px 18px;
-  border: 1px solid transparent;
-  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 10px;
+  min-width: 0;
+  padding: 13px 16px;
+  border: none;
+  border-radius: 0;
   text-align: left;
   color: #445468;
-  background: transparent;
+  background: #ffffff;
+  box-shadow: inset -1px -1px 0 #edf2f7;
   transition:
-    transform 140ms ease,
-    border-color 140ms ease,
     background-color 140ms ease,
+    color 140ms ease,
     box-shadow 140ms ease;
 }
 
 .import-tab-button:hover {
-  transform: translateY(-1px);
-  border-color: #d7e2ee;
-  background: rgba(248, 251, 255, 0.9);
+  color: #223247;
+  background: #f8fbff;
 }
 
-.import-tab-button span {
-  font-size: 1rem;
-  font-weight: 800;
-  color: var(--text);
-}
-
-.import-tab-button small {
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.5;
+.import-tab-label {
+  color: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .import-tab-button em {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: fit-content;
-  min-height: 26px;
-  padding: 0 10px;
+  min-height: 20px;
+  padding: 0 7px;
   border-radius: 999px;
   color: #274260;
   font-style: normal;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  background: #eaf1f8;
+  line-height: 1;
+  background: #dfe9f4;
 }
 
 .import-tab-button-active {
-  border-color: transparent;
-  color: #ffffff;
-  background: linear-gradient(135deg, #183650 0%, #10253b 100%);
-  box-shadow: 0 16px 28px rgba(16, 37, 59, 0.18);
-}
-
-.import-tab-button-active span,
-.import-tab-button-active small {
-  color: #eff5fb;
+  color: #10253b;
+  background: #f7fbff;
+  box-shadow:
+    inset 0 -2px 0 #143a60,
+    inset -1px -1px 0 #edf2f7;
 }
 
 .import-tab-button-active em {
   color: #10253b;
-  background: #ffffff;
+  background: #edf3f9;
 }
 
 .import-panel-stack {
@@ -2984,6 +2968,7 @@ textarea {
   border-bottom: 1px solid #e7edf4;
   text-align: left;
   vertical-align: top;
+  word-break: break-word;
 }
 
 .data-table th {
@@ -2996,6 +2981,14 @@ textarea {
 
 .data-table tr:hover td {
   background: #f8fbff;
+}
+
+.admin-main .table-wrap {
+  overflow-x: hidden;
+}
+
+.admin-main .data-table {
+  table-layout: fixed;
 }
 
 .role-grid {
@@ -3201,6 +3194,7 @@ textarea {
 
   .import-tabbar {
     width: 100%;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   }
 }
 
@@ -3260,8 +3254,7 @@ textarea {
   }
 
   .import-tab-button {
-    min-width: 136px;
-    padding: 14px 16px;
+    padding: 12px 14px;
   }
 
   .mcp-url-meta {

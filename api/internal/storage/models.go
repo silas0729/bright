@@ -107,6 +107,8 @@ type Word struct {
 	SourceLabel string `gorm:"size:255;index"`
 	Phonetics   string `gorm:"type:text"`
 	Explanation string `gorm:"type:text"`
+	DefaultLevel      string `gorm:"size:32;not null;default:beginner;index"`
+	DefaultDifficulty string `gorm:"size:32;not null;default:medium;index"`
 	IsVIP       bool   `gorm:"column:is_v_ip;not null;default:false;index"`
 	Status      string `gorm:"size:32;not null;default:published;index"`
 	CreatedAt   time.Time

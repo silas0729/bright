@@ -54,6 +54,8 @@ export interface Word {
   source?: string;
   phonetics?: string;
   explanation?: string;
+  default_level?: string;
+  default_difficulty?: string;
   is_vip?: boolean;
 }
 
@@ -526,6 +528,13 @@ export interface MCPToolConfig {
   updated_at: string;
 }
 
+export interface PagedMCPToolConfigs {
+  items: MCPToolConfig[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 export interface UpdateMCPToolConfigInput {
   is_enabled?: boolean;
   requires_membership?: boolean;
@@ -736,12 +745,14 @@ export interface CreateWordInput {
   source: string;
   phonetics: string;
   explanation: string;
+  default_level?: string;
+  default_difficulty?: string;
   is_vip: boolean;
 }
 
 export interface UpdateWordInput {
- legacy_id?: number;
- subject_key: string;
+  legacy_id?: number;
+  subject_key: string;
   classification?: string;
   category_name?: string;
   grade_id?: number | null;
@@ -750,7 +761,9 @@ export interface UpdateWordInput {
   source: string;
   phonetics: string;
   explanation: string;
- is_vip: boolean;
+  default_level?: string;
+  default_difficulty?: string;
+  is_vip: boolean;
 }
 
 export interface BatchUpdateWordVIPInput {
@@ -2003,8 +2016,18 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     });
   },
-  adminMCPToolConfigs(token: string) {
-    return request<MCPToolConfig[]>("/api/v1/admin/mcp/tools", {
+  adminMCPToolConfigs(token: string, params: { page: number; pageSize: number; query?: string; category?: string }) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.category) {
+      search.set("category", params.category);
+    }
+    return request<PagedMCPToolConfigs>(`/api/v1/admin/mcp/tools?${search.toString()}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
   },

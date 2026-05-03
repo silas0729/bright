@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -9,12 +10,19 @@ import (
 )
 
 func (s *Server) handleAdminMCPToolConfigs(c *gin.Context) {
-	items, err := s.service.ListMCPToolConfigs(c.Request.Context())
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	result, err := s.service.ListAdminMCPToolConfigs(c.Request.Context(), domain.MCPToolConfigFilter{
+		Query:    c.Query("q"),
+		Category: c.Query("category"),
+		Page:     page,
+		PageSize: pageSize,
+	})
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, err)
 		return
 	}
-	c.JSON(http.StatusOK, items)
+	c.JSON(http.StatusOK, result)
 }
 
 func (s *Server) handleAdminUpdateMCPToolConfig(c *gin.Context) {

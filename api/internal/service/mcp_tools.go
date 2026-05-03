@@ -81,6 +81,52 @@ func (s *Service) ListMCPToolConfigs(ctx context.Context) ([]domain.MCPToolConfi
 	return items, nil
 }
 
+func (s *Service) ListAdminMCPToolConfigs(ctx context.Context, filter domain.MCPToolConfigFilter) (domain.PagedMCPToolConfigs, error) {
+	if err := s.SyncDefaultMCPToolConfigs(ctx); err != nil {
+		return domain.PagedMCPToolConfigs{}, err
+	}
+
+	page, pageSize := normalizePage(filter.Page, filter.PageSize, 20)
+
+	query := s.db.WithContext(ctx).Model(&storage.MCPToolConfig{})
+	if q := strings.TrimSpace(filter.Query); q != "" {
+		like := "%" + q + "%"
+		query = query.Where(
+			"tool_name LIKE ? OR title LIKE ? OR description LIKE ? OR category LIKE ? OR source_type LIKE ?",
+			like,
+			like,
+			like,
+			like,
+			like,
+		)
+	}
+	if category := strings.TrimSpace(filter.Category); category != "" {
+		query = query.Where("category = ?", normalizeToolCategory(category))
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return domain.PagedMCPToolConfigs{}, err
+	}
+
+	var models []storage.MCPToolConfig
+	if err := query.Order("category asc, tool_name asc").Limit(pageSize).Offset((page - 1) * pageSize).Find(&models).Error; err != nil {
+		return domain.PagedMCPToolConfigs{}, err
+	}
+
+	items := make([]domain.MCPToolConfig, 0, len(models))
+	for _, model := range models {
+		items = append(items, toMCPToolConfig(model))
+	}
+
+	return domain.PagedMCPToolConfigs{
+		Items:    items,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+	}, nil
+}
+
 func (s *Service) GetMCPToolConfigMap(ctx context.Context) (map[string]domain.MCPToolConfig, error) {
 	items, err := s.ListMCPToolConfigs(ctx)
 	if err != nil {

@@ -14,7 +14,6 @@ import {
   type CatalogStats,
   type Grade,
   type KnowledgeBaseChunk,
-  type MCPToolConfig,
   type PagedAPIConfigs,
   type PagedAdminUsers,
   type PagedAdminInviteStats,
@@ -22,6 +21,7 @@ import {
   type PagedGrades,
   type PagedKnowledgeBaseDocuments,
   type PagedLearnerUsers,
+  type PagedMCPToolConfigs,
   type PagedPaymentOrders,
   type PagedSubscriptions,
   type PagedWords,
@@ -40,6 +40,17 @@ const adminSessionStorageKey = "brights_admin_session";
 const adminUIStateStorageKey = "brights_admin_ui_state";
 const unclassifiedCategoryValue = "__unclassified__";
 const defaultRolePermissionsValue = "admin.read\ncatalog.read\npayment.read\nplan.read";
+const learningLevelOptions = [
+  { value: "beginner", label: "初级" },
+  { value: "intermediate", label: "中级" },
+  { value: "advanced", label: "高级" },
+  { value: "mastered", label: "已掌握" },
+] as const;
+const learningDifficultyOptions = [
+  { value: "easy", label: "简单" },
+  { value: "medium", label: "中等" },
+  { value: "hard", label: "困难" },
+] as const;
 
 const rolePermissionGroups = [
   {
@@ -275,7 +286,7 @@ export default function AdminPortal() {
   } | null>(null);
   const [knowledgeBasePreviewChunks, setKnowledgeBasePreviewChunks] = useState<KnowledgeBaseChunk[]>([]);
   const [knowledgeBasePreviewLoading, setKnowledgeBasePreviewLoading] = useState(false);
-  const [mcpToolConfigs, setMcpToolConfigs] = useState<MCPToolConfig[]>([]);
+  const [mcpToolConfigs, setMcpToolConfigs] = useState<PagedMCPToolConfigs | null>(null);
   const [apiConfigs, setAPIConfigs] = useState<PagedAPIConfigs | null>(null);
   const [inviteStats, setInviteStats] = useState<PagedAdminInviteStats | null>(null);
   const [wordFilterCategories, setWordFilterCategories] = useState<Category[]>([]);
@@ -369,6 +380,8 @@ export default function AdminPortal() {
     source: "",
     phonetics: "",
     explanation: "",
+    defaultLevel: "beginner",
+    defaultDifficulty: "medium",
     isVIP: false,
   });
   const [siteForm, setSiteForm] = useState<SiteSetting>(defaultSiteForm);
@@ -439,6 +452,7 @@ export default function AdminPortal() {
   const [categoryPage, setCategoryPage] = useState(persistedUIState.categoryPage ?? 1);
   const [gradePage, setGradePage] = useState(persistedUIState.gradePage ?? 1);
   const [knowledgeBasePage, setKnowledgeBasePage] = useState(1);
+  const [mcpToolPage, setMcpToolPage] = useState(1);
   const [paymentPage, setPaymentPage] = useState(persistedUIState.paymentPage ?? 1);
   const [subscriptionPage, setSubscriptionPage] = useState(persistedUIState.subscriptionPage ?? 1);
   const [adminUserQuery, setAdminUserQuery] = useState(persistedUIState.adminUserQuery ?? "");
@@ -450,6 +464,7 @@ export default function AdminPortal() {
   const [categoryQuery, setCategoryQuery] = useState(persistedUIState.categoryQuery ?? "");
   const [gradeQuery, setGradeQuery] = useState(persistedUIState.gradeQuery ?? "");
   const [knowledgeBaseQuery, setKnowledgeBaseQuery] = useState("");
+  const [mcpToolQuery, setMcpToolQuery] = useState("");
   const [apiConfigPage, setAPIConfigPage] = useState(1);
   const [apiConfigQuery, setAPIConfigQuery] = useState("");
   const [inviteStatPage, setInviteStatPage] = useState(1);
@@ -471,6 +486,7 @@ export default function AdminPortal() {
   const deferredCategoryQuery = useDeferredValue(categoryQuery);
   const deferredGradeQuery = useDeferredValue(gradeQuery);
   const deferredKnowledgeBaseQuery = useDeferredValue(knowledgeBaseQuery);
+  const deferredMCPToolQuery = useDeferredValue(mcpToolQuery);
   const deferredAPIConfigQuery = useDeferredValue(apiConfigQuery);
   const deferredInviteStatQuery = useDeferredValue(inviteStatQuery);
   const deferredPaymentQuery = useDeferredValue(paymentQuery);
@@ -560,6 +576,16 @@ export default function AdminPortal() {
       return match.name;
     }
     return key || "-";
+  };
+
+  const formatLearningLevelLabel = (value?: string) => {
+    const match = learningLevelOptions.find((item) => item.value === value);
+    return match?.label ?? value ?? "-";
+  };
+
+  const formatLearningDifficultyLabel = (value?: string) => {
+    const match = learningDifficultyOptions.find((item) => item.value === value);
+    return match?.label ?? value ?? "-";
   };
 
   async function refreshLoginCaptcha() {
@@ -698,7 +724,7 @@ export default function AdminPortal() {
       setKnowledgeBaseDocuments(null);
       setKnowledgeBasePreviewDocument(null);
       setKnowledgeBasePreviewChunks([]);
-      setMcpToolConfigs([]);
+      setMcpToolConfigs(null);
       setInviteStats(null);
       setSelectedOrderDetail(null);
       return;
@@ -743,7 +769,13 @@ export default function AdminPortal() {
         query: deferredKnowledgeBaseQuery,
         subjectKey: subjectFilter,
       }),
-      canViewMCPTools ? api.adminMCPToolConfigs(token) : Promise.resolve([]),
+      canViewMCPTools
+        ? api.adminMCPToolConfigs(token, {
+            page: mcpToolPage,
+            pageSize: adminPageSize,
+            query: deferredMCPToolQuery,
+          })
+        : Promise.resolve(null),
       canViewMCPTools
         ? api.adminAPIConfigs(token, {
             page: apiConfigPage,
@@ -819,7 +851,7 @@ export default function AdminPortal() {
           setCategories(categoryData);
           setGrades(gradeData);
           setKnowledgeBaseDocuments(knowledgeBaseData);
-          setMcpToolConfigs((mcpToolConfigData as MCPToolConfig[]) ?? []);
+          setMcpToolConfigs((mcpToolConfigData as PagedMCPToolConfigs | null) ?? null);
           setAPIConfigs((apiConfigData as PagedAPIConfigs | null) ?? null);
           setInviteStats((inviteStatData as PagedAdminInviteStats | null) ?? null);
           setSiteSettings((siteData as SiteSetting | null) ?? null);
@@ -872,6 +904,7 @@ export default function AdminPortal() {
     deferredInviteStatQuery,
     deferredKnowledgeBaseQuery,
     deferredLearnerQuery,
+    deferredMCPToolQuery,
     deferredPaymentQuery,
     deferredSubscriptionQuery,
     deferredWordQuery,
@@ -880,6 +913,7 @@ export default function AdminPortal() {
     knowledgeBasePage,
     learnerPage,
     learnerStatusFilter,
+    mcpToolPage,
     paymentPage,
     paymentStatusFilter,
     reloadKey,
@@ -1628,6 +1662,8 @@ export default function AdminPortal() {
         source: wordEditor.source,
         phonetics: wordEditor.phonetics,
         explanation: wordEditor.explanation,
+        default_level: wordEditor.defaultLevel,
+        default_difficulty: wordEditor.defaultDifficulty,
         is_vip: wordEditor.isVIP,
       };
 
@@ -2173,6 +2209,8 @@ function startEditPlan(plan: Plan) {
       source: item.source || "",
       phonetics: item.phonetics || "",
       explanation: item.explanation || "",
+      defaultLevel: item.default_level || "beginner",
+      defaultDifficulty: item.default_difficulty || "medium",
       isVIP: Boolean(item.is_vip),
     });
     setNotice("");
@@ -2401,6 +2439,8 @@ function startEditLearner(item: AdminLearnerUser) {
       source: "",
       phonetics: "",
       explanation: "",
+      defaultLevel: "beginner",
+      defaultDifficulty: "medium",
       isVIP: false,
     });
   }
@@ -2669,7 +2709,7 @@ function startEditLearner(item: AdminLearnerUser) {
 
   const mcpTabItems: Array<(WorkspaceTabItem<MCPWorkspaceTab> & { hidden?: boolean })> = [
     { key: "api-tools", label: "API 工具", helper: "动态接口与测试", hidden: !canViewMCPTools, count: apiConfigs?.total ?? 0 },
-    { key: "tool-access", label: "工具权限", helper: "开关与会员门槛", hidden: !canViewMCPTools, count: mcpToolConfigs.length },
+    { key: "tool-access", label: "工具权限", helper: "开关与会员门槛", hidden: !canViewMCPTools, count: mcpToolConfigs?.total ?? 0 },
     { key: "invite-stats", label: "邀请统计", helper: "邀请与付费转化", hidden: !canViewInviteStats, count: inviteStats?.total ?? 0 },
   ];
 
@@ -4810,10 +4850,19 @@ function startEditLearner(item: AdminLearnerUser) {
                       <h2>MCP 工具配置</h2>
                       <p className="helper-text">管理员可以决定哪些工具开放、哪些工具需要会员才能调用。</p>
                     </div>
+                    <input
+                      className="toolbar-search"
+                      value={mcpToolQuery}
+                      onChange={(event) => {
+                        setMcpToolQuery(event.target.value);
+                        setMcpToolPage(1);
+                      }}
+                      placeholder="搜索工具名、标题、分类或来源"
+                    />
                   </div>
                   <DataTable
                     columns={canManageMCPTools ? ["工具", "分类", "来源", "说明", "开关", "会员"] : ["工具", "分类", "来源", "说明", "开关", "会员"]}
-                    rows={mcpToolConfigs.map((item) => [
+                    rows={(mcpToolConfigs?.items ?? []).map((item) => [
                       <div className="mcp-cell-stack">
                         <strong>{item.title || item.tool_name}</strong>
                         <span className="mcp-table-muted">{item.tool_name}</span>
@@ -4855,6 +4904,13 @@ function startEditLearner(item: AdminLearnerUser) {
                       ),
                     ])}
                     emptyText="当前还没有可管理的 MCP 工具。"
+                  />
+                  <PagerControls
+                    disabled={dataLoading}
+                    onChange={setMcpToolPage}
+                    page={mcpToolConfigs?.page ?? mcpToolPage}
+                    pageSize={mcpToolConfigs?.page_size ?? adminPageSize}
+                    total={mcpToolConfigs?.total ?? 0}
                   />
                 </article>
               ) : null}
@@ -6232,10 +6288,10 @@ function AdminSectionTabs<K extends string>(props: {
           key={item.key}
           onClick={() => props.onChange(item.key)}
           role="tab"
+          title={item.helper ? `${item.label} · ${item.helper}` : item.label}
           type="button"
         >
-          <span>{item.label}</span>
-          {item.helper ? <small>{item.helper}</small> : null}
+          <span className="import-tab-label">{item.label}</span>
           {item.count !== undefined ? <em>{formatCount(item.count)}</em> : null}
         </button>
       ))}
