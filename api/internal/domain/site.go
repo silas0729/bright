@@ -12,6 +12,7 @@ type SiteSetting struct {
 	SEOKeywords     string `json:"seo_keywords"`
 	FooterText      string `json:"footer_text"`
 	ContactEmail    string `json:"contact_email"`
+	InviteCommissionRate float64 `json:"invite_commission_rate"`
 }
 
 type SaveSiteSettingInput struct {
@@ -26,4 +27,5 @@ type SaveSiteSettingInput struct {
 	SEOKeywords     string `json:"seo_keywords"`
 	FooterText      string `json:"footer_text"`
 	ContactEmail    string `json:"contact_email"`
+	InviteCommissionRate float64 `json:"invite_commission_rate"`
 }

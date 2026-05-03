@@ -618,6 +618,88 @@ func (s *Server) tools(ctx context.Context, session *Session) []Tool {
 			OutputSchema: toolResultSchema,
 		},
 		{
+			Name:         "get_my_invite_payout_profile",
+			Title:        "Get Invite Payout Profile",
+			Description:  "Get the current learner's invite commission payout profile.",
+			Category:     "account",
+			SourceType:   "builtin",
+			Enabled:      true,
+			InputSchema:  objectSchema(nil),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "save_my_invite_payout_profile",
+			Title:       "Save Invite Payout Profile",
+			Description: "Create or update the current learner's invite commission payout profile.",
+			Category:    "account",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"real_name":      map[string]interface{}{"type": "string"},
+				"wechat_account": map[string]interface{}{"type": "string"},
+				"wechat_qr_code": map[string]interface{}{"type": "string"},
+				"alipay_account": map[string]interface{}{"type": "string"},
+				"alipay_qr_code": map[string]interface{}{"type": "string"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "list_my_invite_commissions",
+			Title:       "List Invite Commissions",
+			Description: "List the current learner's invite commission records.",
+			Category:    "account",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"status":    map[string]interface{}{"type": "string"},
+				"page":      map[string]interface{}{"type": "integer"},
+				"page_size": map[string]interface{}{"type": "integer"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "list_my_invite_withdraw_requests",
+			Title:       "List Invite Withdraw Requests",
+			Description: "List the current learner's invite commission withdraw requests.",
+			Category:    "account",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"status":    map[string]interface{}{"type": "string"},
+				"query":     map[string]interface{}{"type": "string"},
+				"q":         map[string]interface{}{"type": "string"},
+				"page":      map[string]interface{}{"type": "integer"},
+				"page_size": map[string]interface{}{"type": "integer"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "create_invite_withdraw_request",
+			Title:       "Create Invite Withdraw Request",
+			Description: "Create a withdraw request for the current learner's invite commissions.",
+			Category:    "account",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"amount_cents": map[string]interface{}{"type": "integer"},
+				"payment_type": map[string]interface{}{"type": "string", "description": "wechat or alipay."},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "cancel_invite_withdraw_request",
+			Title:       "Cancel Invite Withdraw Request",
+			Description: "Cancel a pending invite commission withdraw request for the current learner.",
+			Category:    "account",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"withdraw_request_id": map[string]interface{}{"type": "integer"},
+				"id":                  map[string]interface{}{"type": "integer"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
 			Name:        "get_learning_summary",
 			Title:       "Get Learning Summary",
 			Description: "Get level counts, difficulty counts, and memory curve statistics for the current learner.",
@@ -845,6 +927,49 @@ func (s *Server) callTool(ctx context.Context, session Session, req CallToolRequ
 	case "get_invite_summary":
 		data, err := s.service.GetInviteSummary(ctx, session.UserID)
 		return newToolResult(canonicalName, data, err)
+	case "get_my_invite_payout_profile":
+		data, err := s.service.GetInvitePayoutProfile(ctx, session.UserID)
+		return newToolResult(canonicalName, data, err)
+	case "save_my_invite_payout_profile":
+		data, err := s.service.SaveInvitePayoutProfile(ctx, session.UserID, domain.SaveInvitePayoutProfileInput{
+			RealName:      stringArg(req.Arguments, "real_name", ""),
+			WechatAccount: stringArg(req.Arguments, "wechat_account", ""),
+			WechatQRCode:  stringArg(req.Arguments, "wechat_qr_code", ""),
+			AlipayAccount: stringArg(req.Arguments, "alipay_account", ""),
+			AlipayQRCode:  stringArg(req.Arguments, "alipay_qr_code", ""),
+		})
+		return newToolResult(canonicalName, data, err)
+	case "list_my_invite_commissions":
+		data, err := s.service.ListInviteCommissionRecords(ctx, session.UserID, domain.InviteCommissionFilter{
+			Status:   stringArg(req.Arguments, "status", ""),
+			Page:     intArg(req.Arguments, "page", 1),
+			PageSize: intArg(req.Arguments, "page_size", 10),
+		})
+		return newToolResult(canonicalName, data, err)
+	case "list_my_invite_withdraw_requests":
+		data, err := s.service.ListInviteWithdrawRequests(ctx, session.UserID, domain.InviteWithdrawFilter{
+			Query:    firstNonEmpty(stringArg(req.Arguments, "query", ""), stringArg(req.Arguments, "q", "")),
+			Status:   stringArg(req.Arguments, "status", ""),
+			Page:     intArg(req.Arguments, "page", 1),
+			PageSize: intArg(req.Arguments, "page_size", 10),
+		})
+		return newToolResult(canonicalName, data, err)
+	case "create_invite_withdraw_request":
+		data, err := s.service.CreateInviteWithdrawRequest(ctx, session.UserID, domain.CreateInviteWithdrawRequestInput{
+			AmountCents: int64(intArg(req.Arguments, "amount_cents", 0)),
+			PaymentType: stringArg(req.Arguments, "payment_type", ""),
+		})
+		return newToolResult(canonicalName, data, err)
+	case "cancel_invite_withdraw_request":
+		requestID := intArg(req.Arguments, "withdraw_request_id", 0)
+		if requestID <= 0 {
+			requestID = intArg(req.Arguments, "id", 0)
+		}
+		err := s.service.CancelInviteWithdrawRequest(ctx, session.UserID, uint(requestID))
+		return newToolResult(canonicalName, map[string]interface{}{
+			"success":             err == nil,
+			"withdraw_request_id": requestID,
+		}, err)
 	case "get_learning_summary":
 		data, err := s.service.GetLearnerLearningSummary(ctx, session.UserID, stringArg(req.Arguments, "subject_key", session.SubjectKey))
 		return newToolResult(canonicalName, data, err)
@@ -1051,6 +1176,18 @@ func canonicalToolName(name string) string {
 		return "list_my_memberships"
 	case "get_invite_summary", "my_invite_summary", "brights_get_invite_summary":
 		return "get_invite_summary"
+	case "get_my_invite_payout_profile", "my_invite_payout_profile":
+		return "get_my_invite_payout_profile"
+	case "save_my_invite_payout_profile", "update_my_invite_payout_profile":
+		return "save_my_invite_payout_profile"
+	case "list_my_invite_commissions", "my_invite_commissions":
+		return "list_my_invite_commissions"
+	case "list_my_invite_withdraw_requests", "my_invite_withdraw_requests":
+		return "list_my_invite_withdraw_requests"
+	case "create_invite_withdraw_request", "my_create_invite_withdraw_request":
+		return "create_invite_withdraw_request"
+	case "cancel_invite_withdraw_request", "my_cancel_invite_withdraw_request":
+		return "cancel_invite_withdraw_request"
 	case "get_learning_summary", "my_learning_summary":
 		return "get_learning_summary"
 	case "list_learning_progress", "my_learning_progress":
@@ -1071,6 +1208,9 @@ func toolRequiresAuthenticatedSession(tool Tool) bool {
 	switch canonicalToolName(tool.Name) {
 	case "list_my_knowledge_base_documents", "view_knowledge_base_document",
 		"list_my_payment_orders", "list_my_memberships", "get_invite_summary",
+		"get_my_invite_payout_profile", "save_my_invite_payout_profile",
+		"list_my_invite_commissions", "list_my_invite_withdraw_requests",
+		"create_invite_withdraw_request", "cancel_invite_withdraw_request",
 		"get_learning_summary", "list_learning_progress", "save_learning_word_progress", "review_learning_word",
 		"xiaomi_get_devices", "xiaomi_extract_tokens", "xiaomi_miot_prop_get", "xiaomi_miot_prop_set",
 		"xiaomi_miot_action", "xiaomi_miot_prop_get_batch", "xiaomi_find_device", "xiaomi_control_device",

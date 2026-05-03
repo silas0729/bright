@@ -166,6 +166,7 @@ export interface SiteSetting {
   seo_keywords: string;
   footer_text: string;
   contact_email: string;
+  invite_commission_rate?: number;
 }
 
 export interface SaveSiteSettingInput {
@@ -180,6 +181,7 @@ export interface SaveSiteSettingInput {
   seo_keywords: string;
   footer_text: string;
   contact_email: string;
+  invite_commission_rate?: number;
 }
 
 export interface LearnerSession {
@@ -555,7 +557,107 @@ export interface InviteSummary {
   invited_count: number;
   paid_invite_count: number;
   total_recharge_cents: number;
+  commission_rate: number;
+  commission_available_cents: number;
+  commission_withdrawing_cents: number;
+  commission_paid_cents: number;
+  commission_total_cents: number;
   items: InviteeItem[];
+}
+
+export interface InvitePayoutProfile {
+  real_name: string;
+  wechat_account: string;
+  wechat_qr_code: string;
+  alipay_account: string;
+  alipay_qr_code: string;
+}
+
+export interface SaveInvitePayoutProfileInput {
+  real_name: string;
+  wechat_account: string;
+  wechat_qr_code: string;
+  alipay_account: string;
+  alipay_qr_code: string;
+}
+
+export interface InviteCommissionRecord {
+  id: number;
+  payment_order_id: number;
+  payment_order_no: string;
+  invited_user_id: number;
+  invited_username: string;
+  invited_display_name: string;
+  order_amount_cents: number;
+  commission_rate: number;
+  commission_cents: number;
+  status: string;
+  withdraw_request_id?: number;
+  order_paid_at?: string;
+  paid_at?: string;
+  created_at: string;
+}
+
+export interface PagedInviteCommissionRecords {
+  items: InviteCommissionRecord[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface InviteWithdrawRequest {
+  id: number;
+  amount_cents: number;
+  payment_type: string;
+  account_name: string;
+  account_no: string;
+  account_qr_code: string;
+  status: string;
+  admin_note: string;
+  processed_at?: string;
+  created_at: string;
+}
+
+export interface CreateInviteWithdrawRequestInput {
+  amount_cents: number;
+  payment_type: string;
+}
+
+export interface PagedInviteWithdrawRequests {
+  items: InviteWithdrawRequest[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface AdminInviteWithdrawItem {
+  id: number;
+  learner_user_id: number;
+  learner_username: string;
+  learner_display_name: string;
+  amount_cents: number;
+  payment_type: string;
+  account_name: string;
+  account_no: string;
+  account_qr_code: string;
+  status: string;
+  admin_note: string;
+  processed_by_admin_id?: number;
+  processed_by_name?: string;
+  processed_at?: string;
+  created_at: string;
+}
+
+export interface PagedAdminInviteWithdrawRequests {
+  items: AdminInviteWithdrawItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface AdminInviteWithdrawDetail {
+  withdraw: AdminInviteWithdrawItem;
+  commissions: InviteCommissionRecord[];
 }
 
 export interface AdminInviteStatItem {
@@ -1270,6 +1372,64 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     });
   },
+  learnerInvitePayoutProfile(token: string) {
+    return request<InvitePayoutProfile>("/api/v1/auth/invite/payout-profile", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerSaveInvitePayoutProfile(token: string, payload: SaveInvitePayoutProfileInput) {
+    return request<InvitePayoutProfile>("/api/v1/auth/invite/payout-profile", {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerInviteCommissions(
+    token: string,
+    params: { page: number; pageSize: number; status?: string },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.status) {
+      search.set("status", params.status);
+    }
+    return request<PagedInviteCommissionRecords>(`/api/v1/auth/invite/commissions?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerInviteWithdraws(
+    token: string,
+    params: { page: number; pageSize: number; status?: string; query?: string },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.status) {
+      search.set("status", params.status);
+    }
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    return request<PagedInviteWithdrawRequests>(`/api/v1/auth/invite/withdraws?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerCreateInviteWithdraw(token: string, payload: CreateInviteWithdrawRequestInput) {
+    return request<InviteWithdrawRequest>("/api/v1/auth/invite/withdraws", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerCancelInviteWithdraw(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/auth/invite/withdraws/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
   learnerKnowledgeBaseDocuments(
     token: string,
     params: { page: number; pageSize: number; query?: string; subjectKey?: string },
@@ -1449,20 +1609,12 @@ export const api = {
     token: string,
     id: number,
     payload: { arguments: Record<string, unknown> },
-    subjectKey?: string,
   ) {
-    const search = new URLSearchParams();
-    if (subjectKey?.trim()) {
-      search.set("subject", subjectKey.trim());
-    }
-    return request<APIConfigTestResult>(
-      `/api/v1/auth/api-configs/${id}/test${search.toString() ? `?${search.toString()}` : ""}`,
-      {
-        method: "POST",
-        headers: authHeaders(token),
-        body: JSON.stringify(payload),
-      },
-    );
+    return request<APIConfigTestResult>(`/api/v1/auth/api-configs/${id}/test`, {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
   },
   learnerXiaomiConfig(token: string) {
     return request<XiaomiConfig>("/api/v1/auth/xiaomi/config", {
@@ -2047,6 +2199,50 @@ export const api = {
     }
     return request<PagedAdminInviteStats>(`/api/v1/admin/invite/stats?${search.toString()}`, {
       headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminInviteWithdraws(
+    token: string,
+    params: { page: number; pageSize: number; query?: string; status?: string },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.status) {
+      search.set("status", params.status);
+    }
+    return request<PagedAdminInviteWithdrawRequests>(`/api/v1/admin/invite/withdraws?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminInviteWithdrawDetail(token: string, id: number) {
+    return request<AdminInviteWithdrawDetail>(`/api/v1/admin/invite/withdraws/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminApproveInviteWithdraw(token: string, id: number, admin_note: string) {
+    return request<AdminInviteWithdrawItem>(`/api/v1/admin/invite/withdraws/${id}/approve`, {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ admin_note }),
+    });
+  },
+  adminRejectInviteWithdraw(token: string, id: number, admin_note: string) {
+    return request<AdminInviteWithdrawItem>(`/api/v1/admin/invite/withdraws/${id}/reject`, {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ admin_note }),
+    });
+  },
+  adminPayInviteWithdraw(token: string, id: number, admin_note: string) {
+    return request<AdminInviteWithdrawItem>(`/api/v1/admin/invite/withdraws/${id}/pay`, {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ admin_note }),
     });
   },
   adminMCPToolConfigs(token: string, params: { page: number; pageSize: number; query?: string; category?: string }) {

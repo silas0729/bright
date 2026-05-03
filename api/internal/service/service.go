@@ -92,7 +92,7 @@ func (s *Service) SeedDefaults(ctx context.Context) error {
 			Key:         "content_admin",
 			Name:        "内容管理员",
 			Description: "负责学科、词库、分类、年级与支付配置管理。",
-			Permissions: storage.JSONStringSlice{"admin.read", "subject.read", "subject.write", "catalog.read", "catalog.write", "grade.read", "grade.write", "plan.read", "plan.write", "payment.read", "payment.write", "site.read", "site.write", "learner.read", "learner.write", "mcp.read", "mcp.write", "invite.read"},
+			Permissions: storage.JSONStringSlice{"admin.read", "subject.read", "subject.write", "catalog.read", "catalog.write", "grade.read", "grade.write", "plan.read", "plan.write", "payment.read", "payment.write", "site.read", "site.write", "learner.read", "learner.write", "mcp.read", "mcp.write", "invite.read", "invite.write"},
 			System:      true,
 			Sort:        2,
 		},

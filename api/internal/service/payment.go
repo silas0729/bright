@@ -554,8 +554,10 @@ func (s *Service) markPaymentOrderSuccess(ctx context.Context, orderNo string, t
 		if err := tx.Save(&order).Error; err != nil {
 			return err
 		}
-
-		return s.applyPaymentEntitlement(tx, order)
+		if err := s.applyPaymentEntitlement(tx, order); err != nil {
+			return err
+		}
+		return s.createInviteCommissionForPayment(tx, order)
 	})
 }
 

@@ -67,6 +67,29 @@ type NoticeDialogState = {
   actionHref?: string;
 };
 
+type APIParameterValueType = "string" | "number" | "boolean" | "object";
+type APIParameterLocation = "url" | "body" | "header";
+type APIParameterEditorRow = {
+  id: string;
+  name: string;
+  type: APIParameterValueType;
+  location: APIParameterLocation;
+  description: string;
+  exampleValue: string;
+  required: boolean;
+};
+type APIParameterDraft = {
+  name?: unknown;
+  type?: unknown;
+  description?: unknown;
+  example?: unknown;
+  default?: unknown;
+  sample?: unknown;
+  required?: unknown;
+  in?: unknown;
+  location?: unknown;
+};
+
 const fallbackSiteSettings: SiteSetting = {
   site_name: "Brights 英语单词学习站",
   site_icon: "",
@@ -100,6 +123,138 @@ const emptyAPIConfigEditor: SaveAPIConfigInput & { id: number } = {
   is_active: true,
   is_public: false,
   allow_admin_publish: false,
+};
+
+const apiParameterTypeOptions: Array<{ value: APIParameterValueType; label: string }> = [
+  { value: "string", label: "文本" },
+  { value: "number", label: "数字" },
+  { value: "boolean", label: "布尔" },
+  { value: "object", label: "JSON" },
+];
+
+const apiParameterLocationOptions: Array<{ value: APIParameterLocation; label: string }> = [
+  { value: "url", label: "URL 参数" },
+  { value: "body", label: "请求体" },
+  { value: "header", label: "请求头" },
+];
+
+const createAPIParameterRow = (overrides: Partial<Omit<APIParameterEditorRow, "id">> = {}): APIParameterEditorRow => ({
+  id: `api-param-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  name: "",
+  type: "string",
+  location: "url",
+  description: "",
+  exampleValue: "",
+  required: false,
+  ...overrides,
+});
+
+const normalizeAPIParameterType = (value: unknown): APIParameterValueType => {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  switch (normalized) {
+    case "number":
+    case "integer":
+      return "number";
+    case "boolean":
+    case "bool":
+      return "boolean";
+    case "object":
+    case "json":
+    case "array":
+      return "object";
+    default:
+      return "string";
+  }
+};
+
+const normalizeAPIParameterLocation = (value: unknown): APIParameterLocation => {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  switch (normalized) {
+    case "body":
+    case "request_body":
+    case "payload":
+      return "body";
+    case "header":
+    case "headers":
+    case "request_header":
+      return "header";
+    default:
+      return "url";
+  }
+};
+
+const safeParseJSONValue = (raw: string): unknown => {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return null;
+  }
+};
+
+const safeParseJSONObject = (raw: string): Record<string, unknown> | null => {
+  const parsed = safeParseJSONValue(raw);
+  if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+    return null;
+  }
+  return parsed as Record<string, unknown>;
+};
+
+const isPlainJSONObject = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && !Array.isArray(value) && typeof value === "object";
+
+const extractExactTemplateToken = (value: string) => {
+  const match = value.trim().match(/^\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}$/);
+  return match?.[1]?.trim() ?? "";
+};
+
+const extractTemplateKeysFromText = (value: string) => {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  const matcher = /\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g;
+  for (const match of value.matchAll(matcher)) {
+    const key = match[1]?.trim();
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    keys.push(key);
+  }
+  return keys;
+};
+
+const parseAPIParameterDrafts = (raw: string): APIParameterDraft[] => {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return [];
+  }
+  const parsed = safeParseJSONValue(trimmed);
+  if (Array.isArray(parsed)) {
+    return parsed.map((item) => (typeof item === "string" ? { name: item } : ((item as APIParameterDraft) ?? {})));
+  }
+  if (isPlainJSONObject(parsed)) {
+    return Object.entries(parsed).map(([name, value]) => {
+      if (isPlainJSONObject(value)) {
+        return { name, ...(value as APIParameterDraft) };
+      }
+      if (typeof value === "string") {
+        return { name, description: value };
+      }
+      return { name };
+    });
+  }
+  return trimmed
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((name) => ({ name }));
 };
 
 export default function PublicSite() {
@@ -182,8 +337,15 @@ export default function PublicSite() {
   const [apiConfigPage, setAPIConfigPage] = useState(1);
   const [apiConfigQuery, setAPIConfigQuery] = useState("");
   const [apiConfigEditor, setAPIConfigEditor] = useState(emptyAPIConfigEditor);
+  const [apiConfigModalOpen, setAPIConfigModalOpen] = useState(false);
+  const [apiConfigParameterRows, setAPIConfigParameterRows] = useState<APIParameterEditorRow[]>([]);
+  const [apiConfigAdvancedHeaders, setAPIConfigAdvancedHeaders] = useState("");
+  const [apiConfigAdvancedBody, setAPIConfigAdvancedBody] = useState("");
+  const [apiConfigAdvancedOpen, setAPIConfigAdvancedOpen] = useState(false);
   const [apiConfigTestArguments, setAPIConfigTestArguments] = useState("{}");
+  const [apiConfigTestValues, setAPIConfigTestValues] = useState<Record<string, string>>({});
   const [apiConfigTestResult, setAPIConfigTestResult] = useState<APIConfigTestResult | null>(null);
+  const [apiConfigTestTarget, setAPIConfigTestTarget] = useState<APIConfig | null>(null);
   const [xiaomiConfig, setXiaomiConfig] = useState<XiaomiConfig | null>(null);
   const [xiaomiHomes, setXiaomiHomes] = useState<XiaomiHome[]>([]);
   const [xiaomiDevices, setXiaomiDevices] = useState<XiaomiDeviceListResult | null>(null);
@@ -454,15 +616,7 @@ export default function PublicSite() {
     return () => {
       active = false;
     };
-  }, [
-    deferredKnowledgeBaseQuery,
-    knowledgeBasePage,
-    membershipHistoryPage,
-    orderHistoryPage,
-    profileReloadKey,
-    session?.access_token,
-    subjectKey,
-  ]);
+  }, [session, subjectKey, orderHistoryPage, membershipHistoryPage, knowledgeBasePage, deferredKnowledgeBaseQuery, profileReloadKey]);
 
   useEffect(() => {
     if (!session?.access_token) {
@@ -1403,10 +1557,295 @@ export default function PublicSite() {
     return Array.from(homes.values()).sort((left, right) => left.name.localeCompare(right.name, "zh-CN"));
   }
 
+  const buildAPIParameterEditorState = (item: APIConfig) => {
+    const rowMap = new Map<string, APIParameterEditorRow>();
+    const headerObject = safeParseJSONObject(item.headers);
+    const bodyValue = safeParseJSONValue(item.body);
+    let advancedHeaders = item.headers.trim();
+    let advancedBody = item.body.trim();
+
+    const upsertRow = (name: string, partial: Partial<Omit<APIParameterEditorRow, "id" | "name">> = {}) => {
+      const normalizedName = name.trim();
+      if (!normalizedName) {
+        return;
+      }
+      const existing = rowMap.get(normalizedName);
+      if (existing) {
+        rowMap.set(normalizedName, {
+          ...existing,
+          ...partial,
+          name: normalizedName,
+          description: partial.description !== undefined ? partial.description : existing.description,
+          exampleValue: partial.exampleValue !== undefined ? partial.exampleValue : existing.exampleValue,
+        });
+        return;
+      }
+      rowMap.set(
+        normalizedName,
+        createAPIParameterRow({
+          name: normalizedName,
+          type: normalizeAPIParameterType(partial.type),
+          location: normalizeAPIParameterLocation(partial.location),
+          description: partial.description ?? "",
+          exampleValue: partial.exampleValue ?? "",
+          required: partial.required ?? false,
+        }),
+      );
+    };
+
+    for (const definition of parseAPIParameterDrafts(item.parameters)) {
+      const name = String(definition.name ?? "").trim();
+      if (!name) {
+        continue;
+      }
+      upsertRow(name, {
+        type: normalizeAPIParameterType(definition.type),
+        location: normalizeAPIParameterLocation(definition.in ?? definition.location),
+        description: String(definition.description ?? "").trim(),
+        exampleValue: String(definition.example ?? definition.default ?? definition.sample ?? "").trim(),
+        required: Boolean(definition.required),
+      });
+    }
+
+    if (headerObject) {
+      const extras: Record<string, unknown> = { ...headerObject };
+      Object.entries(headerObject).forEach(([key, value]) => {
+        if (typeof value !== "string") {
+          return;
+        }
+        const token = extractExactTemplateToken(value);
+        if (!token || token !== key) {
+          return;
+        }
+        delete extras[key];
+        upsertRow(token, {
+          location: "header",
+          description: rowMap.get(token)?.description || `请求头参数：${token}`,
+        });
+      });
+      advancedHeaders = Object.keys(extras).length > 0 ? JSON.stringify(extras, null, 2) : "";
+    }
+
+    if (isPlainJSONObject(bodyValue)) {
+      const extras: Record<string, unknown> = { ...bodyValue };
+      Object.entries(bodyValue).forEach(([key, value]) => {
+        if (typeof value !== "string") {
+          return;
+        }
+        const token = extractExactTemplateToken(value);
+        if (!token || token !== key) {
+          return;
+        }
+        delete extras[key];
+        upsertRow(token, {
+          location: "body",
+          description: rowMap.get(token)?.description || `请求体参数：${token}`,
+        });
+      });
+      advancedBody = Object.keys(extras).length > 0 ? JSON.stringify(extras, null, 2) : "";
+    }
+
+    for (const key of extractTemplateKeysFromText(item.url)) {
+      upsertRow(key, {
+        location: rowMap.get(key)?.location ?? "url",
+        description: rowMap.get(key)?.description || `URL 参数：${key}`,
+      });
+    }
+
+    const rows = Array.from(rowMap.values()).sort((left, right) => {
+      const locationOrder: Record<APIParameterLocation, number> = { url: 0, body: 1, header: 2 };
+      const locationDiff = locationOrder[left.location] - locationOrder[right.location];
+      if (locationDiff !== 0) {
+        return locationDiff;
+      }
+      return left.name.localeCompare(right.name, "zh-CN");
+    });
+
+    return {
+      rows,
+      advancedHeaders,
+      advancedBody,
+      advancedOpen: Boolean(advancedHeaders || advancedBody),
+    };
+  };
+
+  const getAPIConfigTestRows = (item: APIConfig | null) =>
+    item ? buildAPIParameterEditorState(item).rows.filter((row) => row.name.trim()) : [];
+
+  const buildAPIConfigTestValuePreset = (item: APIConfig) => {
+    const rows = getAPIConfigTestRows(item);
+    const values: Record<string, string> = {};
+    rows.forEach((row) => {
+      if (values[row.name] !== undefined) {
+        return;
+      }
+      if (row.exampleValue.trim()) {
+        values[row.name] = row.exampleValue.trim();
+        return;
+      }
+      if (row.type === "boolean") {
+        values[row.name] = "true";
+        return;
+      }
+      values[row.name] = "";
+    });
+    return values;
+  };
+
+  const buildAPIConfigTestArgumentPreview = (item: APIConfig, values: Record<string, string>) => {
+    const payload: Record<string, unknown> = {};
+    getAPIConfigTestRows(item).forEach((row) => {
+      if (payload[row.name] !== undefined) {
+        return;
+      }
+      const rawValue = values[row.name] ?? "";
+      const trimmedValue = rawValue.trim();
+      if (!trimmedValue) {
+        payload[row.name] = row.type === "boolean" ? false : "";
+        return;
+      }
+      switch (row.type) {
+        case "number": {
+          const numeric = Number(trimmedValue);
+          payload[row.name] = Number.isFinite(numeric) ? numeric : rawValue;
+          return;
+        }
+        case "boolean":
+          payload[row.name] = trimmedValue.toLowerCase() === "true";
+          return;
+        case "object":
+          payload[row.name] = safeParseJSONValue(rawValue) ?? rawValue;
+          return;
+        default:
+          payload[row.name] = rawValue;
+      }
+    });
+    return JSON.stringify(payload, null, 2);
+  };
+
+  const buildAPIConfigTestPayload = (item: APIConfig, values: Record<string, string>) => {
+    const payload: Record<string, unknown> = {};
+    getAPIConfigTestRows(item).forEach((row) => {
+      if (payload[row.name] !== undefined) {
+        return;
+      }
+      const rawValue = values[row.name] ?? "";
+      const trimmedValue = rawValue.trim();
+      if (!trimmedValue) {
+        if (row.required) {
+          throw new Error(`请填写“${row.name}”测试值。`);
+        }
+        return;
+      }
+      switch (row.type) {
+        case "number": {
+          const numeric = Number(trimmedValue);
+          if (!Number.isFinite(numeric)) {
+            throw new Error(`参数“${row.name}”必须填写数字。`);
+          }
+          payload[row.name] = numeric;
+          return;
+        }
+        case "boolean":
+          if (trimmedValue !== "true" && trimmedValue !== "false") {
+            throw new Error(`参数“${row.name}”只能选择 true 或 false。`);
+          }
+          payload[row.name] = trimmedValue === "true";
+          return;
+        case "object": {
+          const parsed = safeParseJSONValue(rawValue);
+          if (parsed === null && trimmedValue !== "null") {
+            throw new Error(`参数“${row.name}”必须是有效 JSON。`);
+          }
+          payload[row.name] = parsed;
+          return;
+        }
+        default:
+          payload[row.name] = rawValue;
+      }
+    });
+    return payload;
+  };
+
   function resetAPIConfigEditor() {
     setAPIConfigEditor(emptyAPIConfigEditor);
+    setAPIConfigParameterRows([createAPIParameterRow()]);
+    setAPIConfigAdvancedHeaders("");
+    setAPIConfigAdvancedBody("");
+    setAPIConfigAdvancedOpen(false);
+    setAPIConfigTestArguments("{}");
+    setAPIConfigTestValues({});
+    setAPIConfigTestResult(null);
+  }
+
+  function openCreateAPIConfigModal() {
+    resetAPIConfigEditor();
+    setAPIConfigModalOpen(true);
+  }
+
+  function closeAPIConfigModal() {
+    setAPIConfigModalOpen(false);
+    resetAPIConfigEditor();
+  }
+
+  function addAPIConfigParameterRow(location: APIParameterLocation = "url") {
+    setAPIConfigParameterRows((current) => [...current, createAPIParameterRow({ location })]);
+  }
+
+  function updateAPIConfigParameterRow(id: string, patch: Partial<Omit<APIParameterEditorRow, "id">>) {
+    setAPIConfigParameterRows((current) =>
+      current.map((row) =>
+        row.id === id
+          ? {
+              ...row,
+              ...patch,
+            }
+          : row,
+      ),
+    );
+  }
+
+  function removeAPIConfigParameterRow(id: string) {
+    setAPIConfigParameterRows((current) => {
+      const nextRows = current.filter((row) => row.id !== id);
+      return nextRows.length > 0 ? nextRows : [createAPIParameterRow()];
+    });
+  }
+
+  function isValidHTTPHeaderFieldName(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return false;
+    }
+    return /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(trimmed);
+  }
+
+  function openAPIConfigTestModal(item: APIConfig) {
+    const presetValues = buildAPIConfigTestValuePreset(item);
+    setAPIConfigTestTarget(item);
+    setAPIConfigTestValues(presetValues);
+    setAPIConfigTestArguments(buildAPIConfigTestArgumentPreview(item, presetValues));
+    setAPIConfigTestResult(null);
+  }
+
+  function closeAPIConfigTestModal() {
+    setAPIConfigTestTarget(null);
+    setAPIConfigTestValues({});
     setAPIConfigTestArguments("{}");
     setAPIConfigTestResult(null);
+  }
+
+  function updateAPIConfigTestValue(name: string, value: string) {
+    setAPIConfigTestValues((current) => {
+      const nextValues = {
+        ...current,
+        [name]: value,
+      };
+      if (apiConfigTestTarget) {
+        setAPIConfigTestArguments(buildAPIConfigTestArgumentPreview(apiConfigTestTarget, nextValues));
+      }
+      return nextValues;
+    });
   }
 
   function toAPIConfigPayload(item: APIConfig | (SaveAPIConfigInput & { id?: number })): SaveAPIConfigInput {
@@ -1428,11 +1867,106 @@ export default function PublicSite() {
     };
   }
 
+  function buildAPIConfigPayloadFromEditor(): SaveAPIConfigInput {
+    const rows = apiConfigParameterRows
+      .map((row) => ({
+        ...row,
+        name: row.name.trim(),
+        description: row.description.trim(),
+        exampleValue: row.exampleValue.trim(),
+      }))
+      .filter((row) => row.name);
+
+    const seen = new Set<string>();
+    for (const row of rows) {
+      if (seen.has(row.name)) {
+        throw new Error(`接口参数“${row.name}”重复，请调整后再保存。`);
+      }
+      if (/[=?&]/.test(row.name)) {
+        throw new Error(`参数名“${row.name}”只填写字段名即可，例如 keyword，不要带 =、?、&。`);
+      }
+      if (row.location === "header" && !isValidHTTPHeaderFieldName(row.name)) {
+        throw new Error(`请求头参数名“${row.name}”无效，请只填写标准请求头名称。`);
+      }
+      seen.add(row.name);
+    }
+
+    const headerObject: Record<string, unknown> = {};
+    const advancedHeaders = apiConfigAdvancedHeaders.trim();
+    if (advancedHeaders) {
+      let parsedHeaders: unknown;
+      try {
+        parsedHeaders = JSON.parse(advancedHeaders) as unknown;
+      } catch {
+        throw new Error("高级请求头必须是有效的 JSON 对象。");
+      }
+      if (!isPlainJSONObject(parsedHeaders)) {
+        throw new Error("高级请求头必须是有效的 JSON 对象。");
+      }
+      for (const key of Object.keys(parsedHeaders)) {
+        if (!isValidHTTPHeaderFieldName(key)) {
+          throw new Error(`高级请求头里的字段名“${key}”无效，请不要带 =。`);
+        }
+      }
+      Object.assign(headerObject, parsedHeaders);
+    }
+
+    const bodyRows = rows.filter((row) => row.location === "body");
+    const bodyAdvanced = apiConfigAdvancedBody.trim();
+    let bodyValue: unknown = null;
+    if (bodyAdvanced) {
+      try {
+        bodyValue = JSON.parse(bodyAdvanced) as unknown;
+      } catch {
+        throw new Error("高级请求体必须是有效的 JSON。");
+      }
+    }
+    if (bodyRows.length > 0) {
+      if (bodyValue !== null && !isPlainJSONObject(bodyValue)) {
+        throw new Error("当你使用请求体参数时，高级请求体需要填写为 JSON 对象。");
+      }
+      const bodyObject: Record<string, unknown> = isPlainJSONObject(bodyValue) ? { ...bodyValue } : {};
+      bodyRows.forEach((row) => {
+        bodyObject[row.name] = `{{${row.name}}}`;
+      });
+      bodyValue = bodyObject;
+    }
+
+    rows
+      .filter((row) => row.location === "header")
+      .forEach((row) => {
+        headerObject[row.name] = `{{${row.name}}}`;
+      });
+
+    const payload = toAPIConfigPayload(apiConfigEditor);
+    payload.headers = Object.keys(headerObject).length > 0 ? JSON.stringify(headerObject, null, 2) : "";
+    payload.body = bodyValue !== null ? JSON.stringify(bodyValue, null, 2) : "";
+    payload.parameters = JSON.stringify(
+      rows.map((row) => ({
+        name: row.name,
+        type: row.type,
+        description: row.description || `参数：${row.name}`,
+        example: row.exampleValue || undefined,
+        required: row.required,
+        in: row.location,
+      })),
+      null,
+      2,
+    );
+    return payload;
+  }
+
   function startEditAPIConfig(item: APIConfig) {
+    const parameterEditorState = buildAPIParameterEditorState(item);
     setAPIConfigEditor({
       id: item.id,
       ...toAPIConfigPayload(item),
     });
+    setAPIConfigParameterRows(parameterEditorState.rows.length > 0 ? parameterEditorState.rows : [createAPIParameterRow()]);
+    setAPIConfigAdvancedHeaders(parameterEditorState.advancedHeaders);
+    setAPIConfigAdvancedBody(parameterEditorState.advancedBody);
+    setAPIConfigAdvancedOpen(parameterEditorState.advancedOpen);
+    setAPIConfigModalOpen(true);
     setAPIConfigTestResult(null);
   }
 
@@ -1443,9 +1977,10 @@ export default function PublicSite() {
     }
 
     setProfileBusyAction("api-config-save");
+    setProfileError("");
     setAPIConfigTestResult(null);
     try {
-      const payload = toAPIConfigPayload(apiConfigEditor);
+      const payload = buildAPIConfigPayloadFromEditor();
       if (apiConfigEditor.id > 0) {
         await api.learnerUpdateAPIConfig(session.access_token, apiConfigEditor.id, payload);
         setProfileNotice("API 工具已更新。");
@@ -1453,7 +1988,7 @@ export default function PublicSite() {
         await api.learnerCreateAPIConfig(session.access_token, payload);
         setProfileNotice("API 工具已创建。");
       }
-      resetAPIConfigEditor();
+      closeAPIConfigModal();
       setAPIConfigPage(1);
       setProfileReloadKey((current) => current + 1);
     } catch (err) {
@@ -1468,6 +2003,7 @@ export default function PublicSite() {
       return;
     }
     setProfileBusyAction(`api-config-toggle-${item.id}`);
+    setProfileError("");
     try {
       await api.learnerUpdateAPIConfig(session.access_token, item.id, {
         ...toAPIConfigPayload(item),
@@ -1491,10 +2027,14 @@ export default function PublicSite() {
       return;
     }
     setProfileBusyAction(`api-config-delete-${item.id}`);
+    setProfileError("");
     try {
       await api.learnerDeleteAPIConfig(session.access_token, item.id);
-      if (apiConfigEditor.id === item.id) {
-        resetAPIConfigEditor();
+      if (apiConfigModalOpen && apiConfigEditor.id === item.id) {
+        closeAPIConfigModal();
+      }
+      if (apiConfigTestTarget?.id === item.id) {
+        closeAPIConfigTestModal();
       }
       setProfileReloadKey((current) => current + 1);
       setProfileNotice("API 工具已删除。");
@@ -1512,22 +2052,19 @@ export default function PublicSite() {
 
     let argumentsPayload: Record<string, unknown> = {};
     try {
-      argumentsPayload = apiConfigTestArguments.trim() ? (JSON.parse(apiConfigTestArguments) as Record<string, unknown>) : {};
-    } catch {
-      setProfileError("测试参数必须是有效 JSON。");
+      argumentsPayload = buildAPIConfigTestPayload(item, apiConfigTestValues);
+      setAPIConfigTestArguments(buildAPIConfigTestArgumentPreview(item, apiConfigTestValues));
+    } catch (err) {
+      setProfileError((err as Error).message);
       return;
     }
 
     setProfileBusyAction(`api-config-test-${item.id}`);
+    setProfileError("");
     try {
-      const result = await api.learnerTestAPIConfig(
-        session.access_token,
-        item.id,
-        { arguments: argumentsPayload },
-        subjectKey,
-      );
+      const result = await api.learnerTestAPIConfig(session.access_token, item.id, { arguments: argumentsPayload });
       setAPIConfigTestResult(result);
-      setProfileNotice("API 工具测试请求已完成。");
+      setProfileNotice("API 工具测试已完成。");
     } catch (err) {
       setProfileError((err as Error).message);
     } finally {
@@ -2545,7 +3082,8 @@ export default function PublicSite() {
                   </div>
                   {currentUser ? (
                     <>
-                      <div className="profile-grid">
+                      {false ? (
+                        <div className="profile-grid">
                         <form className="setup-form" onSubmit={handleSubmitKnowledgeBase}>
                           <label className="form-field">
                             <span>选择知识库文件</span>
@@ -2569,7 +3107,7 @@ export default function PublicSite() {
                                   <strong>{knowledgeBaseForm.fileName || "点击选择要上传的知识库文件"}</strong>
                                   <span>
                                     {knowledgeBaseForm.file
-                                      ? `文件大小 ${formatFileSize(knowledgeBaseForm.file.size)}，上传后仅当前账号和对应 MCP 检索可见`
+                                      ? `文件大小 ${formatFileSize(knowledgeBaseForm.file?.size ?? 0)}，上传后仅当前账号和对应 MCP 检索可见`
                                       : "支持 TXT、Markdown、CSV、Excel，上传后会自动切片用于检索"}
                                   </span>
                                 </div>
@@ -2611,7 +3149,8 @@ export default function PublicSite() {
                             <li>知识库检索结果会返回命中片段和文档来源，方便定位答案来自哪份文档。</li>
                           </ul>
                         </div>
-                      </div>
+                        </div>
+                      ) : null}
 
                       <div className="section-toolbar">
                         <div>
@@ -2714,212 +3253,48 @@ export default function PublicSite() {
                   <div className="section-header">
                     <div>
                       <p className="section-eyebrow">API 工具</p>
-                      <h2>把你的开放接口配置成可供 MCP 直接调用的个人工具</h2>
+                      <h2>把你自己的开放接口整理成可直接给 MCP 调用的个人工具</h2>
                     </div>
+                    {currentUser ? (
+                      <button className="primary-button" onClick={openCreateAPIConfigModal} type="button">
+                        新增 API 工具
+                      </button>
+                    ) : null}
                   </div>
                   {currentUser ? (
                     <>
-                      <div className="profile-grid">
-                        <form className="setup-form" onSubmit={handleSaveAPIConfig}>
-                          <label className="form-field">
-                            <span>工具名称</span>
-                            <input
-                              value={apiConfigEditor.name}
-                              onChange={(event) => {
-                                setAPIConfigEditor((current) => ({ ...current, name: event.target.value }));
-                              }}
-                              placeholder="例如：查询内部订单"
-                            />
-                          </label>
-                          <label className="form-field">
-                            <span>MCP 工具名</span>
-                            <input
-                              value={apiConfigEditor.tool_name}
-                              onChange={(event) => {
-                                setAPIConfigEditor((current) => ({ ...current, tool_name: event.target.value }));
-                              }}
-                              placeholder="例如：query_order_status"
-                            />
-                          </label>
-                          <label className="form-field">
-                            <span>请求地址</span>
-                            <input
-                              value={apiConfigEditor.url}
-                              onChange={(event) => {
-                                setAPIConfigEditor((current) => ({ ...current, url: event.target.value }));
-                              }}
-                              placeholder="https://example.com/api/orders 或 /api/v1/orders"
-                            />
-                          </label>
-                          <div className="button-row">
-                            <label className="form-field" style={{ flex: 1 }}>
-                              <span>请求方法</span>
-                              <select
-                                value={apiConfigEditor.method}
-                                onChange={(event) => {
-                                  setAPIConfigEditor((current) => ({ ...current, method: event.target.value }));
-                                }}
-                              >
-                                <option value="GET">GET</option>
-                                <option value="POST">POST</option>
-                                <option value="PUT">PUT</option>
-                                <option value="PATCH">PATCH</option>
-                                <option value="DELETE">DELETE</option>
-                                <option value="HEAD">HEAD</option>
-                              </select>
-                            </label>
-                            <label className="form-field" style={{ flex: 1 }}>
-                              <span>分类</span>
-                              <input
-                                value={apiConfigEditor.category}
-                                onChange={(event) => {
-                                  setAPIConfigEditor((current) => ({ ...current, category: event.target.value }));
-                                }}
-                                placeholder="custom"
-                              />
-                            </label>
-                          </div>
-                          <label className="form-field">
-                            <span>说明</span>
-                            <textarea
-                              rows={3}
-                              value={apiConfigEditor.description}
-                              onChange={(event) => {
-                                setAPIConfigEditor((current) => ({ ...current, description: event.target.value }));
-                              }}
-                              placeholder="告诉 MCP 这个工具做什么。"
-                            />
-                          </label>
-                          <label className="form-field">
-                            <span>Headers JSON</span>
-                            <textarea
-                              rows={4}
-                              value={apiConfigEditor.headers}
-                              onChange={(event) => {
-                                setAPIConfigEditor((current) => ({ ...current, headers: event.target.value }));
-                              }}
-                              placeholder='{"Authorization":"Bearer {{access_token}}"}'
-                            />
-                          </label>
-                          <label className="form-field">
-                            <span>Body JSON / 模板</span>
-                            <textarea
-                              rows={4}
-                              value={apiConfigEditor.body}
-                              onChange={(event) => {
-                                setAPIConfigEditor((current) => ({ ...current, body: event.target.value }));
-                              }}
-                              placeholder='{"keyword":"{{query}}"}'
-                            />
-                          </label>
-                          <label className="form-field">
-                            <span>参数定义 JSON</span>
-                            <textarea
-                              rows={4}
-                              value={apiConfigEditor.parameters}
-                              onChange={(event) => {
-                                setAPIConfigEditor((current) => ({ ...current, parameters: event.target.value }));
-                              }}
-                              placeholder='[{"name":"query","type":"string","required":true,"description":"搜索词"}]'
-                            />
-                          </label>
-                          <div className="button-row">
-                            <label className="tag">
-                              <input
-                                checked={apiConfigEditor.is_active}
-                                onChange={(event) => {
-                                  setAPIConfigEditor((current) => ({ ...current, is_active: event.target.checked }));
-                                }}
-                                type="checkbox"
-                              />
-                              启用
-                            </label>
-                            <label className="tag">
-                              <input
-                                checked={Boolean(apiConfigEditor.is_public)}
-                                onChange={(event) => {
-                                  setAPIConfigEditor((current) => ({ ...current, is_public: event.target.checked }));
-                                }}
-                                type="checkbox"
-                              />
-                              发布到工具市场
-                            </label>
-                            <label className="tag">
-                              <input
-                                checked={Boolean(apiConfigEditor.allow_admin_publish)}
-                                onChange={(event) => {
-                                  setAPIConfigEditor((current) => ({ ...current, allow_admin_publish: event.target.checked }));
-                                }}
-                                type="checkbox"
-                              />
-                              允许管理员代为公开
-                            </label>
-                          </div>
-                          <div className="button-row">
-                            <button className="primary-button" disabled={profileBusyAction === "api-config-save"} type="submit">
-                              {profileBusyAction === "api-config-save"
-                                ? "保存中..."
-                                : apiConfigEditor.id > 0
-                                  ? "更新 API 工具"
-                                  : "创建 API 工具"}
-                            </button>
-                            <button className="secondary-button" onClick={resetAPIConfigEditor} type="button">
-                              新建空白
-                            </button>
-                          </div>
-                        </form>
-
-                        <div className="profile-card-body">
-                          <div className="feedback-banner feedback-success">
-                            这里创建的是你自己的 API 工具。启用后可以进入 MCP 工具列表，并继续由管理员决定是否要加会员门槛。
-                          </div>
-                          <label className="form-field">
-                            <span>测试参数 JSON</span>
-                            <textarea
-                              rows={8}
-                              value={apiConfigTestArguments}
-                              onChange={(event) => {
-                                setAPIConfigTestArguments(event.target.value);
-                              }}
-                              placeholder='{"query":"hello"}'
-                            />
-                          </label>
-                          {apiConfigTestResult ? (
-                            <div className="feedback-banner">
-                              <strong>最近一次测试返回状态：</strong> {apiConfigTestResult.status_code}
-                              <pre className="code-panel">{apiConfigTestPreview}</pre>
-                            </div>
-                          ) : (
-                            <div className="feedback-banner">
-                              先从下面列表里选择一个已有工具进行测试，返回结果会显示在这里。
-                            </div>
-                          )}
-                        </div>
+                      <div className="feedback-banner feedback-success">
+                        这里创建的是你自己的 API 工具。新增和编辑都会走弹窗表单，按参数逐项填写即可，不需要手写 JSON。
                       </div>
 
                       <div className="section-toolbar">
                         <div>
                           <h2>我的 API 工具</h2>
-                          <p className="helper-text">支持停用、删除、重新编辑，也支持作为 MCP 工具直接调用。</p>
+                          <p className="helper-text">支持编辑、测试、启用停用和删除；启用后可以进入 MCP 工具链路。</p>
                         </div>
-                        <input
-                          className="toolbar-search"
-                          value={apiConfigQuery}
-                          onChange={(event) => {
-                            setAPIConfigQuery(event.target.value);
-                            setAPIConfigPage(1);
-                          }}
-                          placeholder="搜索名称、工具名或分类"
-                        />
+                        <div className="button-row">
+                          <input
+                            className="toolbar-search"
+                            value={apiConfigQuery}
+                            onChange={(event) => {
+                              setAPIConfigQuery(event.target.value);
+                              setAPIConfigPage(1);
+                            }}
+                            placeholder="搜索工具名称、MCP 名称或分类"
+                          />
+                          <button className="secondary-button" onClick={openCreateAPIConfigModal} type="button">
+                            添加
+                          </button>
+                        </div>
                       </div>
 
                       <div className="table-wrap">
                         <table className="data-table">
                           <thead>
                             <tr>
-                              <th>名称</th>
-                              <th>工具名</th>
-                              <th>方法</th>
+                              <th>工具名称</th>
+                              <th>MCP 工具名</th>
+                              <th>请求方式</th>
                               <th>分类</th>
                               <th>状态</th>
                               <th>公开</th>
@@ -2944,14 +3319,14 @@ export default function PublicSite() {
                                   </td>
                                   <td>{item.is_public ? "公开" : "私有"}</td>
                                   <td>
-                                    <div className="button-row">
+                                    <div className="button-row api-config-actions">
                                       <button className="secondary-button small-button" onClick={() => startEditAPIConfig(item)} type="button">
                                         编辑
                                       </button>
                                       <button
                                         className="secondary-button small-button"
                                         disabled={testBusy}
-                                        onClick={() => void handleTestAPIConfig(item)}
+                                        onClick={() => openAPIConfigTestModal(item)}
                                         type="button"
                                       >
                                         {testBusy ? "测试中..." : "测试"}
@@ -2981,7 +3356,7 @@ export default function PublicSite() {
                         </table>
                       </div>
                       {(apiConfigs?.items ?? []).length === 0 ? (
-                        <div className="feedback-banner">当前还没有创建个人 API 工具，先配置一条接口试试。</div>
+                        <div className="feedback-banner">当前还没有创建个人 API 工具，点右上角“新增 API 工具”先配置一条接口试试。</div>
                       ) : null}
                       <PagerControls
                         onChange={setAPIConfigPage}
@@ -3995,6 +4370,414 @@ export default function PublicSite() {
                 ) : null}
               </div>
             )}
+          </section>
+        </div>
+      ) : null}
+
+      {apiConfigModalOpen ? (
+        <div className="admin-edit-modal-backdrop" onClick={closeAPIConfigModal} role="presentation">
+          <section
+            aria-labelledby="api-config-modal-title"
+            aria-modal="true"
+            className="admin-edit-modal api-config-modal"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+            role="dialog"
+          >
+            <div className="admin-edit-modal-header">
+              <div>
+                <p className="section-eyebrow">API 工具弹窗</p>
+                <h2 id="api-config-modal-title">{apiConfigEditor.id > 0 ? "编辑 API 工具" : "新增 API 工具"}</h2>
+              </div>
+              <button className="secondary-button small-button" onClick={closeAPIConfigModal} type="button">
+                关闭
+              </button>
+            </div>
+
+            <form className="setup-form admin-edit-modal-form" onSubmit={handleSaveAPIConfig}>
+              <div className="form-grid-two">
+                <label className="form-field">
+                  <span>工具名称</span>
+                  <input
+                    value={apiConfigEditor.name}
+                    onChange={(event) => {
+                      setAPIConfigEditor((current) => ({ ...current, name: event.target.value }));
+                    }}
+                    placeholder="例如：汇率查询"
+                  />
+                </label>
+                <label className="form-field">
+                  <span>MCP 工具名</span>
+                  <input
+                    value={apiConfigEditor.tool_name}
+                    onChange={(event) => {
+                      setAPIConfigEditor((current) => ({ ...current, tool_name: event.target.value }));
+                    }}
+                    placeholder="例如：exchange_rate_query"
+                  />
+                </label>
+              </div>
+
+              <div className="feedback-banner">这里按参数逐项填写即可，下面的 JSON 会自动生成，不需要手动写。</div>
+
+              <label className="form-field">
+                <span>请求地址</span>
+                <input
+                  value={apiConfigEditor.url}
+                  onChange={(event) => {
+                    setAPIConfigEditor((current) => ({ ...current, url: event.target.value }));
+                  }}
+                  placeholder="例如：https://api.example.com/search?keyword={{keyword}}"
+                />
+                <small className="helper-text">URL 上需要拼接的参数，直接写成 {"{{keyword}}"} 这种模板即可。</small>
+              </label>
+
+              <div className="form-grid-two">
+                <label className="form-field">
+                  <span>请求方法</span>
+                  <select
+                    value={apiConfigEditor.method}
+                    onChange={(event) => {
+                      setAPIConfigEditor((current) => ({ ...current, method: event.target.value }));
+                    }}
+                  >
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="PATCH">PATCH</option>
+                    <option value="DELETE">DELETE</option>
+                    <option value="HEAD">HEAD</option>
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>分类</span>
+                  <input
+                    value={apiConfigEditor.category}
+                    onChange={(event) => {
+                      setAPIConfigEditor((current) => ({ ...current, category: event.target.value }));
+                    }}
+                    placeholder="例如：查询 / 数据 / 办公"
+                  />
+                </label>
+              </div>
+
+              <label className="form-field">
+                <span>说明</span>
+                <textarea
+                  rows={3}
+                  value={apiConfigEditor.description}
+                  onChange={(event) => {
+                    setAPIConfigEditor((current) => ({ ...current, description: event.target.value }));
+                  }}
+                  placeholder="简单说明这个接口是做什么的、适合什么场景调用。"
+                />
+              </label>
+
+              <div className="button-row">
+                <label className="tag">
+                  <input
+                    checked={apiConfigEditor.is_active}
+                    onChange={(event) => {
+                      setAPIConfigEditor((current) => ({ ...current, is_active: event.target.checked }));
+                    }}
+                    type="checkbox"
+                  />
+                  启用
+                </label>
+                <label className="tag">
+                  <input
+                    checked={Boolean(apiConfigEditor.is_public)}
+                    onChange={(event) => {
+                      setAPIConfigEditor((current) => ({ ...current, is_public: event.target.checked }));
+                    }}
+                    type="checkbox"
+                  />
+                  发布到工具市场
+                </label>
+                <label className="tag">
+                  <input
+                    checked={Boolean(apiConfigEditor.allow_admin_publish)}
+                    onChange={(event) => {
+                      setAPIConfigEditor((current) => ({ ...current, allow_admin_publish: event.target.checked }));
+                    }}
+                    type="checkbox"
+                  />
+                  允许管理员代为公开
+                </label>
+              </div>
+
+              <section className="api-parameter-builder">
+                <div className="api-parameter-builder-header">
+                  <div>
+                    <h3>接口参数</h3>
+                    <p className="helper-text">按参数名、类型、位置和说明添加，系统会自动生成 URL 参数、请求体和请求头。</p>
+                  </div>
+                  <button
+                    className="secondary-button small-button"
+                    onClick={() => {
+                      addAPIConfigParameterRow();
+                    }}
+                    type="button"
+                  >
+                    添加参数
+                  </button>
+                </div>
+
+                <div className="api-parameter-list">
+                  {apiConfigParameterRows.map((row) => (
+                    <div className="api-parameter-card" key={row.id}>
+                      <div className="api-parameter-row">
+                        <input
+                          placeholder="参数名"
+                          value={row.name}
+                          onChange={(event) => {
+                            updateAPIConfigParameterRow(row.id, { name: event.target.value });
+                          }}
+                        />
+                        <select
+                          value={row.type}
+                          onChange={(event) => {
+                            updateAPIConfigParameterRow(row.id, {
+                              type: normalizeAPIParameterType(event.target.value),
+                            });
+                          }}
+                        >
+                          {apiParameterTypeOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={row.location}
+                          onChange={(event) => {
+                            updateAPIConfigParameterRow(row.id, {
+                              location: normalizeAPIParameterLocation(event.target.value),
+                            });
+                          }}
+                        >
+                          {apiParameterLocationOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          placeholder="参数描述"
+                          value={row.description}
+                          onChange={(event) => {
+                            updateAPIConfigParameterRow(row.id, { description: event.target.value });
+                          }}
+                        />
+                        <label className="checkbox-field api-parameter-required">
+                          <input
+                            checked={row.required}
+                            onChange={(event) => {
+                              updateAPIConfigParameterRow(row.id, { required: event.target.checked });
+                            }}
+                            type="checkbox"
+                          />
+                          <span>必填</span>
+                        </label>
+                        <button
+                          className="secondary-button small-button api-parameter-delete"
+                          onClick={() => {
+                            removeAPIConfigParameterRow(row.id);
+                          }}
+                          type="button"
+                        >
+                          删除
+                        </button>
+                      </div>
+                      <div className="api-parameter-example">
+                        <label className="form-field">
+                          <span>测试示例值</span>
+                          <input
+                            placeholder={row.type === "object" ? '{"keyword":"value"}' : "保存后点测试会自动带出这个值"}
+                            value={row.exampleValue}
+                            onChange={(event) => {
+                              updateAPIConfigParameterRow(row.id, { exampleValue: event.target.value });
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <details
+                className="api-config-advanced"
+                onToggle={(event) => {
+                  setAPIConfigAdvancedOpen((event.currentTarget as HTMLDetailsElement).open);
+                }}
+                open={apiConfigAdvancedOpen}
+              >
+                <summary>高级设置（可选）</summary>
+                <p className="helper-text">只有遇到固定请求头、复杂请求体、签名字段这些特殊场景时，才需要展开填写。</p>
+
+                <label className="form-field">
+                  <span>额外请求头 JSON</span>
+                  <textarea
+                    rows={5}
+                    value={apiConfigAdvancedHeaders}
+                    onChange={(event) => {
+                      setAPIConfigAdvancedHeaders(event.target.value);
+                    }}
+                    placeholder='{"Authorization":"Bearer {{token}}"}'
+                  />
+                </label>
+
+                <label className="form-field">
+                  <span>额外请求体 JSON</span>
+                  <textarea
+                    rows={6}
+                    value={apiConfigAdvancedBody}
+                    onChange={(event) => {
+                      setAPIConfigAdvancedBody(event.target.value);
+                    }}
+                    placeholder='{"fixed_key":"fixed_value"}'
+                  />
+                </label>
+              </details>
+
+              <div className="button-row">
+                <button className="primary-button" disabled={profileBusyAction === "api-config-save"} type="submit">
+                  {profileBusyAction === "api-config-save"
+                    ? "保存中..."
+                    : apiConfigEditor.id > 0
+                      ? "保存 API 工具"
+                      : "添加 API 工具"}
+                </button>
+                <button className="secondary-button" onClick={closeAPIConfigModal} type="button">
+                  取消
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {apiConfigTestTarget ? (
+        <div className="admin-edit-modal-backdrop" onClick={closeAPIConfigTestModal} role="presentation">
+          <section
+            aria-labelledby="api-config-test-modal-title"
+            aria-modal="true"
+            className="admin-edit-modal api-test-modal"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+            role="dialog"
+          >
+            <div className="admin-edit-modal-header">
+              <div>
+                <p className="section-eyebrow">测试数据弹窗</p>
+                <h2 id="api-config-test-modal-title">测试 API 工具</h2>
+              </div>
+              <button className="secondary-button small-button" onClick={closeAPIConfigTestModal} type="button">
+                关闭
+              </button>
+            </div>
+
+            <div className="api-test-meta">
+              <div>
+                <span>工具名称</span>
+                <strong>{apiConfigTestTarget.name}</strong>
+              </div>
+              <div>
+                <span>MCP 工具名</span>
+                <strong>{apiConfigTestTarget.resolved_tool_name}</strong>
+              </div>
+              <div>
+                <span>请求方式</span>
+                <strong>{apiConfigTestTarget.method}</strong>
+              </div>
+            </div>
+
+            <form
+              className="setup-form admin-edit-modal-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleTestAPIConfig(apiConfigTestTarget);
+              }}
+            >
+              {getAPIConfigTestRows(apiConfigTestTarget).length > 0 ? (
+                <section className="api-test-parameter-builder">
+                  <div className="feedback-banner">真实参数值要填在这里，不是填在“参数描述”里。系统会按这些值自动拼出测试请求。</div>
+                  <div className="api-test-parameter-list">
+                    {getAPIConfigTestRows(apiConfigTestTarget).map((row) => (
+                      <label className="form-field api-test-parameter-field" key={row.name}>
+                        <span>
+                          {row.name}
+                          {row.required ? " *" : ""}
+                        </span>
+                        <small className="helper-text">
+                          {row.description || (row.location === "url" ? "URL 参数" : row.location === "body" ? "请求体参数" : "请求头参数")}
+                        </small>
+
+                        {row.type === "object" ? (
+                          <textarea
+                            rows={6}
+                            value={apiConfigTestValues[row.name] ?? ""}
+                            onChange={(event) => {
+                              updateAPIConfigTestValue(row.name, event.target.value);
+                            }}
+                            placeholder='{"key":"value"}'
+                          />
+                        ) : row.type === "boolean" ? (
+                          <select
+                            value={apiConfigTestValues[row.name] ?? "true"}
+                            onChange={(event) => {
+                              updateAPIConfigTestValue(row.name, event.target.value);
+                            }}
+                          >
+                            <option value="true">true</option>
+                            <option value="false">false</option>
+                          </select>
+                        ) : (
+                          <input
+                            type={row.type === "number" ? "number" : "text"}
+                            value={apiConfigTestValues[row.name] ?? ""}
+                            onChange={(event) => {
+                              updateAPIConfigTestValue(row.name, event.target.value);
+                            }}
+                            placeholder={row.exampleValue || `请输入 ${row.name}`}
+                          />
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </section>
+              ) : (
+                <div className="feedback-banner">这个接口当前没有定义测试参数，直接点击“开始测试”即可。</div>
+              )}
+
+              <label className="form-field">
+                <span>生成的测试参数 JSON（自动生成）</span>
+                <textarea rows={12} readOnly value={apiConfigTestArguments} />
+              </label>
+
+              {apiConfigTestResult ? (
+                <div className="api-test-response">
+                  <div className="feedback-banner">
+                    <strong>最近一次状态：</strong> {apiConfigTestResult.status_code}
+                  </div>
+                  <pre className="code-panel">{apiConfigTestPreview}</pre>
+                </div>
+              ) : (
+                <div className="feedback-banner">输入测试值后点击“开始测试”，返回结果会显示在这个弹窗里。</div>
+              )}
+
+              <div className="button-row">
+                <button className="primary-button" disabled={profileBusyAction === `api-config-test-${apiConfigTestTarget.id}`} type="submit">
+                  {profileBusyAction === `api-config-test-${apiConfigTestTarget.id}` ? "测试中..." : "开始测试"}
+                </button>
+                <button className="secondary-button" onClick={closeAPIConfigTestModal} type="button">
+                  关闭弹窗
+                </button>
+              </div>
+            </form>
           </section>
         </div>
       ) : null}

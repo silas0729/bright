@@ -181,6 +181,18 @@ type LearnerUser struct {
 	UpdatedAt       time.Time
 }
 
+type InvitePayoutProfile struct {
+	ID             uint   `gorm:"primaryKey"`
+	LearnerUserID  uint   `gorm:"not null;uniqueIndex"`
+	RealName       string `gorm:"size:120"`
+	WechatAccount  string `gorm:"size:120"`
+	WechatQRCode   string `gorm:"size:500"`
+	AlipayAccount  string `gorm:"size:120"`
+	AlipayQRCode   string `gorm:"size:500"`
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
 type SiteSetting struct {
 	ID              uint   `gorm:"primaryKey"`
 	SiteName        string `gorm:"size:120;not null"`
@@ -194,6 +206,7 @@ type SiteSetting struct {
 	SEOKeywords     string `gorm:"type:text"`
 	FooterText      string `gorm:"type:text"`
 	ContactEmail    string `gorm:"size:120"`
+	InviteCommissionRate float64 `gorm:"not null;default:10"`
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
@@ -255,6 +268,39 @@ type MemberSubscription struct {
 	CurrentPeriodStart *time.Time
 	CurrentPeriodEnd   *time.Time
 	CancelledAt        *time.Time
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
+type InviteCommissionRecord struct {
+	ID                  uint   `gorm:"primaryKey"`
+	InviterLearnerUserID uint   `gorm:"not null;index"`
+	PaymentOrderID      uint   `gorm:"not null;uniqueIndex"`
+	PaymentOrderNo      string `gorm:"size:80;not null;index"`
+	InvitedLearnerUserID uint   `gorm:"not null;index"`
+	OrderAmountCents    int64  `gorm:"not null"`
+	CommissionRate      float64 `gorm:"not null"`
+	CommissionCents     int64  `gorm:"not null"`
+	Status              string `gorm:"size:32;not null;default:pending;index"`
+	OrderPaidAt         *time.Time
+	PaidAt              *time.Time
+	WithdrawRequestID   *uint `gorm:"index"`
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+}
+
+type InviteWithdrawRequest struct {
+	ID                 uint   `gorm:"primaryKey"`
+	LearnerUserID      uint   `gorm:"not null;index"`
+	AmountCents        int64  `gorm:"not null"`
+	PaymentType        string `gorm:"size:32;not null;index"`
+	AccountName        string `gorm:"size:120"`
+	AccountNo          string `gorm:"size:255"`
+	AccountQRCode      string `gorm:"size:500"`
+	Status             string `gorm:"size:32;not null;default:pending;index"`
+	AdminNote          string `gorm:"type:text"`
+	ProcessedByAdminUserID *uint `gorm:"index"`
+	ProcessedAt        *time.Time
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }
@@ -428,10 +474,13 @@ func AutoMigrate(db *gorm.DB) error {
 		&AdminUser{},
 		&AdminRole{},
 		&LearnerUser{},
+		&InvitePayoutProfile{},
 		&SiteSetting{},
 		&WechatPayConfig{},
 		&PaymentOrder{},
 		&MemberSubscription{},
+		&InviteCommissionRecord{},
+		&InviteWithdrawRequest{},
 		&LearnerMCPEndpoint{},
 		&ImportJob{},
 		&KnowledgeBaseDocument{},

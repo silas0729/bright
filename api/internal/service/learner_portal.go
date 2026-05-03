@@ -55,6 +55,10 @@ func (s *Service) GetInviteSummary(ctx context.Context, learnerID uint) (domain.
 	if err != nil {
 		return domain.InviteSummary{}, err
 	}
+	commissionStats, err := s.getInviteCommissionStats(ctx, learnerID)
+	if err != nil {
+		return domain.InviteSummary{}, err
+	}
 
 	items := make([]domain.InviteeItem, 0, len(invitees))
 	var paidInviteCount int64
@@ -77,11 +81,16 @@ func (s *Service) GetInviteSummary(ctx context.Context, learnerID uint) (domain.
 	}
 
 	return domain.InviteSummary{
-		InviteCode:         learner.InviteCode,
-		InvitedCount:       int64(len(invitees)),
-		PaidInviteCount:    paidInviteCount,
-		TotalRechargeCents: totalRechargeCents,
-		Items:              items,
+		InviteCode:                 learner.InviteCode,
+		InvitedCount:               int64(len(invitees)),
+		PaidInviteCount:            paidInviteCount,
+		TotalRechargeCents:         totalRechargeCents,
+		CommissionRate:             commissionStats.CommissionRate,
+		CommissionAvailableCents:   commissionStats.AvailableCents,
+		CommissionWithdrawingCents: commissionStats.WithdrawingCents,
+		CommissionPaidCents:        commissionStats.PaidCents,
+		CommissionTotalCents:       commissionStats.TotalCents,
+		Items:                      items,
 	}, nil
 }
 
