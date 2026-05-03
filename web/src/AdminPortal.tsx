@@ -479,6 +479,7 @@ export default function AdminPortal() {
   const [apiConfigEditor, setAPIConfigEditor] = useState(emptyAdminAPIConfigEditor);
   const [apiConfigTestArguments, setAPIConfigTestArguments] = useState("{}");
   const [apiConfigTestResult, setAPIConfigTestResult] = useState<APIConfigTestResult | null>(null);
+  const [apiConfigTestTarget, setAPIConfigTestTarget] = useState<APIConfig | null>(null);
 
   const deferredAdminUserQuery = useDeferredValue(adminUserQuery);
   const deferredLearnerQuery = useDeferredValue(learnerQuery);
@@ -1403,6 +1404,16 @@ export default function AdminPortal() {
   function resetAPIConfigEditor() {
     setAPIConfigEditor(emptyAdminAPIConfigEditor);
     setAPIConfigTestArguments("{}");
+    setAPIConfigTestResult(null);
+  }
+
+  function openAPIConfigTestModal(item: APIConfig) {
+    setAPIConfigTestTarget(item);
+    setAPIConfigTestResult(null);
+  }
+
+  function closeAPIConfigTestModal() {
+    setAPIConfigTestTarget(null);
     setAPIConfigTestResult(null);
   }
 
@@ -3635,6 +3646,40 @@ function startEditLearner(item: AdminLearnerUser) {
                             placeholder="这里可以记录例句、适用场景或运营备注。"
                           />
                         </label>
+                        <div className="form-grid-two">
+                          <label className="form-field">
+                            <span>默认学习等级</span>
+                            <select
+                              value={wordEditor.defaultLevel}
+                              onChange={(event) => {
+                                setWordEditor((current) => ({ ...current, defaultLevel: event.target.value }));
+                              }}
+                            >
+                              {learningLevelOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="helper-text">学员第一次加入学习时，会默认带入这个掌握等级。</p>
+                          </label>
+                          <label className="form-field">
+                            <span>默认学习难度</span>
+                            <select
+                              value={wordEditor.defaultDifficulty}
+                              onChange={(event) => {
+                                setWordEditor((current) => ({ ...current, defaultDifficulty: event.target.value }));
+                              }}
+                            >
+                              {learningDifficultyOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="helper-text">学员第一次复习这个单词时，会默认使用这里的难度。</p>
+                          </label>
+                        </div>
                         <label className="checkbox-field">
                           <input
                             checked={wordEditor.isVIP}
@@ -4754,27 +4799,13 @@ function startEditLearner(item: AdminLearnerUser) {
                     </form>
 
                     <div className="profile-card-body">
-                      <label className="form-field">
-                        <span>测试参数 JSON</span>
-                        <textarea
-                          rows={10}
-                          value={apiConfigTestArguments}
-                          onChange={(event) => {
-                            setAPIConfigTestArguments(event.target.value);
-                          }}
-                          placeholder='{"query":"hello"}'
-                        />
-                      </label>
-                      {apiConfigTestResult ? (
+                      <div className="api-config-test-helper">
+                        <h3>测试方式</h3>
+                        <p className="helper-text">列表里的“测试”按钮会弹出独立测试窗口，输入 JSON 参数后直接查看返回结果，不再占用当前编辑区。</p>
                         <div className="feedback-banner">
-                          <strong>最近一次状态：</strong> {apiConfigTestResult.status_code}
-                          <pre className="code-panel">
-                            {JSON.stringify(apiConfigTestResult.body ?? apiConfigTestResult.raw_body ?? apiConfigTestResult, null, 2)}
-                          </pre>
+                          当前科目上下文：<strong>{formatSubjectLabel(subjectFilter)}</strong>
                         </div>
-                      ) : (
-                        <div className="feedback-banner">从下面表格挑一个已有 API 工具来测试，结果会显示在这里。</div>
-                      )}
+                      </div>
                     </div>
                   </div>
 
@@ -4795,6 +4826,8 @@ function startEditLearner(item: AdminLearnerUser) {
                   </div>
                   <DataTable
                     columns={["名称", "工具名", "方法", "分类", "归属", "状态", "公开", "操作"]}
+                    tableClassName="data-table api-config-table"
+                    wrapClassName="table-wrap api-config-table-wrap"
                     rows={(apiConfigs?.items ?? []).map((item) => [
                       item.name,
                       item.resolved_tool_name,
@@ -4805,7 +4838,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         {item.is_active ? "启用中" : "已停用"}
                       </span>,
                       item.is_public ? "公开" : "私有",
-                      <div className="button-row">
+                      <div className="button-row api-config-actions">
                         <button className="secondary-button small-button" onClick={() => startEditAPIConfig(item)} type="button">
                           编辑
                         </button>
@@ -4813,7 +4846,7 @@ function startEditLearner(item: AdminLearnerUser) {
                           className="secondary-button small-button"
                           disabled={busyAction === `admin-api-config-test-${item.id}`}
                           onClick={() => {
-                            void handleTestAPIConfig(item);
+                            openAPIConfigTestModal(item);
                           }}
                           type="button"
                         >
@@ -5817,6 +5850,95 @@ function startEditLearner(item: AdminLearnerUser) {
             </div>
           ) : null}
 
+          {apiConfigTestTarget ? (
+            <div className="admin-edit-modal-backdrop" onClick={closeAPIConfigTestModal} role="presentation">
+              <section
+                aria-labelledby="api-config-test-modal-title"
+                aria-modal="true"
+                className="admin-edit-modal api-test-modal"
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
+                role="dialog"
+              >
+                <div className="admin-edit-modal-header">
+                  <div>
+                    <p className="section-eyebrow">测试数据弹窗</p>
+                    <h2 id="api-config-test-modal-title">测试 API 工具</h2>
+                  </div>
+                  <button className="secondary-button small-button" onClick={closeAPIConfigTestModal} type="button">
+                    关闭
+                  </button>
+                </div>
+
+                <div className="api-test-meta">
+                  <div>
+                    <span>工具名称</span>
+                    <strong>{apiConfigTestTarget.name}</strong>
+                  </div>
+                  <div>
+                    <span>MCP 工具名</span>
+                    <strong>{apiConfigTestTarget.resolved_tool_name}</strong>
+                  </div>
+                  <div>
+                    <span>请求方式</span>
+                    <strong>{apiConfigTestTarget.method}</strong>
+                  </div>
+                  <div>
+                    <span>当前科目</span>
+                    <strong>{formatSubjectLabel(subjectFilter)}</strong>
+                  </div>
+                </div>
+
+                <form
+                  className="setup-form admin-edit-modal-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void handleTestAPIConfig(apiConfigTestTarget);
+                  }}
+                >
+                  <label className="form-field">
+                    <span>测试参数 JSON</span>
+                    <textarea
+                      rows={12}
+                      value={apiConfigTestArguments}
+                      onChange={(event) => {
+                        setAPIConfigTestArguments(event.target.value);
+                      }}
+                      placeholder='{"query":"hello"}'
+                    />
+                  </label>
+
+                  {apiConfigTestResult ? (
+                    <div className="api-test-response">
+                      <div className="feedback-banner">
+                        <strong>最近一次状态：</strong> {apiConfigTestResult.status_code}
+                      </div>
+                      <pre className="code-panel">
+                        {JSON.stringify(apiConfigTestResult.body ?? apiConfigTestResult.raw_body ?? apiConfigTestResult, null, 2)}
+                      </pre>
+                    </div>
+                  ) : (
+                    <div className="feedback-banner">输入测试参数后点击“开始测试”，返回结果会显示在这个弹窗里。</div>
+                  )}
+
+                  <div className="button-row">
+                    <button
+                      className="primary-button"
+                      disabled={busyAction === `admin-api-config-test-${apiConfigTestTarget.id}`}
+                      type="submit"
+                    >
+                      {busyAction === `admin-api-config-test-${apiConfigTestTarget.id}` ? "测试中..." : "开始测试"}
+                    </button>
+                    <button className="secondary-button" onClick={closeAPIConfigTestModal} type="button">
+                      关闭弹窗
+                    </button>
+                  </div>
+                </form>
+              </section>
+            </div>
+          ) : null}
+
           {contentEditModal ? (
             <div className="admin-edit-modal-backdrop" onClick={closeContentEditModal} role="presentation">
               <section
@@ -6204,6 +6326,40 @@ function startEditLearner(item: AdminLearnerUser) {
                         placeholder="这里可以记录例句、适用场景或运营备注。"
                       />
                     </label>
+                    <div className="form-grid-two">
+                      <label className="form-field">
+                        <span>默认学习等级</span>
+                        <select
+                          value={wordEditor.defaultLevel}
+                          onChange={(event) => {
+                            setWordEditor((current) => ({ ...current, defaultLevel: event.target.value }));
+                          }}
+                        >
+                          {learningLevelOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="helper-text">学员第一次加入学习时，会默认带入这个掌握等级。</p>
+                      </label>
+                      <label className="form-field">
+                        <span>默认学习难度</span>
+                        <select
+                          value={wordEditor.defaultDifficulty}
+                          onChange={(event) => {
+                            setWordEditor((current) => ({ ...current, defaultDifficulty: event.target.value }));
+                          }}
+                        >
+                          {learningDifficultyOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="helper-text">学员第一次复习这个单词时，会默认使用这里的难度。</p>
+                      </label>
+                    </div>
                     <label className="checkbox-field">
                       <input
                         checked={wordEditor.isVIP}
@@ -6244,14 +6400,23 @@ function SummaryCard(props: { label: string; value: string; help: string }) {
   );
 }
 
-function DataTable(props: { columns: string[]; rows: ReactNode[][]; emptyText: string }) {
+function DataTable(props: {
+  columns: string[];
+  rows: ReactNode[][];
+  emptyText: string;
+  wrapClassName?: string;
+  tableClassName?: string;
+}) {
   if (props.rows.length === 0) {
     return <div className="feedback-banner">{props.emptyText}</div>;
   }
 
+  const wrapClassName = props.wrapClassName ? props.wrapClassName : "table-wrap";
+  const tableClassName = props.tableClassName ? props.tableClassName : "data-table";
+
   return (
-    <div className="table-wrap">
-      <table className="data-table">
+    <div className={wrapClassName}>
+      <table className={tableClassName}>
         <thead>
           <tr>
             {props.columns.map((column) => (

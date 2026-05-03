@@ -2991,6 +2991,74 @@ textarea {
   table-layout: fixed;
 }
 
+.admin-main .api-config-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-main .api-config-table {
+  min-width: 1100px;
+  table-layout: auto;
+}
+
+.api-config-table th:last-child,
+.api-config-table td:last-child {
+  width: 228px;
+}
+
+.api-config-actions {
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+
+.api-config-actions .small-button {
+  white-space: nowrap;
+}
+
+.api-config-test-helper {
+  display: grid;
+  gap: 14px;
+}
+
+.api-config-test-helper h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.api-test-modal {
+  width: min(900px, 100%);
+}
+
+.api-test-meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.api-test-meta div {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+
+.api-test-meta span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.api-test-meta strong {
+  font-size: 0.96rem;
+  word-break: break-word;
+}
+
+.api-test-response {
+  display: grid;
+  gap: 12px;
+}
+
 .role-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3046,6 +3114,7 @@ textarea {
   .dashboard-grid,
   .admin-card-grid,
   .role-grid,
+  .api-test-meta,
   .payment-panel-grid {
     grid-template-columns: 1fr;
   }
