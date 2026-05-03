@@ -105,6 +105,7 @@ type LearnerUser struct {
 	Username    string              `json:"username"`
 	DisplayName string              `json:"display_name"`
 	Status      string              `json:"status"`
+	InviteCode  string              `json:"invite_code,omitempty"`
 	CreatedAt   time.Time           `json:"created_at"`
 	Membership  *SubscriptionStatus `json:"membership,omitempty"`
 }
@@ -138,6 +139,7 @@ type LearnerRegisterInput struct {
 	Username      string `json:"username"`
 	Password      string `json:"password"`
 	DisplayName   string `json:"display_name"`
+	InviteCode    string `json:"invite_code"`
 	CaptchaID     string `json:"captcha_id"`
 	CaptchaAnswer string `json:"captcha_answer"`
 }

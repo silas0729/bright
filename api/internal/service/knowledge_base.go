@@ -149,15 +149,19 @@ func (s *Service) SearchKnowledgeBase(ctx context.Context, input domain.SearchKn
 		}, nil
 	}
 
-	query := s.db.WithContext(ctx).Model(&storage.KnowledgeBaseChunk{})
+	query := s.db.WithContext(ctx).
+		Model(&storage.KnowledgeBaseChunk{}).
+		Joins("JOIN knowledge_base_documents ON knowledge_base_documents.id = knowledge_base_chunks.document_id").
+		Where("knowledge_base_documents.status = ?", "active")
 	if subjectKey := normalizeKey(input.SubjectKey); subjectKey != "" {
-		query = query.Where("subject_key = ?", subjectKey)
+		query = query.Where("knowledge_base_chunks.subject_key = ?", subjectKey)
 	}
 
 	lowerQuery := strings.ToLower(queryText)
 	like := "%" + lowerQuery + "%"
 	query = query.Where(
-		"LOWER(title) LIKE ? OR content_search LIKE ? OR LOWER(content) LIKE ?",
+		"LOWER(knowledge_base_documents.title) LIKE ? OR LOWER(knowledge_base_chunks.title) LIKE ? OR content_search LIKE ? OR LOWER(content) LIKE ?",
+		like,
 		like,
 		like,
 		like,
@@ -173,9 +177,14 @@ func (s *Service) SearchKnowledgeBase(ctx context.Context, input domain.SearchKn
 		return domain.PagedKnowledgeBaseChunks{}, err
 	}
 
+	documentMap, err := s.knowledgeBaseDocumentMap(ctx, models)
+	if err != nil {
+		return domain.PagedKnowledgeBaseChunks{}, err
+	}
+
 	items := make([]domain.KnowledgeBaseChunk, 0, len(models))
 	for _, model := range models {
-		items = append(items, toKnowledgeBaseChunk(model))
+		items = append(items, toKnowledgeBaseChunk(model, documentMap[model.DocumentID], queryText))
 	}
 
 	return domain.PagedKnowledgeBaseChunks{
@@ -184,6 +193,51 @@ func (s *Service) SearchKnowledgeBase(ctx context.Context, input domain.SearchKn
 		Page:     page,
 		PageSize: pageSize,
 	}, nil
+}
+
+func (s *Service) UpdateKnowledgeBaseDocumentStatus(ctx context.Context, id uint, input domain.UpdateKnowledgeBaseDocumentStatusInput) (domain.KnowledgeBaseDocument, error) {
+	if id == 0 {
+		return domain.KnowledgeBaseDocument{}, errors.New("document id is required")
+	}
+
+	status, err := normalizeKnowledgeBaseDocumentStatus(input.Status)
+	if err != nil {
+		return domain.KnowledgeBaseDocument{}, err
+	}
+
+	var model storage.KnowledgeBaseDocument
+	if err := s.db.WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.KnowledgeBaseDocument{}, errors.New("knowledge base document does not exist")
+		}
+		return domain.KnowledgeBaseDocument{}, err
+	}
+
+	if err := s.db.WithContext(ctx).Model(&model).Update("status", status).Error; err != nil {
+		return domain.KnowledgeBaseDocument{}, err
+	}
+	model.Status = status
+	return toKnowledgeBaseDocument(model), nil
+}
+
+func (s *Service) DeleteKnowledgeBaseDocument(ctx context.Context, id uint) error {
+	if id == 0 {
+		return errors.New("document id is required")
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var model storage.KnowledgeBaseDocument
+		if err := tx.Where("id = ?", id).First(&model).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("knowledge base document does not exist")
+			}
+			return err
+		}
+		if err := tx.Where("document_id = ?", id).Delete(&storage.KnowledgeBaseChunk{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&model).Error
+	})
 }
 
 func toKnowledgeBaseDocument(model storage.KnowledgeBaseDocument) domain.KnowledgeBaseDocument {
@@ -201,15 +255,137 @@ func toKnowledgeBaseDocument(model storage.KnowledgeBaseDocument) domain.Knowled
 	}
 }
 
-func toKnowledgeBaseChunk(model storage.KnowledgeBaseChunk) domain.KnowledgeBaseChunk {
-	return domain.KnowledgeBaseChunk{
-		ID:             model.ID,
-		DocumentID:     model.DocumentID,
-		SubjectKey:     model.SubjectKey,
-		Title:          model.Title,
-		ChunkIndex:     model.ChunkIndex,
-		Content:        model.Content,
-		CharacterCount: model.CharacterCount,
-		CreatedAt:      model.CreatedAt,
+func toKnowledgeBaseChunk(model storage.KnowledgeBaseChunk, document storage.KnowledgeBaseDocument, queryText string) domain.KnowledgeBaseChunk {
+	documentTitle := strings.TrimSpace(document.Title)
+	if documentTitle == "" {
+		documentTitle = model.Title
 	}
+	snippetSource := model.Content
+	if !strings.Contains(strings.ToLower(model.Content), strings.ToLower(strings.TrimSpace(queryText))) && documentTitle != "" {
+		snippetSource = documentTitle
+	}
+	snippet, highlightedSnippet := buildKnowledgeBaseSnippet(snippetSource, queryText)
+
+	return domain.KnowledgeBaseChunk{
+		ID:                 model.ID,
+		DocumentID:         model.DocumentID,
+		SubjectKey:         model.SubjectKey,
+		Title:              model.Title,
+		DocumentTitle:      documentTitle,
+		SourceFileName:     document.SourceFileName,
+		SourceType:         document.SourceType,
+		Status:             document.Status,
+		ChunkIndex:         model.ChunkIndex,
+		Content:            model.Content,
+		Snippet:            snippet,
+		HighlightedSnippet: highlightedSnippet,
+		CharacterCount:     model.CharacterCount,
+		CreatedAt:          model.CreatedAt,
+	}
+}
+
+func (s *Service) knowledgeBaseDocumentMap(ctx context.Context, chunks []storage.KnowledgeBaseChunk) (map[uint]storage.KnowledgeBaseDocument, error) {
+	result := make(map[uint]storage.KnowledgeBaseDocument)
+	if len(chunks) == 0 {
+		return result, nil
+	}
+
+	ids := make([]uint, 0, len(chunks))
+	seen := make(map[uint]struct{}, len(chunks))
+	for _, chunk := range chunks {
+		if _, ok := seen[chunk.DocumentID]; ok || chunk.DocumentID == 0 {
+			continue
+		}
+		seen[chunk.DocumentID] = struct{}{}
+		ids = append(ids, chunk.DocumentID)
+	}
+
+	var documents []storage.KnowledgeBaseDocument
+	if err := s.db.WithContext(ctx).Where("id IN ?", ids).Find(&documents).Error; err != nil {
+		return nil, err
+	}
+	for _, document := range documents {
+		result[document.ID] = document
+	}
+	return result, nil
+}
+
+func normalizeKnowledgeBaseDocumentStatus(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "active":
+		return "active", nil
+	case "disabled":
+		return "disabled", nil
+	default:
+		return "", errors.New("knowledge base document status must be active or disabled")
+	}
+}
+
+func buildKnowledgeBaseSnippet(content string, queryText string) (string, string) {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return "", ""
+	}
+
+	queryText = strings.TrimSpace(queryText)
+	runes := []rune(content)
+	if len(runes) <= 180 {
+		return content, highlightFirstKnowledgeBaseMatch(content, queryText)
+	}
+
+	matchStart, matchLength := firstCaseInsensitiveRuneMatch(content, queryText)
+	if matchStart < 0 {
+		snippet := string(runes[:180]) + "..."
+		return snippet, snippet
+	}
+
+	start := matchStart - 40
+	if start < 0 {
+		start = 0
+	}
+	end := matchStart + matchLength + 80
+	if end > len(runes) {
+		end = len(runes)
+	}
+
+	snippet := string(runes[start:end])
+	if start > 0 {
+		snippet = "..." + snippet
+	}
+	if end < len(runes) {
+		snippet += "..."
+	}
+	return snippet, highlightFirstKnowledgeBaseMatch(snippet, queryText)
+}
+
+func highlightFirstKnowledgeBaseMatch(content string, queryText string) string {
+	content = strings.TrimSpace(content)
+	queryText = strings.TrimSpace(queryText)
+	if content == "" || queryText == "" {
+		return content
+	}
+
+	matchStart, matchLength := firstCaseInsensitiveRuneMatch(content, queryText)
+	if matchStart < 0 || matchLength <= 0 {
+		return content
+	}
+
+	runes := []rune(content)
+	return string(runes[:matchStart]) + "<<" + string(runes[matchStart:matchStart+matchLength]) + ">>" + string(runes[matchStart+matchLength:])
+}
+
+func firstCaseInsensitiveRuneMatch(content string, queryText string) (int, int) {
+	contentRunes := []rune(content)
+	queryRunes := []rune(strings.ToLower(queryText))
+	lowerContentRunes := []rune(strings.ToLower(content))
+	if len(queryRunes) == 0 || len(contentRunes) == 0 || len(queryRunes) > len(contentRunes) {
+		return -1, 0
+	}
+
+	for index := 0; index <= len(lowerContentRunes)-len(queryRunes); index++ {
+		if string(lowerContentRunes[index:index+len(queryRunes)]) == string(queryRunes) {
+			return index, len(queryRunes)
+		}
+	}
+	return -1, 0
 }

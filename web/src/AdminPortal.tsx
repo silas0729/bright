@@ -34,6 +34,7 @@ const adminUIStateStorageKey = "brights_admin_ui_state";
 const unclassifiedCategoryValue = "__unclassified__";
 
 type AdminSection = "dashboard" | "import" | "catalog" | "site" | "payments" | "memberships" | "learners" | "admins";
+type ImportWorkspaceTab = "catalog-upload" | "knowledge-base-upload" | "knowledge-base-docs" | "subjects" | "categories" | "grades";
 type ContentEditModal = "subject" | "category" | "grade" | "word" | null;
 type PanelEditModal = "plan" | "subscription" | "learner" | "admin" | "role" | null;
 type NoticeDialogTone = "info" | "success" | "error" | "warning";
@@ -117,6 +118,7 @@ export default function AdminPortal() {
   const [busyAction, setBusyAction] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [activeSection, setActiveSection] = useState<AdminSection>(persistedUIState.activeSection ?? "dashboard");
+  const [activeImportTab, setActiveImportTab] = useState<ImportWorkspaceTab>("catalog-upload");
   const [contentEditModal, setContentEditModal] = useState<ContentEditModal>(null);
   const [panelEditModal, setPanelEditModal] = useState<PanelEditModal>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
@@ -2164,6 +2166,15 @@ function startEditLearner(item: AdminLearnerUser) {
     { key: "admins", label: "团队与权限" },
   ];
 
+  const importTabItems: Array<{ key: ImportWorkspaceTab; label: string; helper: string; count?: number }> = [
+    { key: "catalog-upload", label: "词库导入", helper: "CSV / Excel" },
+    { key: "knowledge-base-upload", label: "知识库导入", helper: "TXT / Markdown / 表格" },
+    { key: "knowledge-base-docs", label: "知识库文档", helper: "已上传文档", count: knowledgeBaseDocuments?.total ?? 0 },
+    { key: "subjects", label: "科目管理", helper: "已开通科目", count: subjects.length },
+    { key: "categories", label: "分组管理", helper: "当前分组", count: categories?.total ?? 0 },
+    { key: "grades", label: "阶段管理", helper: "学习阶段", count: grades?.total ?? 0 },
+  ];
+
   return (
     <div className="admin-shell">
       <header className="admin-topbar">
@@ -2292,479 +2303,582 @@ function startEditLearner(item: AdminLearnerUser) {
                 </div>
               </div>
 
-              <div className="admin-card-grid">
-                <article className="content-card">
-                  <h2>上传学习内容文件</h2>
-                  <form className="setup-form" onSubmit={handleImportLocal}>
-                    <label className="form-field">
-                      <span>选择词库文件</span>
-                      <label className={`upload-picker ${importForm.file ? "upload-picker-ready" : ""}`}>
-                        <input
-                          accept=".csv,.xlsx"
-                          className="upload-picker-input"
-                          onChange={(event) => {
-                            const file = event.target.files?.[0] ?? null;
-                            setImportForm((current) => ({
-                              ...current,
-                              file,
-                              fileName: file?.name ?? "",
-                            }));
-                          }}
-                          type="file"
-                        />
-                        <div className="upload-picker-main">
-                          <div className="upload-picker-meta">
-                            <strong>{importForm.fileName || "点击选择要导入的词库文件"}</strong>
-                            <span>
-                              {importForm.file
-                                ? `文件大小 ${formatFileSize(importForm.file.size)}，导入后会自动匹配内容分组`
-                                : "支持 CSV、Excel 文件，上传后系统会自动识别分类并归入当前科目"}
-                            </span>
-                          </div>
-                          <span className="upload-picker-action">{importForm.file ? "重新选择" : "选择文件"}</span>
-                        </div>
-                      </label>
-                    </label>
-                    <div className="upload-hint-list">
-                      <span className="tag">支持 CSV</span>
-                      <span className="tag">支持 Excel</span>
-                      <span className="tag">自动识别内容分组</span>
-                    </div>
-                    <label className="form-field">
-                      <span>导入到哪个科目</span>
-                      <select
-                        value={importForm.subjectKey}
-                        onChange={(event) => {
-                          setImportForm((current) => ({ ...current, subjectKey: event.target.value }));
-                        }}
-                      >
-                        {subjects.map((subject) => (
-                          <option key={subject.key} value={subject.key}>
-                            {subject.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="checkbox-field">
-                      <input
-                        checked={importForm.replace}
-                        onChange={(event) => {
-                          setImportForm((current) => ({ ...current, replace: event.target.checked }));
-                        }}
-                        type="checkbox"
-                      />
-                      <span>导入前先清空当前科目下的旧内容</span>
-                    </label>
-                    <button className="primary-button" disabled={busyAction === "import"} type="submit">
-                      {busyAction === "import" ? "导入中..." : "开始导入"}
+              <div className="import-workbench">
+                <div className="import-tabbar" role="tablist" aria-label="内容导入内部导航">
+                  {importTabItems.map((item) => (
+                    <button
+                      aria-selected={activeImportTab === item.key}
+                      className={activeImportTab === item.key ? "import-tab-button import-tab-button-active" : "import-tab-button"}
+                      key={item.key}
+                      onClick={() => setActiveImportTab(item.key)}
+                      role="tab"
+                      type="button"
+                    >
+                      <span>{item.label}</span>
+                      <small>{item.helper}</small>
+                      {item.count !== undefined ? <em>{formatCount(item.count)}</em> : null}
                     </button>
-                  </form>
-                </article>
+                  ))}
+                </div>
 
-                <article className="content-card">
-                  <h2>上传知识库文件</h2>
-                  <form className="setup-form" onSubmit={handleImportKnowledgeBase}>
-                    <label className="form-field">
-                      <span>选择知识库文件</span>
-                      <label className={`upload-picker ${knowledgeBaseForm.file ? "upload-picker-ready" : ""}`}>
-                        <input
-                          accept=".txt,.md,.csv,.xlsx"
-                          className="upload-picker-input"
-                          onChange={(event) => {
-                            const file = event.target.files?.[0] ?? null;
-                            setKnowledgeBaseForm((current) => ({
-                              ...current,
-                              file,
-                              fileName: file?.name ?? "",
-                              title: current.title || (file?.name ? file.name.replace(/\.[^.]+$/, "") : ""),
-                            }));
-                          }}
-                          type="file"
-                        />
-                        <div className="upload-picker-main">
-                          <div className="upload-picker-meta">
-                            <strong>{knowledgeBaseForm.fileName || "点击选择要导入的知识库文件"}</strong>
-                            <span>
-                              {knowledgeBaseForm.file
-                                ? `文件大小 ${formatFileSize(knowledgeBaseForm.file.size)}，上传后会自动切分为可检索片段`
-                                : "支持 TXT、Markdown、CSV、Excel，上传后可通过开放接口和 MCP 工具检索"}
-                            </span>
+                {activeImportTab === "catalog-upload" ? (
+                  <article className="content-card import-panel-card">
+                    <div className="section-toolbar">
+                      <div>
+                        <h2>上传学习内容文件</h2>
+                        <p className="helper-text">导入词库时会自动识别分类并归入当前科目，适合批量上架学习内容。</p>
+                      </div>
+                    </div>
+                    <form className="setup-form" onSubmit={handleImportLocal}>
+                      <label className="form-field">
+                        <span>选择词库文件</span>
+                        <label className={`upload-picker ${importForm.file ? "upload-picker-ready" : ""}`}>
+                          <input
+                            accept=".csv,.xlsx"
+                            className="upload-picker-input"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0] ?? null;
+                              setImportForm((current) => ({
+                                ...current,
+                                file,
+                                fileName: file?.name ?? "",
+                              }));
+                            }}
+                            type="file"
+                          />
+                          <div className="upload-picker-main">
+                            <div className="upload-picker-meta">
+                              <strong>{importForm.fileName || "点击选择要导入的词库文件"}</strong>
+                              <span>
+                                {importForm.file
+                                  ? `文件大小 ${formatFileSize(importForm.file.size)}，导入后会自动匹配内容分组`
+                                  : "支持 CSV、Excel 文件，上传后系统会自动识别分类并归入当前科目"}
+                              </span>
+                            </div>
+                            <span className="upload-picker-action">{importForm.file ? "重新选择" : "选择文件"}</span>
                           </div>
-                          <span className="upload-picker-action">{knowledgeBaseForm.file ? "重新选择" : "选择文件"}</span>
-                        </div>
+                        </label>
                       </label>
-                    </label>
-                    <div className="upload-hint-list">
-                      <span className="tag">支持 TXT</span>
-                      <span className="tag">支持 Markdown</span>
-                      <span className="tag">支持 CSV / Excel</span>
-                      <span className="tag">自动切片检索</span>
-                    </div>
-                    <label className="form-field">
-                      <span>知识库标题</span>
-                      <input
-                        value={knowledgeBaseForm.title}
-                        onChange={(event) => {
-                          setKnowledgeBaseForm((current) => ({ ...current, title: event.target.value }));
-                        }}
-                        placeholder="例如：英语语法答疑库"
-                      />
-                    </label>
-                    <label className="form-field">
-                      <span>归属到哪个科目</span>
-                      <select
-                        value={knowledgeBaseForm.subjectKey}
-                        onChange={(event) => {
-                          setKnowledgeBaseForm((current) => ({ ...current, subjectKey: event.target.value }));
-                        }}
-                      >
-                        {subjects.map((subject) => (
-                          <option key={subject.key} value={subject.key}>
-                            {subject.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <button className="primary-button" disabled={busyAction === "knowledge-base-import"} type="submit">
-                      {busyAction === "knowledge-base-import" ? "上传处理中..." : "上传到知识库"}
-                    </button>
-                  </form>
-                </article>
-
-                <article className="content-card">
-                  <h2>新增学习科目</h2>
-                  <form className="setup-form" onSubmit={handleSaveSubject}>
-                    <label className="form-field">
-                      <span>科目编码</span>
-                      <input
-                        value={subjectForm.key}
-                        onChange={(event) => {
-                          setSubjectForm((current) => ({ ...current, key: event.target.value }));
-                        }}
-                        placeholder="english"
-                      />
-                    </label>
-                    <label className="form-field">
-                      <span>前台展示名称</span>
-                      <input
-                        value={subjectForm.name}
-                        onChange={(event) => {
-                          setSubjectForm((current) => ({ ...current, name: event.target.value }));
-                        }}
-                        placeholder="英语高频词汇"
-                      />
-                    </label>
-                    <label className="form-field">
-                      <span>显示顺序</span>
-                      <input
-                        inputMode="numeric"
-                        value={subjectForm.sort}
-                        onChange={(event) => {
-                          setSubjectForm((current) => ({ ...current, sort: event.target.value }));
-                        }}
-                        placeholder="0"
-                      />
-                    </label>
-                    <label className="form-field">
-                      <span>科目简介</span>
-                      <textarea
-                        rows={3}
-                        value={subjectForm.description}
-                        onChange={(event) => {
-                          setSubjectForm((current) => ({ ...current, description: event.target.value }));
-                        }}
-                      />
-                    </label>
-                    <label className="checkbox-field">
-                      <input
-                        checked={subjectForm.featured}
-                        onChange={(event) => {
-                          setSubjectForm((current) => ({ ...current, featured: event.target.checked }));
-                        }}
-                        type="checkbox"
-                      />
-                      <span>前台优先展示这个科目</span>
-                    </label>
-                    <div className="button-row">
-                      <button className="primary-button" disabled={busyAction === "subject"} type="submit">
-                        {busyAction === "subject" ? "保存中..." : "新增科目"}
-                      </button>
-                      <button className="secondary-button" onClick={resetSubjectEditor} type="button">
-                        清空表单
-                      </button>
-                    </div>
-                  </form>
-                </article>
-
-                <article className="content-card">
-                  <h2>新增内容分组</h2>
-                  <form className="setup-form" onSubmit={handleSaveCategory}>
-                    <label className="form-field">
-                      <span>归属科目</span>
-                      <select
-                        value={categoryForm.subjectKey}
-                        onChange={(event) => {
-                          setCategoryForm((current) => ({ ...current, subjectKey: event.target.value }));
-                        }}
-                      >
-                        {subjects.map((subject) => (
-                          <option key={subject.key} value={subject.key}>
-                            {subject.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="form-field">
-                      <span>分组类型</span>
-                      <input
-                        value={categoryForm.kind}
-                        onChange={(event) => {
-                          setCategoryForm((current) => ({ ...current, kind: event.target.value }));
-                        }}
-                        placeholder="topic"
-                      />
-                    </label>
-                    <label className="form-field">
-                      <span>分组编码</span>
-                      <input
-                        value={categoryForm.key}
-                        onChange={(event) => {
-                          setCategoryForm((current) => ({ ...current, key: event.target.value }));
-                        }}
-                        placeholder="travel"
-                      />
-                    </label>
-                    <label className="form-field">
-                      <span>前台展示名称</span>
-                      <input
-                        value={categoryForm.name}
-                        onChange={(event) => {
-                          setCategoryForm((current) => ({ ...current, name: event.target.value }));
-                        }}
-                        placeholder="旅行场景"
-                      />
-                    </label>
-                    <div className="form-grid-two">
+                      <div className="upload-hint-list">
+                        <span className="tag">支持 CSV</span>
+                        <span className="tag">支持 Excel</span>
+                        <span className="tag">自动识别内容分组</span>
+                      </div>
                       <label className="form-field">
-                        <span>显示顺序</span>
-                        <input
-                          inputMode="numeric"
-                          value={categoryForm.sort}
-                          onChange={(event) => {
-                            setCategoryForm((current) => ({ ...current, sort: event.target.value }));
-                          }}
-                          placeholder="0"
-                        />
-                      </label>
-                      <label className="form-field">
-                        <span>当前状态</span>
+                        <span>导入到哪个科目</span>
                         <select
-                          value={categoryForm.enabled ? "enabled" : "disabled"}
+                          value={importForm.subjectKey}
                           onChange={(event) => {
-                            setCategoryForm((current) => ({
-                              ...current,
-                              enabled: event.target.value === "enabled",
-                            }));
+                            setImportForm((current) => ({ ...current, subjectKey: event.target.value }));
                           }}
                         >
-                          <option value="enabled">启用</option>
-                          <option value="disabled">停用</option>
+                          {subjects.map((subject) => (
+                            <option key={subject.key} value={subject.key}>
+                              {subject.name}
+                            </option>
+                          ))}
                         </select>
                       </label>
-                    </div>
-                    <label className="form-field">
-                      <span>分组说明</span>
-                      <textarea
-                        rows={3}
-                        value={categoryForm.description}
-                        onChange={(event) => {
-                          setCategoryForm((current) => ({ ...current, description: event.target.value }));
-                        }}
-                      />
-                    </label>
-                    <div className="button-row">
-                      <button className="primary-button" disabled={busyAction === "category"} type="submit">
-                        {busyAction === "category" ? "保存中..." : "新增分组"}
-                      </button>
-                      <button className="secondary-button" onClick={resetCategoryEditor} type="button">
-                        清空表单
-                      </button>
-                    </div>
-                  </form>
-                </article>
-
-                <article className="content-card">
-                  <h2>新增学习阶段</h2>
-                  <form className="setup-form" onSubmit={handleSaveGrade}>
-                    <label className="form-field">
-                      <span>阶段编码</span>
-                      <input
-                        value={gradeForm.key}
-                        onChange={(event) => {
-                          setGradeForm((current) => ({ ...current, key: event.target.value }));
-                        }}
-                        placeholder="junior-1"
-                      />
-                    </label>
-                    <label className="form-field">
-                      <span>阶段名称</span>
-                      <input
-                        value={gradeForm.name}
-                        onChange={(event) => {
-                          setGradeForm((current) => ({ ...current, name: event.target.value }));
-                        }}
-                        placeholder="初一"
-                      />
-                    </label>
-                    <label className="form-field">
-                      <span>阶段类型</span>
-                      <input
-                        value={gradeForm.stage}
-                        onChange={(event) => {
-                          setGradeForm((current) => ({ ...current, stage: event.target.value }));
-                        }}
-                        placeholder="junior"
-                      />
-                    </label>
-                    <div className="form-grid-two">
-                      <label className="form-field">
-                        <span>显示顺序</span>
+                      <label className="checkbox-field">
                         <input
-                          inputMode="numeric"
-                          value={gradeForm.sort}
+                          checked={importForm.replace}
                           onChange={(event) => {
-                            setGradeForm((current) => ({ ...current, sort: event.target.value }));
+                            setImportForm((current) => ({ ...current, replace: event.target.checked }));
                           }}
-                          placeholder="0"
+                          type="checkbox"
                         />
+                        <span>导入前先清空当前科目下的旧内容</span>
                       </label>
-                      <label className="form-field">
-                        <span>当前状态</span>
-                        <select
-                          value={gradeForm.enabled ? "enabled" : "disabled"}
-                          onChange={(event) => {
-                            setGradeForm((current) => ({
-                              ...current,
-                              enabled: event.target.value === "enabled",
-                            }));
-                          }}
-                        >
-                          <option value="enabled">启用</option>
-                          <option value="disabled">停用</option>
-                        </select>
-                      </label>
-                    </div>
-                    <label className="form-field">
-                      <span>阶段说明</span>
-                      <textarea
-                        rows={3}
-                        value={gradeForm.description}
-                        onChange={(event) => {
-                          setGradeForm((current) => ({ ...current, description: event.target.value }));
-                        }}
-                      />
-                    </label>
-                    <div className="button-row">
-                      <button className="primary-button" disabled={busyAction === "grade"} type="submit">
-                        {busyAction === "grade" ? "保存中..." : "新增阶段"}
+                      <button className="primary-button" disabled={busyAction === "import"} type="submit">
+                        {busyAction === "import" ? "导入中..." : "开始导入"}
                       </button>
-                      <button className="secondary-button" onClick={resetGradeEditor} type="button">
-                        清空表单
-                      </button>
-                    </div>
-                  </form>
-                </article>
-              </div>
-
-              <section className="content-card">
-                <div className="section-toolbar">
-                  <h2>知识库文档</h2>
-                  <div className="toolbar-controls">
-                    <input
-                      className="toolbar-search"
-                      onChange={(event) => {
-                        setKnowledgeBaseQuery(event.target.value);
-                        setKnowledgeBasePage(1);
-                      }}
-                      placeholder="搜索标题或文件名"
-                      value={knowledgeBaseQuery}
-                    />
-                  </div>
-                </div>
-                <div className="table-wrap">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>标题</th>
-                        <th>文件名</th>
-                        <th>类型</th>
-                        <th>片段数</th>
-                        <th>字数</th>
-                        <th>更新时间</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(knowledgeBaseDocuments?.items ?? []).map((item) => (
-                        <tr key={item.id}>
-                          <td>{item.title}</td>
-                          <td>{item.source_file_name}</td>
-                          <td>{item.source_type}</td>
-                          <td>{formatCount(item.chunk_count)}</td>
-                          <td>{formatCount(item.character_count)}</td>
-                          <td>{formatDateTime(item.updated_at)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {(knowledgeBaseDocuments?.items ?? []).length === 0 ? (
-                  <div className="feedback-banner">当前还没有知识库文档，先上传一份文本或表格文件试试。</div>
+                    </form>
+                  </article>
                 ) : null}
-                <PagerControls
-                  disabled={dataLoading}
-                  onChange={setKnowledgeBasePage}
-                  page={knowledgeBasePage}
-                  pageSize={knowledgeBaseDocuments?.page_size ?? adminPageSize}
-                  total={knowledgeBaseDocuments?.total ?? 0}
-                />
-              </section>
 
-              <article className="content-card">
-                <div className="section-toolbar">
-                  <h2>已开通科目</h2>
-                </div>
-                <div className="table-wrap">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>科目名称</th>
-                        <th>科目编码</th>
-                        <th>显示顺序</th>
-                        <th>前台优先展示</th>
-                        <th>科目说明</th>
-                        <th>操作</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {subjects.map((subject) => (
-                        <tr key={subject.key}>
-                          <td>{subject.name}</td>
-                          <td>{subject.key}</td>
-                          <td>{subject.sort}</td>
-                          <td>{subject.featured ? "是" : "否"}</td>
-                          <td>{subject.description || "-"}</td>
-                          <td>
-                            <button className="secondary-button small-button" onClick={() => startEditSubject(subject)} type="button">
+                {activeImportTab === "knowledge-base-upload" ? (
+                  <article className="content-card import-panel-card">
+                    <div className="section-toolbar">
+                      <div>
+                        <h2>上传知识库文件</h2>
+                        <p className="helper-text">上传后会自动切片，便于后台搜索、开放接口和 MCP 工具统一检索。</p>
+                      </div>
+                    </div>
+                    <form className="setup-form" onSubmit={handleImportKnowledgeBase}>
+                      <label className="form-field">
+                        <span>选择知识库文件</span>
+                        <label className={`upload-picker ${knowledgeBaseForm.file ? "upload-picker-ready" : ""}`}>
+                          <input
+                            accept=".txt,.md,.csv,.xlsx"
+                            className="upload-picker-input"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0] ?? null;
+                              setKnowledgeBaseForm((current) => ({
+                                ...current,
+                                file,
+                                fileName: file?.name ?? "",
+                                title: current.title || (file?.name ? file.name.replace(/\.[^.]+$/, "") : ""),
+                              }));
+                            }}
+                            type="file"
+                          />
+                          <div className="upload-picker-main">
+                            <div className="upload-picker-meta">
+                              <strong>{knowledgeBaseForm.fileName || "点击选择要导入的知识库文件"}</strong>
+                              <span>
+                                {knowledgeBaseForm.file
+                                  ? `文件大小 ${formatFileSize(knowledgeBaseForm.file.size)}，上传后会自动切分为可检索片段`
+                                  : "支持 TXT、Markdown、CSV、Excel，上传后可通过开放接口和 MCP 工具检索"}
+                              </span>
+                            </div>
+                            <span className="upload-picker-action">{knowledgeBaseForm.file ? "重新选择" : "选择文件"}</span>
+                          </div>
+                        </label>
+                      </label>
+                      <div className="upload-hint-list">
+                        <span className="tag">支持 TXT</span>
+                        <span className="tag">支持 Markdown</span>
+                        <span className="tag">支持 CSV / Excel</span>
+                        <span className="tag">自动切片检索</span>
+                      </div>
+                      <label className="form-field">
+                        <span>知识库标题</span>
+                        <input
+                          value={knowledgeBaseForm.title}
+                          onChange={(event) => {
+                            setKnowledgeBaseForm((current) => ({ ...current, title: event.target.value }));
+                          }}
+                          placeholder="例如：英语语法答疑库"
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>归属到哪个科目</span>
+                        <select
+                          value={knowledgeBaseForm.subjectKey}
+                          onChange={(event) => {
+                            setKnowledgeBaseForm((current) => ({ ...current, subjectKey: event.target.value }));
+                          }}
+                        >
+                          {subjects.map((subject) => (
+                            <option key={subject.key} value={subject.key}>
+                              {subject.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button className="primary-button" disabled={busyAction === "knowledge-base-import"} type="submit">
+                        {busyAction === "knowledge-base-import" ? "上传处理中..." : "上传到知识库"}
+                      </button>
+                    </form>
+                  </article>
+                ) : null}
+
+                {activeImportTab === "knowledge-base-docs" ? (
+                  <div className="import-panel-stack">
+                    <div className="table-section import-panel-table">
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>知识库文档</h2>
+                          <p className="helper-text">这里集中查看所有已上传知识库文档，不用在导入表单和列表之间反复滚动。</p>
+                        </div>
+                        <input
+                          className="toolbar-search"
+                          onChange={(event) => {
+                            setKnowledgeBaseQuery(event.target.value);
+                            setKnowledgeBasePage(1);
+                          }}
+                          placeholder="搜索标题或文件名"
+                          value={knowledgeBaseQuery}
+                        />
+                      </div>
+                      <DataTable
+                        columns={["标题", "文件名", "类型", "片段数", "字数", "更新时间"]}
+                        rows={(knowledgeBaseDocuments?.items ?? []).map((item) => [
+                          item.title,
+                          item.source_file_name,
+                          item.source_type,
+                          formatCount(item.chunk_count),
+                          formatCount(item.character_count),
+                          formatDateTime(item.updated_at),
+                        ])}
+                        emptyText="当前还没有知识库文档，先上传一份文本或表格文件试试。"
+                      />
+                      <PagerControls
+                        disabled={dataLoading}
+                        onChange={setKnowledgeBasePage}
+                        page={knowledgeBasePage}
+                        pageSize={knowledgeBaseDocuments?.page_size ?? adminPageSize}
+                        total={knowledgeBaseDocuments?.total ?? 0}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                {activeImportTab === "subjects" ? (
+                  <div className="import-panel-stack">
+                    <article className="content-card import-panel-card">
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>新增学习科目</h2>
+                          <p className="helper-text">用于管理前台学科入口和导入归属科目。</p>
+                        </div>
+                      </div>
+                      <form className="setup-form" onSubmit={handleSaveSubject}>
+                        <label className="form-field">
+                          <span>科目编码</span>
+                          <input
+                            value={subjectForm.key}
+                            onChange={(event) => {
+                              setSubjectForm((current) => ({ ...current, key: event.target.value }));
+                            }}
+                            placeholder="english"
+                          />
+                        </label>
+                        <label className="form-field">
+                          <span>前台展示名称</span>
+                          <input
+                            value={subjectForm.name}
+                            onChange={(event) => {
+                              setSubjectForm((current) => ({ ...current, name: event.target.value }));
+                            }}
+                            placeholder="英语高频词汇"
+                          />
+                        </label>
+                        <label className="form-field">
+                          <span>显示顺序</span>
+                          <input
+                            inputMode="numeric"
+                            value={subjectForm.sort}
+                            onChange={(event) => {
+                              setSubjectForm((current) => ({ ...current, sort: event.target.value }));
+                            }}
+                            placeholder="0"
+                          />
+                        </label>
+                        <label className="form-field">
+                          <span>科目简介</span>
+                          <textarea
+                            rows={3}
+                            value={subjectForm.description}
+                            onChange={(event) => {
+                              setSubjectForm((current) => ({ ...current, description: event.target.value }));
+                            }}
+                          />
+                        </label>
+                        <label className="checkbox-field">
+                          <input
+                            checked={subjectForm.featured}
+                            onChange={(event) => {
+                              setSubjectForm((current) => ({ ...current, featured: event.target.checked }));
+                            }}
+                            type="checkbox"
+                          />
+                          <span>前台优先展示这个科目</span>
+                        </label>
+                        <div className="button-row">
+                          <button className="primary-button" disabled={busyAction === "subject"} type="submit">
+                            {busyAction === "subject" ? "保存中..." : "新增科目"}
+                          </button>
+                          <button className="secondary-button" onClick={resetSubjectEditor} type="button">
+                            清空表单
+                          </button>
+                        </div>
+                      </form>
+                    </article>
+
+                    <div className="table-section import-panel-table">
+                      <div className="section-toolbar">
+                        <h2>已开通科目</h2>
+                      </div>
+                      <DataTable
+                        columns={["科目名称", "科目编码", "显示顺序", "首页优先", "科目说明", "操作"]}
+                        rows={subjects.map((subject) => [
+                          subject.name,
+                          subject.key,
+                          subject.sort,
+                          subject.featured ? "是" : "否",
+                          subject.description || "-",
+                          <button className="secondary-button small-button" onClick={() => startEditSubject(subject)} type="button">
+                            编辑
+                          </button>,
+                        ])}
+                        emptyText="当前还没有开通任何学习科目。"
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                {activeImportTab === "categories" ? (
+                  <div className="import-panel-stack">
+                    <article className="content-card import-panel-card">
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>新增内容分组</h2>
+                          <p className="helper-text">内容分组会影响词库展示和批量导入后的分类归属。</p>
+                        </div>
+                      </div>
+                      <form className="setup-form" onSubmit={handleSaveCategory}>
+                        <label className="form-field">
+                          <span>归属科目</span>
+                          <select
+                            value={categoryForm.subjectKey}
+                            onChange={(event) => {
+                              setCategoryForm((current) => ({ ...current, subjectKey: event.target.value }));
+                            }}
+                          >
+                            {subjects.map((subject) => (
+                              <option key={subject.key} value={subject.key}>
+                                {subject.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="form-field">
+                          <span>分组类型</span>
+                          <input
+                            value={categoryForm.kind}
+                            onChange={(event) => {
+                              setCategoryForm((current) => ({ ...current, kind: event.target.value }));
+                            }}
+                            placeholder="topic"
+                          />
+                        </label>
+                        <label className="form-field">
+                          <span>分组编码</span>
+                          <input
+                            value={categoryForm.key}
+                            onChange={(event) => {
+                              setCategoryForm((current) => ({ ...current, key: event.target.value }));
+                            }}
+                            placeholder="travel"
+                          />
+                        </label>
+                        <label className="form-field">
+                          <span>前台展示名称</span>
+                          <input
+                            value={categoryForm.name}
+                            onChange={(event) => {
+                              setCategoryForm((current) => ({ ...current, name: event.target.value }));
+                            }}
+                            placeholder="旅行场景"
+                          />
+                        </label>
+                        <div className="form-grid-two">
+                          <label className="form-field">
+                            <span>显示顺序</span>
+                            <input
+                              inputMode="numeric"
+                              value={categoryForm.sort}
+                              onChange={(event) => {
+                                setCategoryForm((current) => ({ ...current, sort: event.target.value }));
+                              }}
+                              placeholder="0"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>当前状态</span>
+                            <select
+                              value={categoryForm.enabled ? "enabled" : "disabled"}
+                              onChange={(event) => {
+                                setCategoryForm((current) => ({
+                                  ...current,
+                                  enabled: event.target.value === "enabled",
+                                }));
+                              }}
+                            >
+                              <option value="enabled">启用</option>
+                              <option value="disabled">停用</option>
+                            </select>
+                          </label>
+                        </div>
+                        <label className="form-field">
+                          <span>分组说明</span>
+                          <textarea
+                            rows={3}
+                            value={categoryForm.description}
+                            onChange={(event) => {
+                              setCategoryForm((current) => ({ ...current, description: event.target.value }));
+                            }}
+                          />
+                        </label>
+                        <div className="button-row">
+                          <button className="primary-button" disabled={busyAction === "category"} type="submit">
+                            {busyAction === "category" ? "保存中..." : "新增分组"}
+                          </button>
+                          <button className="secondary-button" onClick={resetCategoryEditor} type="button">
+                            清空表单
+                          </button>
+                        </div>
+                      </form>
+                    </article>
+
+                    <div className="table-section import-panel-table">
+                      <div className="section-toolbar">
+                        <h2>内容分组列表</h2>
+                        <input
+                          className="toolbar-search"
+                          value={categoryQuery}
+                          onChange={(event) => {
+                            setCategoryQuery(event.target.value);
+                            setCategoryPage(1);
+                          }}
+                          placeholder="搜索分组名称"
+                        />
+                      </div>
+                      <DataTable
+                        columns={["名称", "分组编码", "所属科目", "分组类型", "状态", "操作"]}
+                        rows={(categories?.items ?? []).map((item) => [
+                          item.name,
+                          item.key,
+                          formatSubjectLabel(item.subject_key || ""),
+                          item.kind,
+                          item.enabled ? "启用" : "停用",
+                          <div className="button-row" key={`category-actions-${item.id}`}>
+                            <button className="secondary-button small-button" onClick={() => startEditCategory(item)} type="button">
                               编辑
                             </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {subjects.length === 0 ? <div className="feedback-banner">当前还没有开通任何学习科目。</div> : null}
-                </div>
-              </article>
+                            <button className="secondary-button small-button" onClick={() => focusWordsByClassification(item.name)} type="button">
+                              查看词库
+                            </button>
+                          </div>,
+                        ])}
+                        emptyText="当前还没有符合条件的内容分组。"
+                      />
+                      <PagerControls
+                        page={categories?.page ?? 1}
+                        total={categories?.total ?? 0}
+                        pageSize={categories?.page_size ?? adminPageSize}
+                        onChange={setCategoryPage}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                {activeImportTab === "grades" ? (
+                  <div className="import-panel-stack">
+                    <article className="content-card import-panel-card">
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>新增学习阶段</h2>
+                          <p className="helper-text">学习阶段用于组织词库的适用范围和后台筛选维度。</p>
+                        </div>
+                      </div>
+                      <form className="setup-form" onSubmit={handleSaveGrade}>
+                        <label className="form-field">
+                          <span>阶段编码</span>
+                          <input
+                            value={gradeForm.key}
+                            onChange={(event) => {
+                              setGradeForm((current) => ({ ...current, key: event.target.value }));
+                            }}
+                            placeholder="junior-1"
+                          />
+                        </label>
+                        <label className="form-field">
+                          <span>阶段名称</span>
+                          <input
+                            value={gradeForm.name}
+                            onChange={(event) => {
+                              setGradeForm((current) => ({ ...current, name: event.target.value }));
+                            }}
+                            placeholder="初一"
+                          />
+                        </label>
+                        <label className="form-field">
+                          <span>阶段类型</span>
+                          <input
+                            value={gradeForm.stage}
+                            onChange={(event) => {
+                              setGradeForm((current) => ({ ...current, stage: event.target.value }));
+                            }}
+                            placeholder="junior"
+                          />
+                        </label>
+                        <div className="form-grid-two">
+                          <label className="form-field">
+                            <span>显示顺序</span>
+                            <input
+                              inputMode="numeric"
+                              value={gradeForm.sort}
+                              onChange={(event) => {
+                                setGradeForm((current) => ({ ...current, sort: event.target.value }));
+                              }}
+                              placeholder="0"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>当前状态</span>
+                            <select
+                              value={gradeForm.enabled ? "enabled" : "disabled"}
+                              onChange={(event) => {
+                                setGradeForm((current) => ({
+                                  ...current,
+                                  enabled: event.target.value === "enabled",
+                                }));
+                              }}
+                            >
+                              <option value="enabled">启用</option>
+                              <option value="disabled">停用</option>
+                            </select>
+                          </label>
+                        </div>
+                        <label className="form-field">
+                          <span>阶段说明</span>
+                          <textarea
+                            rows={3}
+                            value={gradeForm.description}
+                            onChange={(event) => {
+                              setGradeForm((current) => ({ ...current, description: event.target.value }));
+                            }}
+                          />
+                        </label>
+                        <div className="button-row">
+                          <button className="primary-button" disabled={busyAction === "grade"} type="submit">
+                            {busyAction === "grade" ? "保存中..." : "新增阶段"}
+                          </button>
+                          <button className="secondary-button" onClick={resetGradeEditor} type="button">
+                            清空表单
+                          </button>
+                        </div>
+                      </form>
+                    </article>
+
+                    <div className="table-section import-panel-table">
+                      <div className="section-toolbar">
+                        <h2>学习阶段列表</h2>
+                        <input
+                          className="toolbar-search"
+                          value={gradeQuery}
+                          onChange={(event) => {
+                            setGradeQuery(event.target.value);
+                            setGradePage(1);
+                          }}
+                          placeholder="搜索阶段名称"
+                        />
+                      </div>
+                      <DataTable
+                        columns={["名称", "编码", "阶段类型", "启用", "操作"]}
+                        rows={(grades?.items ?? []).map((item) => [
+                          item.name,
+                          item.key,
+                          item.stage || "-",
+                          item.enabled ? "是" : "否",
+                          <button className="secondary-button small-button" onClick={() => startEditGrade(item)} type="button">
+                            编辑
+                          </button>,
+                        ])}
+                        emptyText="当前还没有符合条件的学习阶段。"
+                      />
+                      <PagerControls
+                        page={grades?.page ?? 1}
+                        total={grades?.total ?? 0}
+                        pageSize={grades?.page_size ?? adminPageSize}
+                        onChange={setGradePage}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </section>
           ) : null}
 

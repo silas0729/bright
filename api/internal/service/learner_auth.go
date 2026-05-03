@@ -16,6 +16,7 @@ func (s *Service) RegisterLearner(ctx context.Context, input domain.LearnerRegis
 	username := normalizeKey(input.Username)
 	password := strings.TrimSpace(input.Password)
 	displayName := strings.TrimSpace(input.DisplayName)
+	inviteCode := normalizeInviteCode(input.InviteCode)
 
 	if username == "" {
 		return domain.LearnerUser{}, errors.New("username is required")
@@ -38,18 +39,34 @@ func (s *Service) RegisterLearner(ctx context.Context, input domain.LearnerRegis
 		return domain.LearnerUser{}, errors.New("username already exists")
 	}
 
+	var invitedByUserID *uint
+	if inviteCode != "" {
+		var inviter storage.LearnerUser
+		if err := s.db.WithContext(ctx).Where("invite_code = ?", inviteCode).First(&inviter).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domain.LearnerUser{}, errors.New("invite code does not exist")
+			}
+			return domain.LearnerUser{}, err
+		}
+		invitedByUserID = uintPtr(inviter.ID)
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return domain.LearnerUser{}, err
 	}
 
 	model := storage.LearnerUser{
-		Username:     username,
-		PasswordHash: string(hash),
-		DisplayName:  displayName,
-		Status:       "active",
+		Username:        username,
+		PasswordHash:    string(hash),
+		DisplayName:     displayName,
+		Status:          "active",
+		InvitedByUserID: invitedByUserID,
 	}
 	if err := s.db.WithContext(ctx).Create(&model).Error; err != nil {
+		return domain.LearnerUser{}, err
+	}
+	if err := s.ensureInviteCode(ctx, &model); err != nil {
 		return domain.LearnerUser{}, err
 	}
 	return toLearnerUser(model), nil
@@ -118,6 +135,7 @@ func toLearnerUser(model storage.LearnerUser) domain.LearnerUser {
 		Username:    model.Username,
 		DisplayName: model.DisplayName,
 		Status:      model.Status,
+		InviteCode:  model.InviteCode,
 		CreatedAt:   model.CreatedAt,
 	}
 }

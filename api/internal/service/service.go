@@ -92,7 +92,7 @@ func (s *Service) SeedDefaults(ctx context.Context) error {
 			Key:         "content_admin",
 			Name:        "内容管理员",
 			Description: "负责学科、词库、分类、年级与支付配置管理。",
-			Permissions: storage.JSONStringSlice{"admin.read", "subject.read", "subject.write", "catalog.read", "catalog.write", "grade.read", "grade.write", "plan.read", "plan.write", "payment.read", "payment.write", "site.read", "site.write", "learner.read", "learner.write"},
+			Permissions: storage.JSONStringSlice{"admin.read", "subject.read", "subject.write", "catalog.read", "catalog.write", "grade.read", "grade.write", "plan.read", "plan.write", "payment.read", "payment.write", "site.read", "site.write", "learner.read", "learner.write", "mcp.read", "mcp.write", "invite.read"},
 			System:      true,
 			Sort:        2,
 		},
@@ -100,7 +100,7 @@ func (s *Service) SeedDefaults(ctx context.Context) error {
 			Key:         "viewer",
 			Name:        "只读查看",
 			Description: "用于运营查看数据，不可修改内容。",
-			Permissions: storage.JSONStringSlice{"subject.read", "catalog.read", "grade.read", "admin.read", "plan.read", "payment.read", "site.read", "learner.read"},
+			Permissions: storage.JSONStringSlice{"subject.read", "catalog.read", "grade.read", "admin.read", "plan.read", "payment.read", "site.read", "learner.read", "mcp.read", "invite.read"},
 			System:      true,
 			Sort:        3,
 		},
@@ -112,7 +112,7 @@ func (s *Service) SeedDefaults(ctx context.Context) error {
 		}
 	}
 
-	return nil
+	return s.SyncDefaultMCPToolConfigs(ctx)
 }
 
 func (s *Service) BootstrapSuperAdmin(ctx context.Context, input domain.BootstrapAdminInput) (domain.AdminUser, bool, error) {

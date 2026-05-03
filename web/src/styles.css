@@ -2288,6 +2288,109 @@ textarea {
   min-width: 240px;
 }
 
+.import-workbench {
+  display: grid;
+  gap: 20px;
+}
+
+.import-tabbar {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px;
+  border: 1px solid rgba(216, 226, 238, 0.9);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: var(--shadow-card);
+}
+
+.import-tabbar::-webkit-scrollbar {
+  height: 8px;
+}
+
+.import-tabbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(84, 99, 118, 0.28);
+}
+
+.import-tab-button {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 6px;
+  min-width: 154px;
+  padding: 16px 18px;
+  border: 1px solid transparent;
+  border-radius: 18px;
+  text-align: left;
+  color: #445468;
+  background: transparent;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.import-tab-button:hover {
+  transform: translateY(-1px);
+  border-color: #d7e2ee;
+  background: rgba(248, 251, 255, 0.9);
+}
+
+.import-tab-button span {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.import-tab-button small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.import-tab-button em {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: #274260;
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 800;
+  background: #eaf1f8;
+}
+
+.import-tab-button-active {
+  border-color: transparent;
+  color: #ffffff;
+  background: linear-gradient(135deg, #183650 0%, #10253b 100%);
+  box-shadow: 0 16px 28px rgba(16, 37, 59, 0.18);
+}
+
+.import-tab-button-active span,
+.import-tab-button-active small {
+  color: #eff5fb;
+}
+
+.import-tab-button-active em {
+  color: #10253b;
+  background: #ffffff;
+}
+
+.import-panel-stack {
+  display: grid;
+  gap: 20px;
+}
+
+.import-panel-card,
+.import-panel-table {
+  min-width: 0;
+}
+
 .upload-picker {
   position: relative;
   display: block;
@@ -2661,6 +2764,10 @@ textarea {
     flex: 1;
     min-width: 0;
   }
+
+  .import-tabbar {
+    width: 100%;
+  }
 }
 
 @media (max-width: 640px) {
@@ -2716,6 +2823,11 @@ textarea {
 
   .mcp-connection-hero h3 {
     font-size: 1.56rem;
+  }
+
+  .import-tab-button {
+    min-width: 136px;
+    padding: 14px 16px;
   }
 
   .mcp-url-meta {

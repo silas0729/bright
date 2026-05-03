@@ -168,13 +168,15 @@ type AdminRole struct {
 }
 
 type LearnerUser struct {
-	ID           uint   `gorm:"primaryKey"`
-	Username     string `gorm:"size:80;uniqueIndex;not null"`
-	PasswordHash string `gorm:"size:255;not null"`
-	DisplayName  string `gorm:"size:120;not null"`
-	Status       string `gorm:"size:32;not null;default:active"`
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID              uint   `gorm:"primaryKey"`
+	Username        string `gorm:"size:80;uniqueIndex;not null"`
+	PasswordHash    string `gorm:"size:255;not null"`
+	DisplayName     string `gorm:"size:120;not null"`
+	Status          string `gorm:"size:32;not null;default:active"`
+	InviteCode      string `gorm:"size:80;uniqueIndex;not null;default:''"`
+	InvitedByUserID *uint  `gorm:"index"`
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 type SiteSetting struct {
@@ -295,6 +297,19 @@ type KnowledgeBaseChunk struct {
 	UpdatedAt      time.Time
 }
 
+type MCPToolConfig struct {
+	ID                 uint   `gorm:"primaryKey"`
+	ToolName           string `gorm:"column:tool_name;size:120;uniqueIndex;not null"`
+	Title              string `gorm:"size:160;not null"`
+	Description        string `gorm:"size:500"`
+	Category           string `gorm:"size:80;not null;default:general;index"`
+	SourceType         string `gorm:"size:40;not null;default:builtin;index"`
+	IsEnabled          bool   `gorm:"column:is_enabled;not null;default:true;index"`
+	RequiresMembership bool   `gorm:"column:requires_membership;not null;default:false;index"`
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
 func Open(driverName, dsn string, autoCreateDatabase bool) (*gorm.DB, error) {
 	gormConfig := &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
@@ -338,6 +353,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&ImportJob{},
 		&KnowledgeBaseDocument{},
 		&KnowledgeBaseChunk{},
+		&MCPToolConfig{},
 	)
 }
 

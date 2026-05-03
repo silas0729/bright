@@ -83,3 +83,38 @@ func (s *Server) handleSearchKnowledgeBase(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, result)
 }
+
+func (s *Server) handleAdminUpdateKnowledgeBaseDocumentStatus(c *gin.Context) {
+	documentID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || documentID == 0 {
+		writeError(c, http.StatusBadRequest, domainError("invalid knowledge base document id"))
+		return
+	}
+
+	var input domain.UpdateKnowledgeBaseDocumentStatusInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+
+	item, err := s.service.UpdateKnowledgeBaseDocumentStatus(c.Request.Context(), uint(documentID), input)
+	if err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, item)
+}
+
+func (s *Server) handleAdminDeleteKnowledgeBaseDocument(c *gin.Context) {
+	documentID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || documentID == 0 {
+		writeError(c, http.StatusBadRequest, domainError("invalid knowledge base document id"))
+		return
+	}
+
+	if err := s.service.DeleteKnowledgeBaseDocument(c.Request.Context(), uint(documentID)); err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}

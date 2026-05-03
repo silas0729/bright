@@ -20,8 +20,14 @@ type KnowledgeBaseChunk struct {
 	DocumentID     uint      `json:"document_id"`
 	SubjectKey     string    `json:"subject_key"`
 	Title          string    `json:"title"`
+	DocumentTitle  string    `json:"document_title,omitempty"`
+	SourceFileName string    `json:"source_file_name,omitempty"`
+	SourceType     string    `json:"source_type,omitempty"`
+	Status         string    `json:"status,omitempty"`
 	ChunkIndex     int       `json:"chunk_index"`
 	Content        string    `json:"content"`
+	Snippet        string    `json:"snippet,omitempty"`
+	HighlightedSnippet string `json:"highlighted_snippet,omitempty"`
 	CharacterCount int       `json:"character_count"`
 	CreatedAt      time.Time `json:"created_at"`
 }
@@ -50,6 +56,10 @@ type ImportKnowledgeBaseResult struct {
 	Document       KnowledgeBaseDocument `json:"document"`
 	ChunkCount     int                   `json:"chunk_count"`
 	CharacterCount int                   `json:"character_count"`
+}
+
+type UpdateKnowledgeBaseDocumentStatusInput struct {
+	Status string `json:"status"`
 }
 
 type PagedKnowledgeBaseDocuments struct {
