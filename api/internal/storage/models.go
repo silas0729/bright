@@ -272,16 +272,18 @@ type ImportJob struct {
 }
 
 type KnowledgeBaseDocument struct {
-	ID             uint   `gorm:"primaryKey"`
-	SubjectKey     string `gorm:"size:80;not null;index"`
-	Title          string `gorm:"size:255;not null;index"`
-	SourceFileName string `gorm:"size:255;not null"`
-	SourceType     string `gorm:"size:32;not null;index"`
-	Status         string `gorm:"size:32;not null;default:active;index"`
-	ChunkCount     int    `gorm:"not null;default:0"`
-	CharacterCount int    `gorm:"not null;default:0"`
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID                 uint   `gorm:"primaryKey"`
+	SubjectKey         string `gorm:"size:80;not null;index"`
+	Title              string `gorm:"size:255;not null;index"`
+	SourceFileName     string `gorm:"size:255;not null"`
+	SourceType         string `gorm:"size:32;not null;index"`
+	Status             string `gorm:"size:32;not null;default:active;index"`
+	Visibility         string `gorm:"size:32;not null;default:public;index"`
+	OwnerLearnerUserID *uint  `gorm:"index"`
+	ChunkCount         int    `gorm:"not null;default:0"`
+	CharacterCount     int    `gorm:"not null;default:0"`
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type KnowledgeBaseChunk struct {

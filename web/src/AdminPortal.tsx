@@ -11,7 +11,9 @@ import {
   type Category,
   type CatalogStats,
   type Grade,
+  type MCPToolConfig,
   type PagedAdminUsers,
+  type PagedAdminInviteStats,
   type PagedCategories,
   type PagedGrades,
   type PagedKnowledgeBaseDocuments,
@@ -33,8 +35,10 @@ const adminSessionStorageKey = "brights_admin_session";
 const adminUIStateStorageKey = "brights_admin_ui_state";
 const unclassifiedCategoryValue = "__unclassified__";
 
-type AdminSection = "dashboard" | "import" | "catalog" | "site" | "payments" | "memberships" | "learners" | "admins";
+type AdminSection = "dashboard" | "import" | "catalog" | "site" | "payments" | "memberships" | "learners" | "mcp" | "admins";
 type ImportWorkspaceTab = "catalog-upload" | "knowledge-base-upload" | "knowledge-base-docs" | "subjects" | "categories" | "grades";
+type CatalogWorkspaceTab = "word-create" | "words" | "categories" | "grades";
+type PaymentWorkspaceTab = "plan-setup" | "wechat-pay" | "plans" | "orders";
 type ContentEditModal = "subject" | "category" | "grade" | "word" | null;
 type PanelEditModal = "plan" | "subscription" | "learner" | "admin" | "role" | null;
 type NoticeDialogTone = "info" | "success" | "error" | "warning";
@@ -101,6 +105,8 @@ export default function AdminPortal() {
   const [categories, setCategories] = useState<PagedCategories | null>(null);
   const [grades, setGrades] = useState<PagedGrades | null>(null);
   const [knowledgeBaseDocuments, setKnowledgeBaseDocuments] = useState<PagedKnowledgeBaseDocuments | null>(null);
+  const [, setMcpToolConfigs] = useState<MCPToolConfig[]>([]);
+  const [, setInviteStats] = useState<PagedAdminInviteStats | null>(null);
   const [wordFilterCategories, setWordFilterCategories] = useState<Category[]>([]);
   const [wordEditorCategories, setWordEditorCategories] = useState<Category[]>([]);
   const [stats, setStats] = useState<CatalogStats | null>(null);
@@ -119,6 +125,8 @@ export default function AdminPortal() {
   const [reloadKey, setReloadKey] = useState(0);
   const [activeSection, setActiveSection] = useState<AdminSection>(persistedUIState.activeSection ?? "dashboard");
   const [activeImportTab, setActiveImportTab] = useState<ImportWorkspaceTab>("catalog-upload");
+  const [activeCatalogTab, setActiveCatalogTab] = useState<CatalogWorkspaceTab>("words");
+  const [activePaymentTab, setActivePaymentTab] = useState<PaymentWorkspaceTab>("plans");
   const [contentEditModal, setContentEditModal] = useState<ContentEditModal>(null);
   const [panelEditModal, setPanelEditModal] = useState<PanelEditModal>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
@@ -269,6 +277,8 @@ export default function AdminPortal() {
   const [categoryQuery, setCategoryQuery] = useState(persistedUIState.categoryQuery ?? "");
   const [gradeQuery, setGradeQuery] = useState(persistedUIState.gradeQuery ?? "");
   const [knowledgeBaseQuery, setKnowledgeBaseQuery] = useState("");
+  const [inviteStatPage] = useState(1);
+  const [inviteStatQuery] = useState("");
   const [paymentQuery, setPaymentQuery] = useState(persistedUIState.paymentQuery ?? "");
   const [subscriptionQuery, setSubscriptionQuery] = useState(persistedUIState.subscriptionQuery ?? "");
   const [learnerStatusFilter, setLearnerStatusFilter] = useState(persistedUIState.learnerStatusFilter ?? "");
@@ -283,6 +293,7 @@ export default function AdminPortal() {
   const deferredCategoryQuery = useDeferredValue(categoryQuery);
   const deferredGradeQuery = useDeferredValue(gradeQuery);
   const deferredKnowledgeBaseQuery = useDeferredValue(knowledgeBaseQuery);
+  const deferredInviteStatQuery = useDeferredValue(inviteStatQuery);
   const deferredPaymentQuery = useDeferredValue(paymentQuery);
   const deferredSubscriptionQuery = useDeferredValue(subscriptionQuery);
 
@@ -317,6 +328,16 @@ export default function AdminPortal() {
     currentAdmin?.is_super === true || permissionSet.has("*") || permissionSet.has("payment.write");
   const canManagePlans =
     currentAdmin?.is_super === true || permissionSet.has("*") || permissionSet.has("plan.write");
+  const canViewMCPTools =
+    currentAdmin?.is_super === true ||
+    permissionSet.has("*") ||
+    permissionSet.has("mcp.read") ||
+    permissionSet.has("mcp.write");
+  const canViewInviteStats =
+    currentAdmin?.is_super === true ||
+    permissionSet.has("*") ||
+    permissionSet.has("invite.read") ||
+    permissionSet.has("learner.read");
   const useWechatPayPublicKeyMode = wechatPayForm.authMode !== "auto_certificate";
   const noticeDialog = authError
     ? {
@@ -488,6 +509,8 @@ export default function AdminPortal() {
       setPaymentOrders(null);
       setSubscriptions(null);
       setKnowledgeBaseDocuments(null);
+      setMcpToolConfigs([]);
+      setInviteStats(null);
       setSelectedOrderDetail(null);
       return;
     }
@@ -531,6 +554,14 @@ export default function AdminPortal() {
         query: deferredKnowledgeBaseQuery,
         subjectKey: subjectFilter,
       }),
+      canViewMCPTools ? api.adminMCPToolConfigs(token) : Promise.resolve([]),
+      canViewInviteStats
+        ? api.adminInviteStats(token, {
+            page: inviteStatPage,
+            pageSize: adminPageSize,
+            query: deferredInviteStatQuery,
+          })
+        : Promise.resolve(null),
       canViewSiteSettings ? api.adminSiteSettings(token) : Promise.resolve(null),
       canViewLearners
         ? api.adminLearners(token, {
@@ -571,6 +602,8 @@ export default function AdminPortal() {
           categoryData,
           gradeData,
           knowledgeBaseData,
+          mcpToolConfigData,
+          inviteStatData,
           siteData,
           learnerData,
           configResult,
@@ -589,6 +622,8 @@ export default function AdminPortal() {
           setCategories(categoryData);
           setGrades(gradeData);
           setKnowledgeBaseDocuments(knowledgeBaseData);
+          setMcpToolConfigs((mcpToolConfigData as MCPToolConfig[]) ?? []);
+          setInviteStats((inviteStatData as PagedAdminInviteStats | null) ?? null);
           setSiteSettings((siteData as SiteSetting | null) ?? null);
           if (siteData) {
             setSiteForm(siteData as SiteSetting);
@@ -2175,6 +2210,25 @@ function startEditLearner(item: AdminLearnerUser) {
     { key: "grades", label: "阶段管理", helper: "学习阶段", count: grades?.total ?? 0 },
   ];
 
+  const catalogTabItems: Array<{ key: CatalogWorkspaceTab; label: string; helper: string; count?: number }> = [
+    { key: "word-create", label: "新增词条", helper: "手动录入内容" },
+    { key: "words", label: "词库内容", helper: "筛选与批量整理", count: words?.total ?? 0 },
+    { key: "categories", label: "内容分组", helper: "分类与批量处理", count: categories?.total ?? 0 },
+    { key: "grades", label: "学习阶段", helper: "阶段筛选管理", count: grades?.total ?? 0 },
+  ];
+
+  const paymentTabItems: Array<{ key: PaymentWorkspaceTab; label: string; helper: string; count?: number; hidden?: boolean }> = [
+    { key: "plan-setup", label: "方案操作", helper: canManagePlans ? "新增与调整入口" : "查看说明" },
+    { key: "wechat-pay", label: "微信收款", helper: "支付参数配置", hidden: !canViewPayments },
+    { key: "plans", label: "方案列表", helper: "价格与渠道管理", count: plans.length },
+    { key: "orders", label: "支付订单", helper: "订单跟进与详情", count: paymentOrders?.total ?? 0, hidden: !canViewPayments },
+  ];
+
+  const visiblePaymentTabItems = paymentTabItems.filter((item) => !item.hidden);
+  const currentPaymentTab = visiblePaymentTabItems.some((item) => item.key === activePaymentTab)
+    ? activePaymentTab
+    : (visiblePaymentTabItems[0]?.key ?? "plans");
+
   return (
     <div className="admin-shell">
       <header className="admin-topbar">
@@ -2891,350 +2945,399 @@ function startEditLearner(item: AdminLearnerUser) {
                 </div>
               </div>
 
-              <article className="content-card">
-                <h2>手动新增单词内容</h2>
-                <form className="setup-form" onSubmit={handleSaveWord}>
-                  <div className="form-grid-two">
-                    <label className="form-field">
-                      <span>所属科目</span>
-                      <select
-                        value={wordEditor.subjectKey}
-                        onChange={(event) => {
-                          setWordEditor((current) => ({ ...current, subjectKey: event.target.value }));
-                        }}
-                      >
-                        {subjects.map((subject) => (
-                          <option key={subject.key} value={subject.key}>
-                            {subject.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="form-field">
-                      <span>原始导入编号</span>
-                      <input
-                        inputMode="numeric"
-                        value={wordEditor.legacyId}
-                        onChange={(event) => {
-                          setWordEditor((current) => ({ ...current, legacyId: event.target.value }));
-                        }}
-                        placeholder="可留空"
-                      />
-                    </label>
-                  </div>
-                  <div className="form-grid-two">
-                    <label className="form-field">
-                      <span>英文单词</span>
-                      <input
-                        value={wordEditor.term}
-                        onChange={(event) => {
-                          setWordEditor((current) => ({ ...current, term: event.target.value }));
-                        }}
-                        placeholder="boarding pass"
-                      />
-                    </label>
-                    <label className="form-field">
-                      <span>中文释义</span>
-                      <input
-                        value={wordEditor.translation}
-                        onChange={(event) => {
-                          setWordEditor((current) => ({ ...current, translation: event.target.value }));
-                        }}
-                        placeholder="登机牌"
-                      />
-                    </label>
-                  </div>
-                  <div className="form-grid-two">
-                    <label className="form-field">
-                      <span>内容分组</span>
-                      <input
-                        list="word-category-options-inline"
-                        value={wordEditor.classification}
-                        onChange={(event) => {
-                          setWordEditor((current) => ({ ...current, classification: event.target.value }));
-                        }}
-                        placeholder="旅行常用英语单词"
-                      />
-                      <datalist id="word-category-options-inline">
-                        {wordEditorCategories.map((category) => (
-                          <option key={category.id} value={category.name} />
-                        ))}
-                      </datalist>
-                      <p className="helper-text">可以直接选择已有分类，也可以输入新的分类名称，保存后会自动归类。</p>
-                    </label>
-                    <label className="form-field">
-                      <span>学习阶段</span>
-                      <select
-                        value={wordEditor.gradeId}
-                        onChange={(event) => {
-                          setWordEditor((current) => ({ ...current, gradeId: event.target.value }));
-                        }}
-                      >
-                        <option value="">暂不设置</option>
-                        {grades?.items.map((grade) => (
-                          <option key={grade.id} value={String(grade.id)}>
-                            {grade.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  <div className="form-grid-two">
-                    <label className="form-field">
-                      <span>来源备注</span>
-                      <input
-                        value={wordEditor.source}
-                        onChange={(event) => {
-                          setWordEditor((current) => ({ ...current, source: event.target.value }));
-                        }}
-                        placeholder="CSV 导入 / 运营补充"
-                      />
-                    </label>
-                    <label className="form-field">
-                      <span>音标</span>
-                      <input
-                        value={wordEditor.phonetics}
-                        onChange={(event) => {
-                          setWordEditor((current) => ({ ...current, phonetics: event.target.value }));
-                        }}
-                        placeholder="/ˈbɔːrdɪŋ pæs/"
-                      />
-                    </label>
-                  </div>
-                  <label className="form-field">
-                    <span>补充说明</span>
-                    <textarea
-                      rows={3}
-                      value={wordEditor.explanation}
-                      onChange={(event) => {
-                        setWordEditor((current) => ({ ...current, explanation: event.target.value }));
-                      }}
-                      placeholder="这里可以记录例句、适用场景或运营备注。"
-                    />
-                  </label>
-                  <label className="checkbox-field">
-                    <input
-                      checked={wordEditor.isVIP}
-                      onChange={(event) => {
-                        setWordEditor((current) => ({ ...current, isVIP: event.target.checked }));
-                      }}
-                      type="checkbox"
-                    />
-                    <span>设为会员专享内容</span>
-                  </label>
-                  <div className="button-row">
-                    <button className="primary-button" disabled={busyAction === "word"} type="submit">
-                      {busyAction === "word" ? "保存中..." : "新增单词"}
-                    </button>
-                    <button className="secondary-button" onClick={resetWordEditor} type="button">
-                      清空表单
-                    </button>
-                  </div>
-                </form>
-              </article>
-
-              <div className="table-section">
-                <div className="section-toolbar">
-                  <h2>词库内容列表</h2>
-                  <div className="toolbar-controls">
-                    <select
-                      value={wordClassificationFilter}
-                      onChange={(event) => {
-                        setWordClassificationFilter(event.target.value);
-                        setWordPage(1);
-                      }}
+              <div className="import-workbench">
+                <div className="import-tabbar" role="tablist" aria-label="内容整理内部导航">
+                  {catalogTabItems.map((item) => (
+                    <button
+                      aria-selected={activeCatalogTab === item.key}
+                      className={activeCatalogTab === item.key ? "import-tab-button import-tab-button-active" : "import-tab-button"}
+                      key={item.key}
+                      onClick={() => setActiveCatalogTab(item.key)}
+                      role="tab"
+                      type="button"
                     >
-                      <option value="">全部分类</option>
-                      <option value={unclassifiedCategoryValue}>未分类</option>
-                      {wordFilterCategories.map((category) => (
-                        <option key={category.id} value={category.name}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      className="toolbar-search"
-                      value={wordQuery}
-                      onChange={(event) => {
-                        setWordQuery(event.target.value);
-                        setWordPage(1);
-                      }}
-                      placeholder="搜索单词、释义或音标"
-                    />
-                  </div>
+                      <span>{item.label}</span>
+                      <small>{item.helper}</small>
+                      {item.count !== undefined ? <em>{formatCount(item.count)}</em> : null}
+                    </button>
+                  ))}
                 </div>
-                {wordClassificationFilter ? (
-                  <div className="feedback-banner">
-                    <div className="button-row">
-                      <span>
-                        当前正在查看分类「
-                        {wordClassificationFilter === unclassifiedCategoryValue ? "未分类" : wordClassificationFilter}
-                        」的内容。
-                      </span>
-                      <button
-                        className="secondary-button small-button"
-                        disabled={busyAction === "word-batch-vip"}
-                        onClick={() =>
-                          void handleBatchUpdateWordVIP({
-                            categoryId:
-                              wordClassificationFilter === unclassifiedCategoryValue
-                                ? undefined
-                                : wordFilterCategories.find((item) => item.name === wordClassificationFilter)?.id,
-                            classification: wordClassificationFilter,
-                            label: wordClassificationFilter === unclassifiedCategoryValue ? "未分类" : wordClassificationFilter,
-                            isVIP: true,
-                          })
-                        }
-                        type="button"
-                      >
-                        整个分类设为会员专享
-                      </button>
-                      <button
-                        className="secondary-button small-button"
-                        disabled={busyAction === "word-batch-vip"}
-                        onClick={() =>
-                          void handleBatchUpdateWordVIP({
-                            categoryId:
-                              wordClassificationFilter === unclassifiedCategoryValue
-                                ? undefined
-                                : wordFilterCategories.find((item) => item.name === wordClassificationFilter)?.id,
-                            classification: wordClassificationFilter,
-                            label: wordClassificationFilter === unclassifiedCategoryValue ? "未分类" : wordClassificationFilter,
-                            isVIP: false,
-                          })
-                        }
-                        type="button"
-                      >
-                        整个分类设为普通内容
-                      </button>
+
+                {activeCatalogTab === "word-create" ? (
+                  <div className="import-panel-stack">
+                    <article className="content-card import-panel-card">
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>手动新增单词内容</h2>
+                          <p className="helper-text">适合运营补录、修正导入结果，或者直接新增少量词条。</p>
+                        </div>
+                      </div>
+                      <form className="setup-form" onSubmit={handleSaveWord}>
+                        <div className="form-grid-two">
+                          <label className="form-field">
+                            <span>所属科目</span>
+                            <select
+                              value={wordEditor.subjectKey}
+                              onChange={(event) => {
+                                setWordEditor((current) => ({ ...current, subjectKey: event.target.value }));
+                              }}
+                            >
+                              {subjects.map((subject) => (
+                                <option key={subject.key} value={subject.key}>
+                                  {subject.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="form-field">
+                            <span>原始导入编号</span>
+                            <input
+                              inputMode="numeric"
+                              value={wordEditor.legacyId}
+                              onChange={(event) => {
+                                setWordEditor((current) => ({ ...current, legacyId: event.target.value }));
+                              }}
+                              placeholder="可留空"
+                            />
+                          </label>
+                        </div>
+                        <div className="form-grid-two">
+                          <label className="form-field">
+                            <span>英文单词</span>
+                            <input
+                              value={wordEditor.term}
+                              onChange={(event) => {
+                                setWordEditor((current) => ({ ...current, term: event.target.value }));
+                              }}
+                              placeholder="boarding pass"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>中文释义</span>
+                            <input
+                              value={wordEditor.translation}
+                              onChange={(event) => {
+                                setWordEditor((current) => ({ ...current, translation: event.target.value }));
+                              }}
+                              placeholder="登机牌"
+                            />
+                          </label>
+                        </div>
+                        <div className="form-grid-two">
+                          <label className="form-field">
+                            <span>内容分组</span>
+                            <input
+                              list="word-category-options-inline"
+                              value={wordEditor.classification}
+                              onChange={(event) => {
+                                setWordEditor((current) => ({ ...current, classification: event.target.value }));
+                              }}
+                              placeholder="旅行常用英语单词"
+                            />
+                            <datalist id="word-category-options-inline">
+                              {wordEditorCategories.map((category) => (
+                                <option key={category.id} value={category.name} />
+                              ))}
+                            </datalist>
+                            <p className="helper-text">可以直接选择已有分类，也可以输入新的分类名称，保存后会自动归类。</p>
+                          </label>
+                          <label className="form-field">
+                            <span>学习阶段</span>
+                            <select
+                              value={wordEditor.gradeId}
+                              onChange={(event) => {
+                                setWordEditor((current) => ({ ...current, gradeId: event.target.value }));
+                              }}
+                            >
+                              <option value="">暂不设置</option>
+                              {grades?.items.map((grade) => (
+                                <option key={grade.id} value={String(grade.id)}>
+                                  {grade.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                        <div className="form-grid-two">
+                          <label className="form-field">
+                            <span>来源备注</span>
+                            <input
+                              value={wordEditor.source}
+                              onChange={(event) => {
+                                setWordEditor((current) => ({ ...current, source: event.target.value }));
+                              }}
+                              placeholder="CSV 导入 / 运营补充"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>音标</span>
+                            <input
+                              value={wordEditor.phonetics}
+                              onChange={(event) => {
+                                setWordEditor((current) => ({ ...current, phonetics: event.target.value }));
+                              }}
+                              placeholder="/ˈbɔːrdɪŋ pæs/"
+                            />
+                          </label>
+                        </div>
+                        <label className="form-field">
+                          <span>补充说明</span>
+                          <textarea
+                            rows={3}
+                            value={wordEditor.explanation}
+                            onChange={(event) => {
+                              setWordEditor((current) => ({ ...current, explanation: event.target.value }));
+                            }}
+                            placeholder="这里可以记录例句、适用场景或运营备注。"
+                          />
+                        </label>
+                        <label className="checkbox-field">
+                          <input
+                            checked={wordEditor.isVIP}
+                            onChange={(event) => {
+                              setWordEditor((current) => ({ ...current, isVIP: event.target.checked }));
+                            }}
+                            type="checkbox"
+                          />
+                          <span>设为会员专享内容</span>
+                        </label>
+                        <div className="button-row">
+                          <button className="primary-button" disabled={busyAction === "word"} type="submit">
+                            {busyAction === "word" ? "保存中..." : "新增单词"}
+                          </button>
+                          <button className="secondary-button" onClick={resetWordEditor} type="button">
+                            清空表单
+                          </button>
+                        </div>
+                      </form>
+                    </article>
+                  </div>
+                ) : null}
+
+                {activeCatalogTab === "words" ? (
+                  <div className="import-panel-stack">
+                    <div className="table-section import-panel-table">
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>词库内容列表</h2>
+                          <p className="helper-text">默认聚焦表格管理，便于筛选、检索和批量调整内容权限。</p>
+                        </div>
+                        <div className="toolbar-controls">
+                          <select
+                            value={wordClassificationFilter}
+                            onChange={(event) => {
+                              setWordClassificationFilter(event.target.value);
+                              setWordPage(1);
+                            }}
+                          >
+                            <option value="">全部分类</option>
+                            <option value={unclassifiedCategoryValue}>未分类</option>
+                            {wordFilterCategories.map((category) => (
+                              <option key={category.id} value={category.name}>
+                                {category.name}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            className="toolbar-search"
+                            value={wordQuery}
+                            onChange={(event) => {
+                              setWordQuery(event.target.value);
+                              setWordPage(1);
+                            }}
+                            placeholder="搜索单词、释义或音标"
+                          />
+                        </div>
+                      </div>
+                      {wordClassificationFilter ? (
+                        <div className="feedback-banner">
+                          <div className="button-row">
+                            <span>
+                              当前正在查看分类「
+                              {wordClassificationFilter === unclassifiedCategoryValue ? "未分类" : wordClassificationFilter}
+                              」的内容。
+                            </span>
+                            <button
+                              className="secondary-button small-button"
+                              disabled={busyAction === "word-batch-vip"}
+                              onClick={() =>
+                                void handleBatchUpdateWordVIP({
+                                  categoryId:
+                                    wordClassificationFilter === unclassifiedCategoryValue
+                                      ? undefined
+                                      : wordFilterCategories.find((item) => item.name === wordClassificationFilter)?.id,
+                                  classification: wordClassificationFilter,
+                                  label: wordClassificationFilter === unclassifiedCategoryValue ? "未分类" : wordClassificationFilter,
+                                  isVIP: true,
+                                })
+                              }
+                              type="button"
+                            >
+                              整个分类设为会员专享
+                            </button>
+                            <button
+                              className="secondary-button small-button"
+                              disabled={busyAction === "word-batch-vip"}
+                              onClick={() =>
+                                void handleBatchUpdateWordVIP({
+                                  categoryId:
+                                    wordClassificationFilter === unclassifiedCategoryValue
+                                      ? undefined
+                                      : wordFilterCategories.find((item) => item.name === wordClassificationFilter)?.id,
+                                  classification: wordClassificationFilter,
+                                  label: wordClassificationFilter === unclassifiedCategoryValue ? "未分类" : wordClassificationFilter,
+                                  isVIP: false,
+                                })
+                              }
+                              type="button"
+                            >
+                              整个分类设为普通内容
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                      <DataTable
+                        columns={["单词", "释义", "内容分组", "内容权限", "来源", "音标", "操作"]}
+                        rows={(words?.items ?? []).map((item) => [
+                          item.term,
+                          item.translation || "-",
+                          item.category_id ? item.classification : "未分类",
+                          item.is_vip ? "会员专享" : "普通内容",
+                          item.source || "-",
+                          item.phonetics || "-",
+                          <button className="secondary-button small-button" onClick={() => startEditWord(item)} type="button">
+                            编辑
+                          </button>,
+                        ])}
+                        emptyText="当前还没有符合条件的词库内容。"
+                      />
+                      <PagerControls
+                        page={words?.page ?? 1}
+                        total={words?.total ?? 0}
+                        pageSize={words?.page_size ?? adminPageSize}
+                        onChange={setWordPage}
+                      />
                     </div>
                   </div>
                 ) : null}
-                <DataTable
-                  columns={["单词", "释义", "内容分组", "内容权限", "来源", "音标", "操作"]}
-                  rows={(words?.items ?? []).map((item) => [
-                    item.term,
-                    item.translation || "-",
-                    item.category_id ? item.classification : "未分类",
-                    item.is_vip ? "会员专享" : "普通内容",
-                    item.source || "-",
-                    item.phonetics || "-",
-                    <button className="secondary-button small-button" onClick={() => startEditWord(item)} type="button">
-                      编辑
-                    </button>,
-                  ])}
-                  emptyText="当前还没有符合条件的词库内容。"
-                />
-                <PagerControls
-                  page={words?.page ?? 1}
-                  total={words?.total ?? 0}
-                  pageSize={words?.page_size ?? adminPageSize}
-                  onChange={setWordPage}
-                />
-              </div>
 
-              <div className="table-section">
-                <div className="section-toolbar">
-                  <h2>内容分组列表</h2>
-                  <input
-                    className="toolbar-search"
-                    value={categoryQuery}
-                    onChange={(event) => {
-                      setCategoryQuery(event.target.value);
-                      setCategoryPage(1);
-                    }}
-                    placeholder="搜索分组名称"
-                  />
-                </div>
-                <DataTable
-                  columns={["名称", "分组编码", "所属科目", "分组类型", "状态", "操作"]}
-                  rows={(categories?.items ?? []).map((item) => [
-                    item.name,
-                    item.key,
-                    formatSubjectLabel(item.subject_key || ""),
-                    item.kind,
-                    item.enabled ? "启用" : "停用",
-                    <div className="button-row" key={`category-actions-${item.id}`}>
-                      <button className="secondary-button small-button" onClick={() => startEditCategory(item)} type="button">
-                        编辑
-                      </button>
-                      <button className="secondary-button small-button" onClick={() => focusWordsByClassification(item.name)} type="button">
-                        查看单词
-                      </button>
-                      <button
-                        className="secondary-button small-button"
-                        disabled={busyAction === "word-batch-vip"}
-                        onClick={() =>
-                          void handleBatchUpdateWordVIP({
-                            categoryId: item.id,
-                            classification: item.name,
-                            label: item.name,
-                            isVIP: true,
-                          })
-                        }
-                        type="button"
-                      >
-                        设为会员
-                      </button>
-                      <button
-                        className="secondary-button small-button"
-                        disabled={busyAction === "word-batch-vip"}
-                        onClick={() =>
-                          void handleBatchUpdateWordVIP({
-                            categoryId: item.id,
-                            classification: item.name,
-                            label: item.name,
-                            isVIP: false,
-                          })
-                        }
-                        type="button"
-                      >
-                        设为普通
-                      </button>
-                    </div>,
-                  ])}
-                  emptyText="当前还没有符合条件的内容分组。"
-                />
-                <PagerControls
-                  page={categories?.page ?? 1}
-                  total={categories?.total ?? 0}
-                  pageSize={categories?.page_size ?? adminPageSize}
-                  onChange={setCategoryPage}
-                />
-              </div>
+                {activeCatalogTab === "categories" ? (
+                  <div className="import-panel-stack">
+                    <div className="table-section import-panel-table">
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>内容分组列表</h2>
+                          <p className="helper-text">这里集中做分组筛选、编辑和按分组查看词库内容。</p>
+                        </div>
+                        <input
+                          className="toolbar-search"
+                          value={categoryQuery}
+                          onChange={(event) => {
+                            setCategoryQuery(event.target.value);
+                            setCategoryPage(1);
+                          }}
+                          placeholder="搜索分组名称"
+                        />
+                      </div>
+                      <DataTable
+                        columns={["名称", "分组编码", "所属科目", "分组类型", "状态", "操作"]}
+                        rows={(categories?.items ?? []).map((item) => [
+                          item.name,
+                          item.key,
+                          formatSubjectLabel(item.subject_key || ""),
+                          item.kind,
+                          item.enabled ? "启用" : "停用",
+                          <div className="button-row" key={`category-actions-${item.id}`}>
+                            <button className="secondary-button small-button" onClick={() => startEditCategory(item)} type="button">
+                              编辑
+                            </button>
+                            <button className="secondary-button small-button" onClick={() => focusWordsByClassification(item.name)} type="button">
+                              查看单词
+                            </button>
+                            <button
+                              className="secondary-button small-button"
+                              disabled={busyAction === "word-batch-vip"}
+                              onClick={() =>
+                                void handleBatchUpdateWordVIP({
+                                  categoryId: item.id,
+                                  classification: item.name,
+                                  label: item.name,
+                                  isVIP: true,
+                                })
+                              }
+                              type="button"
+                            >
+                              设为会员
+                            </button>
+                            <button
+                              className="secondary-button small-button"
+                              disabled={busyAction === "word-batch-vip"}
+                              onClick={() =>
+                                void handleBatchUpdateWordVIP({
+                                  categoryId: item.id,
+                                  classification: item.name,
+                                  label: item.name,
+                                  isVIP: false,
+                                })
+                              }
+                              type="button"
+                            >
+                              设为普通
+                            </button>
+                          </div>,
+                        ])}
+                        emptyText="当前还没有符合条件的内容分组。"
+                      />
+                      <PagerControls
+                        page={categories?.page ?? 1}
+                        total={categories?.total ?? 0}
+                        pageSize={categories?.page_size ?? adminPageSize}
+                        onChange={setCategoryPage}
+                      />
+                    </div>
+                  </div>
+                ) : null}
 
-              <div className="table-section">
-                <div className="section-toolbar">
-                  <h2>学习阶段列表</h2>
-                  <input
-                    className="toolbar-search"
-                    value={gradeQuery}
-                    onChange={(event) => {
-                      setGradeQuery(event.target.value);
-                      setGradePage(1);
-                    }}
-                    placeholder="搜索阶段名称"
-                  />
-                </div>
-                <DataTable
-                  columns={["名称", "编码", "阶段类型", "启用", "操作"]}
-                  rows={(grades?.items ?? []).map((item) => [
-                    item.name,
-                    item.key,
-                    item.stage || "-",
-                    item.enabled ? "是" : "否",
-                    <button className="secondary-button small-button" onClick={() => startEditGrade(item)} type="button">
-                      编辑
-                    </button>,
-                  ])}
-                  emptyText="当前还没有符合条件的学习阶段。"
-                />
-                <PagerControls
-                  page={grades?.page ?? 1}
-                  total={grades?.total ?? 0}
-                  pageSize={grades?.page_size ?? adminPageSize}
-                  onChange={setGradePage}
-                />
+                {activeCatalogTab === "grades" ? (
+                  <div className="import-panel-stack">
+                    <div className="table-section import-panel-table">
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>学习阶段列表</h2>
+                          <p className="helper-text">集中维护阶段维度，便于词库筛选和内容标注。</p>
+                        </div>
+                        <input
+                          className="toolbar-search"
+                          value={gradeQuery}
+                          onChange={(event) => {
+                            setGradeQuery(event.target.value);
+                            setGradePage(1);
+                          }}
+                          placeholder="搜索阶段名称"
+                        />
+                      </div>
+                      <DataTable
+                        columns={["名称", "编码", "阶段类型", "启用", "操作"]}
+                        rows={(grades?.items ?? []).map((item) => [
+                          item.name,
+                          item.key,
+                          item.stage || "-",
+                          item.enabled ? "是" : "否",
+                          <button className="secondary-button small-button" onClick={() => startEditGrade(item)} type="button">
+                            编辑
+                          </button>,
+                        ])}
+                        emptyText="当前还没有符合条件的学习阶段。"
+                      />
+                      <PagerControls
+                        page={grades?.page ?? 1}
+                        total={grades?.total ?? 0}
+                        pageSize={grades?.page_size ?? adminPageSize}
+                        onChange={setGradePage}
+                      />
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </section>
           ) : null}
@@ -3434,395 +3537,410 @@ function startEditLearner(item: AdminLearnerUser) {
                 </div>
               </div>
 
-              <div className="admin-card-grid">
-{canManagePlans ? (
-                  <article className="content-card">
-                    <h2>会员方案设置</h2>
-                    <p className="helper-text">
-                      新增和修改会员方案都改为弹窗处理，方便你边看方案列表边调整，不会打断当前分页和筛选位置。
-                    </p>
-                    <div className="button-row">
-                      <button className="primary-button" onClick={openCreatePlanModal} type="button">
-                        新增会员方案
-                      </button>
-                    </div>
-                  </article>
-                ) : (
-                  <article className="content-card">
-                    <h2>方案查看说明</h2>
-                    <p className="helper-text">当前岗位可以查看会员方案和订单信息，但暂时不能直接修改收费方案。</p>
-                  </article>
-                )}
+              <div className="import-workbench">
+                <div className="import-tabbar" role="tablist" aria-label="收费方案内部导航">
+                  {visiblePaymentTabItems.map((item) => (
+                    <button
+                      aria-selected={currentPaymentTab === item.key}
+                      className={currentPaymentTab === item.key ? "import-tab-button import-tab-button-active" : "import-tab-button"}
+                      key={item.key}
+                      onClick={() => setActivePaymentTab(item.key)}
+                      role="tab"
+                      type="button"
+                    >
+                      <span>{item.label}</span>
+                      <small>{item.helper}</small>
+                      {item.count !== undefined ? <em>{formatCount(item.count)}</em> : null}
+                    </button>
+                  ))}
+                </div>
 
-                {canViewPayments ? (
-                  <article className="content-card">
-                    <h2>微信收款配置</h2>
-                    <form className="setup-form" onSubmit={handleSaveWechatPayConfig}>
-                      {wechatPayConfigExists && wechatPayConfig ? (
-                        <div className={`feedback-banner ${wechatPayConfig.ready_for_checkout ? "feedback-success" : "feedback-error"}`}>
-                          当前收款配置
-                          {wechatPayConfig.ready_for_checkout ? "已经可以用于前台收款。" : "还未达到可收款状态。"}
-                          {!wechatPayConfig.ready_for_checkout && wechatPayConfig.validation_error
-                            ? ` 还需补充：${wechatPayConfig.validation_error}。`
-                            : ""}
+                {currentPaymentTab === "plan-setup" ? (
+                  <div className="import-panel-stack">
+                    {canManagePlans ? (
+                      <article className="content-card import-panel-card">
+                        <div className="section-toolbar">
+                          <div>
+                            <h2>会员方案设置</h2>
+                            <p className="helper-text">新增和修改会员方案都通过弹窗处理，方便你边看列表边调整，不会打断当前分页和筛选位置。</p>
+                          </div>
+                          <button className="primary-button" onClick={openCreatePlanModal} type="button">
+                            新增会员方案
+                          </button>
                         </div>
-                      ) : (
-                        <div className="feedback-banner">还没有保存微信收款配置，保存后前台才能发起支付。</div>
-                      )}
-                      <div className="form-grid-two">
-                        <label className="form-field">
-                          <span>验签方式</span>
-                          <select
-                            disabled={!canManagePayments}
-                            value={wechatPayForm.authMode}
-                            onChange={(event) => {
-                              setWechatPayForm((current) => ({ ...current, authMode: event.target.value }));
-                            }}
-                          >
-                            <option value="public_key">微信支付公钥模式</option>
-                            <option value="auto_certificate">平台证书自动下载模式</option>
-                          </select>
-                        </label>
-                        <label className="form-field">
-                          <span>商户号</span>
-                          <input
-                            disabled={!canManagePayments}
-                            value={wechatPayForm.mchId}
-                            onChange={(event) => {
-                              setWechatPayForm((current) => ({ ...current, mchId: event.target.value }));
-                            }}
-                          />
-                        </label>
-                        <label className="form-field">
-                          <span>AppID</span>
-                          <input
-                            disabled={!canManagePayments}
-                            value={wechatPayForm.appId}
-                            onChange={(event) => {
-                              setWechatPayForm((current) => ({ ...current, appId: event.target.value }));
-                            }}
-                          />
-                        </label>
-                        <label className="form-field">
-                          <span>商户证书序列号</span>
-                          <input
-                            disabled={!canManagePayments}
-                            value={wechatPayForm.merchantSerialNo}
-                            onChange={(event) => {
-                              setWechatPayForm((current) => ({ ...current, merchantSerialNo: event.target.value }));
-                            }}
-                          />
-                        </label>
-                        <label className="form-field">
-                          <span>支付回调地址</span>
-                          <input
-                            disabled={!canManagePayments}
-                            value={wechatPayForm.notifyURL}
-                            onChange={(event) => {
-                              setWechatPayForm((current) => ({ ...current, notifyURL: event.target.value }));
-                            }}
-                            placeholder="https://your-domain/api/v1/payments/wechat/notify"
-                          />
-                        </label>
-                        <label className="form-field">
-                          <span>订单名称前缀</span>
-                          <input
-                            disabled={!canManagePayments}
-                            value={wechatPayForm.descriptionPrefix}
-                            onChange={(event) => {
-                              setWechatPayForm((current) => ({ ...current, descriptionPrefix: event.target.value }));
-                            }}
-                          />
-                        </label>
-                        <label className="form-field">
-                          <span>二维码有效时长（分钟）</span>
-                          <input
-                            disabled={!canManagePayments}
-                            inputMode="numeric"
-                            type="number"
-                            value={wechatPayForm.timeExpireMinutes}
-                            onChange={(event) => {
-                              setWechatPayForm((current) => ({ ...current, timeExpireMinutes: event.target.value }));
-                            }}
-                          />
-                        </label>
-                        <label className="form-field form-grid-span-two">
-                          <span>APIv3 密钥</span>
-                          <input
-                            disabled={!canManagePayments}
-                            value={wechatPayForm.apiV3Key}
-                            onChange={(event) => {
-                              setWechatPayForm((current) => ({ ...current, apiV3Key: event.target.value }));
-                            }}
-                            placeholder="直接粘贴 APIv3 密钥"
-                          />
-                        </label>
-                        <label className="form-field form-grid-span-two">
-                          <span>商户私钥内容</span>
-                          <textarea
-                            disabled={!canManagePayments}
-                            rows={6}
-                            value={wechatPayForm.keyPem}
-                            onChange={(event) => {
-                              setWechatPayForm((current) => ({ ...current, keyPem: event.target.value }));
-                            }}
-                            placeholder="直接粘贴商户私钥完整内容"
-                          />
-                        </label>
-                        {useWechatPayPublicKeyMode ? (
-                          <>
-                            <label className="form-field">
-                              <span>微信支付公钥编号</span>
-                              <input
-                                disabled={!canManagePayments}
-                                value={wechatPayForm.wechatPayPublicKeyID}
-                                onChange={(event) => {
-                                  setWechatPayForm((current) => ({ ...current, wechatPayPublicKeyID: event.target.value }));
-                                }}
-                              />
-                            </label>
-                            <label className="form-field form-grid-span-two">
-                              <span>微信支付公钥内容</span>
-                              <textarea
-                                disabled={!canManagePayments}
-                                rows={5}
-                                value={wechatPayForm.wechatPayPublicKey}
-                                onChange={(event) => {
-                                  setWechatPayForm((current) => ({ ...current, wechatPayPublicKey: event.target.value }));
-                                }}
-                                placeholder="直接粘贴微信支付公钥完整内容"
-                              />
-                            </label>
-                          </>
-                        ) : null}
-                        <div className="feedback-banner form-grid-span-two">
-                          当前页面会直接回显并保存密钥内容。如需清空某一项，把输入框删空后再保存即可。
+                      </article>
+                    ) : (
+                      <article className="content-card import-panel-card">
+                        <h2>方案查看说明</h2>
+                        <p className="helper-text">当前岗位可以查看会员方案和订单信息，但暂时不能直接修改收费方案。</p>
+                      </article>
+                    )}
+                  </div>
+                ) : null}
+
+                {currentPaymentTab === "wechat-pay" && canViewPayments ? (
+                  <div className="import-panel-stack">
+                    <article className="content-card import-panel-card">
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>微信收款配置</h2>
+                          <p className="helper-text">把前台支付需要的微信参数集中放在这里维护，保存后前台会直接使用。</p>
                         </div>
                       </div>
-                      {canManagePayments ? (
-                        <button className="primary-button" disabled={busyAction === "wechatpay"} type="submit">
-                          {busyAction === "wechatpay" ? "保存中..." : "保存收款配置"}
-                        </button>
-                      ) : (
-                        <p className="helper-text">当前账号只能查看收款配置，暂时不能修改。</p>
-                      )}
-                    </form>
-                  </article>
-                ) : null}
-              </div>
-
-              <article className="content-card">
-                <div className="section-toolbar">
-                  <h2>会员方案列表</h2>
-                </div>
-                <div className="table-wrap">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>方案编码</th>
-                        <th>展示名称</th>
-                        <th>收费方式</th>
-                        <th>售价</th>
-                        <th>推荐</th>
-                        <th>收款渠道</th>
-                        {canManagePlans ? <th>操作</th> : null}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {plans.map((item) => (
-                        <tr key={item.key}>
-                          <td>{item.key}</td>
-                          <td>{item.name}</td>
-                          <td>{item.billing_mode === "monthly" ? "按月会员" : "一次性买断"}</td>
-                          <td>{formatPrice(item.price_cents)}</td>
-                          <td>{item.recommended ? "是" : "否"}</td>
-                          <td>{formatPaymentChannelLabels(item.payment_channels)}</td>
-                          {canManagePlans ? (
-                            <td>
-                              <div className="button-row">
-                                <button className="secondary-button small-button" onClick={() => startEditPlan(item)} type="button">
-                                  调整
-                                </button>
-                                <button
-                                  className="secondary-button small-button"
-                                  disabled={busyAction === "plan-delete"}
-                                  onClick={() => handleDeletePlan(item.id ?? 0)}
-                                  type="button"
-                                >
-                                  删除
-                                </button>
-                              </div>
-                            </td>
+                      <form className="setup-form" onSubmit={handleSaveWechatPayConfig}>
+                        {wechatPayConfigExists && wechatPayConfig ? (
+                          <div className={`feedback-banner ${wechatPayConfig.ready_for_checkout ? "feedback-success" : "feedback-error"}`}>
+                            当前收款配置
+                            {wechatPayConfig.ready_for_checkout ? "已经可以用于前台收款。" : "还未达到可收款状态。"}
+                            {!wechatPayConfig.ready_for_checkout && wechatPayConfig.validation_error
+                              ? ` 还需补充：${wechatPayConfig.validation_error}。`
+                              : ""}
+                          </div>
+                        ) : (
+                          <div className="feedback-banner">还没有保存微信收款配置，保存后前台才能发起支付。</div>
+                        )}
+                        <div className="form-grid-two">
+                          <label className="form-field">
+                            <span>验签方式</span>
+                            <select
+                              disabled={!canManagePayments}
+                              value={wechatPayForm.authMode}
+                              onChange={(event) => {
+                                setWechatPayForm((current) => ({ ...current, authMode: event.target.value }));
+                              }}
+                            >
+                              <option value="public_key">微信支付公钥模式</option>
+                              <option value="auto_certificate">平台证书自动下载模式</option>
+                            </select>
+                          </label>
+                          <label className="form-field">
+                            <span>商户号</span>
+                            <input
+                              disabled={!canManagePayments}
+                              value={wechatPayForm.mchId}
+                              onChange={(event) => {
+                                setWechatPayForm((current) => ({ ...current, mchId: event.target.value }));
+                              }}
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>AppID</span>
+                            <input
+                              disabled={!canManagePayments}
+                              value={wechatPayForm.appId}
+                              onChange={(event) => {
+                                setWechatPayForm((current) => ({ ...current, appId: event.target.value }));
+                              }}
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>商户证书序列号</span>
+                            <input
+                              disabled={!canManagePayments}
+                              value={wechatPayForm.merchantSerialNo}
+                              onChange={(event) => {
+                                setWechatPayForm((current) => ({ ...current, merchantSerialNo: event.target.value }));
+                              }}
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>支付回调地址</span>
+                            <input
+                              disabled={!canManagePayments}
+                              value={wechatPayForm.notifyURL}
+                              onChange={(event) => {
+                                setWechatPayForm((current) => ({ ...current, notifyURL: event.target.value }));
+                              }}
+                              placeholder="https://your-domain/api/v1/payments/wechat/notify"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>订单名称前缀</span>
+                            <input
+                              disabled={!canManagePayments}
+                              value={wechatPayForm.descriptionPrefix}
+                              onChange={(event) => {
+                                setWechatPayForm((current) => ({ ...current, descriptionPrefix: event.target.value }));
+                              }}
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>二维码有效时长（分钟）</span>
+                            <input
+                              disabled={!canManagePayments}
+                              inputMode="numeric"
+                              type="number"
+                              value={wechatPayForm.timeExpireMinutes}
+                              onChange={(event) => {
+                                setWechatPayForm((current) => ({ ...current, timeExpireMinutes: event.target.value }));
+                              }}
+                            />
+                          </label>
+                          <label className="form-field form-grid-span-two">
+                            <span>APIv3 密钥</span>
+                            <input
+                              disabled={!canManagePayments}
+                              value={wechatPayForm.apiV3Key}
+                              onChange={(event) => {
+                                setWechatPayForm((current) => ({ ...current, apiV3Key: event.target.value }));
+                              }}
+                              placeholder="直接粘贴 APIv3 密钥"
+                            />
+                          </label>
+                          <label className="form-field form-grid-span-two">
+                            <span>商户私钥内容</span>
+                            <textarea
+                              disabled={!canManagePayments}
+                              rows={6}
+                              value={wechatPayForm.keyPem}
+                              onChange={(event) => {
+                                setWechatPayForm((current) => ({ ...current, keyPem: event.target.value }));
+                              }}
+                              placeholder="直接粘贴商户私钥完整内容"
+                            />
+                          </label>
+                          {useWechatPayPublicKeyMode ? (
+                            <>
+                              <label className="form-field">
+                                <span>微信支付公钥编号</span>
+                                <input
+                                  disabled={!canManagePayments}
+                                  value={wechatPayForm.wechatPayPublicKeyID}
+                                  onChange={(event) => {
+                                    setWechatPayForm((current) => ({ ...current, wechatPayPublicKeyID: event.target.value }));
+                                  }}
+                                />
+                              </label>
+                              <label className="form-field form-grid-span-two">
+                                <span>微信支付公钥内容</span>
+                                <textarea
+                                  disabled={!canManagePayments}
+                                  rows={5}
+                                  value={wechatPayForm.wechatPayPublicKey}
+                                  onChange={(event) => {
+                                    setWechatPayForm((current) => ({ ...current, wechatPayPublicKey: event.target.value }));
+                                  }}
+                                  placeholder="直接粘贴微信支付公钥完整内容"
+                                />
+                              </label>
+                            </>
                           ) : null}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {plans.length === 0 ? <div className="feedback-banner">当前还没有会员方案，请先新增一个方案。</div> : null}
-                </div>
-              </article>
+                          <div className="feedback-banner form-grid-span-two">
+                            当前页面会直接回显并保存密钥内容。如需清空某一项，把输入框删空后再保存即可。
+                          </div>
+                        </div>
+                        {canManagePayments ? (
+                          <button className="primary-button" disabled={busyAction === "wechatpay"} type="submit">
+                            {busyAction === "wechatpay" ? "保存中..." : "保存收款配置"}
+                          </button>
+                        ) : (
+                          <p className="helper-text">当前账号只能查看收款配置，暂时不能修改。</p>
+                        )}
+                      </form>
+                    </article>
+                  </div>
+                ) : null}
 
-              {canViewPayments ? (
-                <article className="content-card">
-                  <div className="section-toolbar">
-                    <h2>收款订单</h2>
-                    <div className="toolbar-controls">
-                      <select
-                        value={paymentStatusFilter}
-                        onChange={(event) => {
-                          setPaymentStatusFilter(event.target.value);
-                          setPaymentPage(1);
-                        }}
-                      >
-                        <option value="">全部状态</option>
-                        <option value="pending">待支付</option>
-                        <option value="success">支付成功</option>
-                        <option value="failed">支付失败</option>
-                        <option value="closed">已关闭</option>
-                      </select>
-                      <input
-                        className="toolbar-search"
-                        value={paymentQuery}
-                        onChange={(event) => {
-                          setPaymentQuery(event.target.value);
-                          setPaymentPage(1);
-                        }}
-                        placeholder="搜索订单号、学员账号、会员方案"
+                {currentPaymentTab === "plans" ? (
+                  <div className="import-panel-stack">
+                    <div className="table-section import-panel-table">
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>会员方案列表</h2>
+                          <p className="helper-text">集中查看方案价格、收费方式、推荐状态和可用收款渠道。</p>
+                        </div>
+                        {canManagePlans ? (
+                          <button className="primary-button" onClick={openCreatePlanModal} type="button">
+                            新增会员方案
+                          </button>
+                        ) : null}
+                      </div>
+                      <DataTable
+                        columns={canManagePlans ? ["方案编码", "展示名称", "收费方式", "售价", "推荐", "收款渠道", "操作"] : ["方案编码", "展示名称", "收费方式", "售价", "推荐", "收款渠道"]}
+                        rows={plans.map((item) =>
+                          canManagePlans
+                            ? [
+                                item.key,
+                                item.name,
+                                item.billing_mode === "monthly" ? "按月会员" : "一次性买断",
+                                formatPrice(item.price_cents),
+                                item.recommended ? "是" : "否",
+                                formatPaymentChannelLabels(item.payment_channels),
+                                <div className="button-row" key={`plan-actions-${item.key}`}>
+                                  <button className="secondary-button small-button" onClick={() => startEditPlan(item)} type="button">
+                                    调整
+                                  </button>
+                                  <button
+                                    className="secondary-button small-button"
+                                    disabled={busyAction === "plan-delete"}
+                                    onClick={() => handleDeletePlan(item.id ?? 0)}
+                                    type="button"
+                                  >
+                                    删除
+                                  </button>
+                                </div>,
+                              ]
+                            : [
+                                item.key,
+                                item.name,
+                                item.billing_mode === "monthly" ? "按月会员" : "一次性买断",
+                                formatPrice(item.price_cents),
+                                item.recommended ? "是" : "否",
+                                formatPaymentChannelLabels(item.payment_channels),
+                              ],
+                        )}
+                        emptyText="当前还没有会员方案，请先新增一个方案。"
                       />
                     </div>
                   </div>
-                  <div className="table-wrap">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>订单号</th>
-                          <th>学员账号</th>
-                          <th>会员方案</th>
-                          <th>金额</th>
-                          <th>状态</th>
-                          <th>支付时间</th>
-                          <th>创建时间</th>
-                          <th>操作</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(paymentOrders?.items ?? []).map((item) => (
-                          <tr key={item.order_no}>
-                            <td>{item.order_no}</td>
-                            <td>{item.customer_ref}</td>
-                            <td>{formatPlanLabel(item.plan_key)}</td>
-                            <td>{formatPrice(item.amount_cents)}</td>
-                            <td>
-                              <span className={`pill ${paymentStatusClass(item.status)}`}>{paymentStatusLabel(item.status)}</span>
-                            </td>
-                            <td>{item.paid_at ? formatDateTime(item.paid_at) : "-"}</td>
-                            <td>{formatDateTime(item.created_at)}</td>
-                            <td>
-                              <button
-                                className="secondary-button small-button"
-                                disabled={busyAction === `order-${item.order_no}`}
-                                onClick={() => handleLoadOrderDetail(item.order_no)}
-                                type="button"
-                              >
-                                查看订单
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {(paymentOrders?.items ?? []).length === 0 ? <div className="feedback-banner">没有符合条件的收款订单。</div> : null}
-                  </div>
-                  <PagerControls
-                    page={paymentOrders?.page ?? 1}
-                    total={paymentOrders?.total ?? 0}
-                    pageSize={paymentOrders?.page_size ?? adminPageSize}
-                    onChange={setPaymentPage}
-                  />
-                </article>
-              ) : null}
+                ) : null}
 
-              {selectedOrderDetail ? (
-                <article className="content-card">
-                  <div className="section-toolbar">
-                    <h2>订单详情</h2>
-                    <button className="secondary-button small-button" onClick={() => setSelectedOrderDetail(null)} type="button">
-                        收起
-                    </button>
+                {currentPaymentTab === "orders" && canViewPayments ? (
+                  <div className="import-panel-stack">
+                    <div className="table-section import-panel-table">
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>收款订单</h2>
+                          <p className="helper-text">按状态筛选订单，并直接查看支付详情与会员权益联动结果。</p>
+                        </div>
+                        <div className="toolbar-controls">
+                          <select
+                            value={paymentStatusFilter}
+                            onChange={(event) => {
+                              setPaymentStatusFilter(event.target.value);
+                              setPaymentPage(1);
+                            }}
+                          >
+                            <option value="">全部状态</option>
+                            <option value="pending">待支付</option>
+                            <option value="success">支付成功</option>
+                            <option value="failed">支付失败</option>
+                            <option value="closed">已关闭</option>
+                          </select>
+                          <input
+                            className="toolbar-search"
+                            value={paymentQuery}
+                            onChange={(event) => {
+                              setPaymentQuery(event.target.value);
+                              setPaymentPage(1);
+                            }}
+                            placeholder="搜索订单号、学员账号、会员方案"
+                          />
+                        </div>
+                      </div>
+                      <DataTable
+                        columns={["订单号", "学员账号", "会员方案", "金额", "状态", "支付时间", "创建时间", "操作"]}
+                        rows={(paymentOrders?.items ?? []).map((item) => [
+                          item.order_no,
+                          item.customer_ref,
+                          formatPlanLabel(item.plan_key),
+                          formatPrice(item.amount_cents),
+                          <span className={`pill ${paymentStatusClass(item.status)}`}>{paymentStatusLabel(item.status)}</span>,
+                          item.paid_at ? formatDateTime(item.paid_at) : "-",
+                          formatDateTime(item.created_at),
+                          <button
+                            className="secondary-button small-button"
+                            disabled={busyAction === `order-${item.order_no}`}
+                            onClick={() => handleLoadOrderDetail(item.order_no)}
+                            type="button"
+                          >
+                            查看订单
+                          </button>,
+                        ])}
+                        emptyText="没有符合条件的收款订单。"
+                      />
+                      <PagerControls
+                        page={paymentOrders?.page ?? 1}
+                        total={paymentOrders?.total ?? 0}
+                        pageSize={paymentOrders?.page_size ?? adminPageSize}
+                        onChange={setPaymentPage}
+                      />
+                    </div>
+
+                    {selectedOrderDetail ? (
+                      <article className="content-card import-panel-card">
+                        <div className="section-toolbar">
+                          <h2>订单详情</h2>
+                          <button className="secondary-button small-button" onClick={() => setSelectedOrderDetail(null)} type="button">
+                            收起
+                          </button>
+                        </div>
+                        <div className="detail-grid">
+                          <div>
+                            <dt>订单号</dt>
+                            <dd>{selectedOrderDetail.order.order_no}</dd>
+                          </div>
+                          <div>
+                            <dt>状态</dt>
+                            <dd>
+                              <span className={`pill ${paymentStatusClass(selectedOrderDetail.order.status)}`}>
+                                {paymentStatusLabel(selectedOrderDetail.order.status)}
+                              </span>
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>学员账号</dt>
+                            <dd>{selectedOrderDetail.order.customer_ref}</dd>
+                          </div>
+                          <div>
+                            <dt>会员方案</dt>
+                            <dd>{formatPlanLabel(selectedOrderDetail.order.plan_key)}</dd>
+                          </div>
+                          <div>
+                            <dt>所属科目</dt>
+                            <dd>{formatSubjectLabel(selectedOrderDetail.order.subject_key)}</dd>
+                          </div>
+                          <div>
+                            <dt>金额</dt>
+                            <dd>{formatPrice(selectedOrderDetail.order.amount_cents)}</dd>
+                          </div>
+                          <div>
+                            <dt>支付渠道</dt>
+                            <dd>{formatPaymentProviderLabel(selectedOrderDetail.order.provider)}</dd>
+                          </div>
+                          <div>
+                            <dt>渠道流水号</dt>
+                            <dd>{selectedOrderDetail.order.provider_trade_no || "-"}</dd>
+                          </div>
+                          <div>
+                            <dt>创建时间</dt>
+                            <dd>{formatDateTime(selectedOrderDetail.order.created_at)}</dd>
+                          </div>
+                          <div>
+                            <dt>更新时间</dt>
+                            <dd>{selectedOrderDetail.order.updated_at ? formatDateTime(selectedOrderDetail.order.updated_at) : "-"}</dd>
+                          </div>
+                          <div>
+                            <dt>支付时间</dt>
+                            <dd>{selectedOrderDetail.order.paid_at ? formatDateTime(selectedOrderDetail.order.paid_at) : "-"}</dd>
+                          </div>
+                          <div>
+                            <dt>过期时间</dt>
+                            <dd>{selectedOrderDetail.order.expires_at ? formatDateTime(selectedOrderDetail.order.expires_at) : "-"}</dd>
+                          </div>
+                        </div>
+                        {selectedOrderDetail.order.description ? (
+                          <div className="feedback-banner">下单说明：{selectedOrderDetail.order.description}</div>
+                        ) : null}
+                        {selectedOrderDetail.order.error_message ? (
+                          <div className="feedback-banner feedback-error">支付失败原因：{selectedOrderDetail.order.error_message}</div>
+                        ) : null}
+                        {selectedOrderDetail.subscription ? (
+                          <div className="feedback-banner feedback-success">
+                            已关联会员权益：学员账号 {selectedOrderDetail.subscription.customer_ref}，状态{" "}
+                            {subscriptionStatusLabel(selectedOrderDetail.subscription.status)}
+                            {selectedOrderDetail.subscription.current_period_end
+                              ? `，有效期至 ${formatDateTime(selectedOrderDetail.subscription.current_period_end)}`
+                              : "，当前为长期有效"}
+                          </div>
+                        ) : (
+                          <div className="feedback-banner">当前订单还没有关联到会员权益记录。</div>
+                        )}
+                      </article>
+                    ) : null}
                   </div>
-                  <div className="detail-grid">
-                    <div>
-                      <dt>订单号</dt>
-                      <dd>{selectedOrderDetail.order.order_no}</dd>
-                    </div>
-                    <div>
-                      <dt>状态</dt>
-                      <dd>
-                        <span className={`pill ${paymentStatusClass(selectedOrderDetail.order.status)}`}>
-                          {paymentStatusLabel(selectedOrderDetail.order.status)}
-                        </span>
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>学员账号</dt>
-                      <dd>{selectedOrderDetail.order.customer_ref}</dd>
-                    </div>
-                    <div>
-                      <dt>会员方案</dt>
-                      <dd>{formatPlanLabel(selectedOrderDetail.order.plan_key)}</dd>
-                    </div>
-                    <div>
-                      <dt>所属科目</dt>
-                      <dd>{formatSubjectLabel(selectedOrderDetail.order.subject_key)}</dd>
-                    </div>
-                    <div>
-                      <dt>金额</dt>
-                      <dd>{formatPrice(selectedOrderDetail.order.amount_cents)}</dd>
-                    </div>
-                    <div>
-                      <dt>支付渠道</dt>
-                      <dd>{formatPaymentProviderLabel(selectedOrderDetail.order.provider)}</dd>
-                    </div>
-                    <div>
-                      <dt>渠道流水号</dt>
-                      <dd>{selectedOrderDetail.order.provider_trade_no || "-"}</dd>
-                    </div>
-                    <div>
-                      <dt>创建时间</dt>
-                      <dd>{formatDateTime(selectedOrderDetail.order.created_at)}</dd>
-                    </div>
-                    <div>
-                      <dt>更新时间</dt>
-                      <dd>{selectedOrderDetail.order.updated_at ? formatDateTime(selectedOrderDetail.order.updated_at) : "-"}</dd>
-                    </div>
-                    <div>
-                      <dt>支付时间</dt>
-                      <dd>{selectedOrderDetail.order.paid_at ? formatDateTime(selectedOrderDetail.order.paid_at) : "-"}</dd>
-                    </div>
-                    <div>
-                      <dt>过期时间</dt>
-                      <dd>{selectedOrderDetail.order.expires_at ? formatDateTime(selectedOrderDetail.order.expires_at) : "-"}</dd>
-                    </div>
-                  </div>
-                  {selectedOrderDetail.order.description ? (
-                    <div className="feedback-banner">下单说明：{selectedOrderDetail.order.description}</div>
-                  ) : null}
-                  {selectedOrderDetail.order.error_message ? (
-                    <div className="feedback-banner feedback-error">支付失败原因：{selectedOrderDetail.order.error_message}</div>
-                  ) : null}
-                  {selectedOrderDetail.subscription ? (
-                    <div className="feedback-banner feedback-success">
-                      已关联会员权益：学员账号 {selectedOrderDetail.subscription.customer_ref}，状态{" "}
-                      {subscriptionStatusLabel(selectedOrderDetail.subscription.status)}
-                      {selectedOrderDetail.subscription.current_period_end
-                        ? `，有效期至 ${formatDateTime(selectedOrderDetail.subscription.current_period_end)}`
-                        : "，当前为长期有效"}
-                    </div>
-                  ) : (
-                    <div className="feedback-banner">当前订单还没有关联到会员权益记录。</div>
-                  )}
-                </article>
-              ) : null}
+                ) : null}
+              </div>
             </section>
           ) : null}
 

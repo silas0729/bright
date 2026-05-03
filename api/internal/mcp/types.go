@@ -51,11 +51,16 @@ type ServerInfo struct {
 
 // Tool describes an MCP tool.
 type Tool struct {
-	Name         string                 `json:"name"`
-	Title        string                 `json:"title,omitempty"`
-	Description  string                 `json:"description"`
-	InputSchema  map[string]interface{} `json:"inputSchema"`
-	OutputSchema map[string]interface{} `json:"outputSchema,omitempty"`
+	Name               string                 `json:"name"`
+	Title              string                 `json:"title,omitempty"`
+	Description        string                 `json:"description"`
+	Category           string                 `json:"category,omitempty"`
+	SourceType         string                 `json:"sourceType,omitempty"`
+	Enabled            bool                   `json:"enabled,omitempty"`
+	RequiresMembership bool                   `json:"requiresMembership,omitempty"`
+	CanUse             bool                   `json:"canUse,omitempty"`
+	InputSchema        map[string]interface{} `json:"inputSchema"`
+	OutputSchema       map[string]interface{} `json:"outputSchema,omitempty"`
 }
 
 // ListToolsResult contains the available tools.

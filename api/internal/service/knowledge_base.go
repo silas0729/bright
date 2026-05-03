@@ -14,6 +14,17 @@ import (
 )
 
 func (s *Service) ImportKnowledgeBaseFromFile(ctx context.Context, input domain.ImportKnowledgeBaseInput) (domain.ImportKnowledgeBaseResult, error) {
+	return s.importKnowledgeBaseFromFile(ctx, input, 0)
+}
+
+func (s *Service) ImportLearnerKnowledgeBaseFromFile(ctx context.Context, learnerID uint, input domain.ImportKnowledgeBaseInput) (domain.ImportKnowledgeBaseResult, error) {
+	if learnerID == 0 {
+		return domain.ImportKnowledgeBaseResult{}, errors.New("learner id is required")
+	}
+	return s.importKnowledgeBaseFromFile(ctx, input, learnerID)
+}
+
+func (s *Service) importKnowledgeBaseFromFile(ctx context.Context, input domain.ImportKnowledgeBaseInput, ownerLearnerUserID uint) (domain.ImportKnowledgeBaseResult, error) {
 	path := strings.TrimSpace(input.Path)
 	if path == "" {
 		return domain.ImportKnowledgeBaseResult{}, errors.New("path is required")
@@ -51,6 +62,11 @@ func (s *Service) ImportKnowledgeBaseFromFile(ctx context.Context, input domain.
 		SourceFileName: filepath.Base(path),
 		SourceType:     sourceType,
 		Status:         "active",
+		Visibility:     knowledgeBaseVisibilityPublic,
+	}
+	if ownerLearnerUserID > 0 {
+		documentModel.Visibility = knowledgeBaseVisibilityPrivate
+		documentModel.OwnerLearnerUserID = uintPtr(ownerLearnerUserID)
 	}
 
 	totalCharacters := 0
@@ -95,7 +111,7 @@ func (s *Service) ImportKnowledgeBaseFromFile(ctx context.Context, input domain.
 	}
 
 	return domain.ImportKnowledgeBaseResult{
-		Document:       toKnowledgeBaseDocument(documentModel),
+		Document:       toKnowledgeBaseDocument(documentModel, ""),
 		ChunkCount:     len(chunks),
 		CharacterCount: totalCharacters,
 	}, nil
@@ -112,6 +128,22 @@ func (s *Service) ListKnowledgeBaseDocuments(ctx context.Context, filter domain.
 		like := "%" + q + "%"
 		query = query.Where("title LIKE ? OR source_file_name LIKE ?", like, like)
 	}
+	switch {
+	case filter.IncludeAll:
+		// Admin view sees both public and learner-owned documents.
+	case filter.OnlyOwned:
+		if filter.OwnerLearnerUserID == 0 {
+			return domain.PagedKnowledgeBaseDocuments{
+				Items:    []domain.KnowledgeBaseDocument{},
+				Total:    0,
+				Page:     page,
+				PageSize: pageSize,
+			}, nil
+		}
+		query = query.Where("owner_learner_user_id = ?", filter.OwnerLearnerUserID)
+	default:
+		query = query.Where("owner_learner_user_id IS NULL")
+	}
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -123,9 +155,14 @@ func (s *Service) ListKnowledgeBaseDocuments(ctx context.Context, filter domain.
 		return domain.PagedKnowledgeBaseDocuments{}, err
 	}
 
+	ownerMap, err := s.knowledgeBaseOwnerMap(ctx, models)
+	if err != nil {
+		return domain.PagedKnowledgeBaseDocuments{}, err
+	}
+
 	items := make([]domain.KnowledgeBaseDocument, 0, len(models))
 	for _, model := range models {
-		items = append(items, toKnowledgeBaseDocument(model))
+		items = append(items, toKnowledgeBaseDocument(model, ownerMap[ownerIDValue(model.OwnerLearnerUserID)]))
 	}
 
 	return domain.PagedKnowledgeBaseDocuments{
@@ -155,6 +192,14 @@ func (s *Service) SearchKnowledgeBase(ctx context.Context, input domain.SearchKn
 		Where("knowledge_base_documents.status = ?", "active")
 	if subjectKey := normalizeKey(input.SubjectKey); subjectKey != "" {
 		query = query.Where("knowledge_base_chunks.subject_key = ?", subjectKey)
+	}
+	if input.LearnerUserID > 0 {
+		query = query.Where(
+			"(knowledge_base_documents.owner_learner_user_id IS NULL OR knowledge_base_documents.owner_learner_user_id = ?)",
+			input.LearnerUserID,
+		)
+	} else {
+		query = query.Where("knowledge_base_documents.owner_learner_user_id IS NULL")
 	}
 
 	lowerQuery := strings.ToLower(queryText)
@@ -196,6 +241,17 @@ func (s *Service) SearchKnowledgeBase(ctx context.Context, input domain.SearchKn
 }
 
 func (s *Service) UpdateKnowledgeBaseDocumentStatus(ctx context.Context, id uint, input domain.UpdateKnowledgeBaseDocumentStatusInput) (domain.KnowledgeBaseDocument, error) {
+	return s.updateKnowledgeBaseDocumentStatus(ctx, id, input, nil)
+}
+
+func (s *Service) UpdateLearnerKnowledgeBaseDocumentStatus(ctx context.Context, learnerID uint, id uint, input domain.UpdateKnowledgeBaseDocumentStatusInput) (domain.KnowledgeBaseDocument, error) {
+	if learnerID == 0 {
+		return domain.KnowledgeBaseDocument{}, errors.New("learner id is required")
+	}
+	return s.updateKnowledgeBaseDocumentStatus(ctx, id, input, uintPtr(learnerID))
+}
+
+func (s *Service) updateKnowledgeBaseDocumentStatus(ctx context.Context, id uint, input domain.UpdateKnowledgeBaseDocumentStatusInput, learnerID *uint) (domain.KnowledgeBaseDocument, error) {
 	if id == 0 {
 		return domain.KnowledgeBaseDocument{}, errors.New("document id is required")
 	}
@@ -205,11 +261,8 @@ func (s *Service) UpdateKnowledgeBaseDocumentStatus(ctx context.Context, id uint
 		return domain.KnowledgeBaseDocument{}, err
 	}
 
-	var model storage.KnowledgeBaseDocument
-	if err := s.db.WithContext(ctx).Where("id = ?", id).First(&model).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return domain.KnowledgeBaseDocument{}, errors.New("knowledge base document does not exist")
-		}
+	model, err := s.findKnowledgeBaseDocumentForActor(s.db.WithContext(ctx), id, learnerID)
+	if err != nil {
 		return domain.KnowledgeBaseDocument{}, err
 	}
 
@@ -217,20 +270,33 @@ func (s *Service) UpdateKnowledgeBaseDocumentStatus(ctx context.Context, id uint
 		return domain.KnowledgeBaseDocument{}, err
 	}
 	model.Status = status
-	return toKnowledgeBaseDocument(model), nil
+
+	ownerMap, err := s.knowledgeBaseOwnerMap(ctx, []storage.KnowledgeBaseDocument{model})
+	if err != nil {
+		return domain.KnowledgeBaseDocument{}, err
+	}
+	return toKnowledgeBaseDocument(model, ownerMap[ownerIDValue(model.OwnerLearnerUserID)]), nil
 }
 
 func (s *Service) DeleteKnowledgeBaseDocument(ctx context.Context, id uint) error {
+	return s.deleteKnowledgeBaseDocument(ctx, id, nil)
+}
+
+func (s *Service) DeleteLearnerKnowledgeBaseDocument(ctx context.Context, learnerID uint, id uint) error {
+	if learnerID == 0 {
+		return errors.New("learner id is required")
+	}
+	return s.deleteKnowledgeBaseDocument(ctx, id, uintPtr(learnerID))
+}
+
+func (s *Service) deleteKnowledgeBaseDocument(ctx context.Context, id uint, learnerID *uint) error {
 	if id == 0 {
 		return errors.New("document id is required")
 	}
 
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var model storage.KnowledgeBaseDocument
-		if err := tx.Where("id = ?", id).First(&model).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return errors.New("knowledge base document does not exist")
-			}
+		model, err := s.findKnowledgeBaseDocumentForActor(tx, id, learnerID)
+		if err != nil {
 			return err
 		}
 		if err := tx.Where("document_id = ?", id).Delete(&storage.KnowledgeBaseChunk{}).Error; err != nil {
@@ -240,18 +306,21 @@ func (s *Service) DeleteKnowledgeBaseDocument(ctx context.Context, id uint) erro
 	})
 }
 
-func toKnowledgeBaseDocument(model storage.KnowledgeBaseDocument) domain.KnowledgeBaseDocument {
+func toKnowledgeBaseDocument(model storage.KnowledgeBaseDocument, ownerUsername string) domain.KnowledgeBaseDocument {
 	return domain.KnowledgeBaseDocument{
-		ID:             model.ID,
-		SubjectKey:     model.SubjectKey,
-		Title:          model.Title,
-		SourceFileName: model.SourceFileName,
-		SourceType:     model.SourceType,
-		Status:         model.Status,
-		ChunkCount:     model.ChunkCount,
-		CharacterCount: model.CharacterCount,
-		CreatedAt:      model.CreatedAt,
-		UpdatedAt:      model.UpdatedAt,
+		ID:                 model.ID,
+		SubjectKey:         model.SubjectKey,
+		Title:              model.Title,
+		SourceFileName:     model.SourceFileName,
+		SourceType:         model.SourceType,
+		Status:             model.Status,
+		Visibility:         normalizeKnowledgeBaseVisibility(model.Visibility),
+		OwnerLearnerUserID: model.OwnerLearnerUserID,
+		OwnerUsername:      strings.TrimSpace(ownerUsername),
+		ChunkCount:         model.ChunkCount,
+		CharacterCount:     model.CharacterCount,
+		CreatedAt:          model.CreatedAt,
+		UpdatedAt:          model.UpdatedAt,
 	}
 }
 
@@ -310,6 +379,57 @@ func (s *Service) knowledgeBaseDocumentMap(ctx context.Context, chunks []storage
 	return result, nil
 }
 
+func (s *Service) knowledgeBaseOwnerMap(ctx context.Context, documents []storage.KnowledgeBaseDocument) (map[uint]string, error) {
+	result := make(map[uint]string)
+	if len(documents) == 0 {
+		return result, nil
+	}
+
+	ownerIDs := make([]uint, 0, len(documents))
+	seen := make(map[uint]struct{}, len(documents))
+	for _, document := range documents {
+		ownerID := ownerIDValue(document.OwnerLearnerUserID)
+		if ownerID == 0 {
+			continue
+		}
+		if _, ok := seen[ownerID]; ok {
+			continue
+		}
+		seen[ownerID] = struct{}{}
+		ownerIDs = append(ownerIDs, ownerID)
+	}
+	if len(ownerIDs) == 0 {
+		return result, nil
+	}
+
+	var learners []storage.LearnerUser
+	if err := s.db.WithContext(ctx).
+		Select("id", "username").
+		Where("id IN ?", ownerIDs).
+		Find(&learners).Error; err != nil {
+		return nil, err
+	}
+	for _, learner := range learners {
+		result[learner.ID] = learner.Username
+	}
+	return result, nil
+}
+
+func (s *Service) findKnowledgeBaseDocumentForActor(db *gorm.DB, id uint, learnerID *uint) (storage.KnowledgeBaseDocument, error) {
+	var model storage.KnowledgeBaseDocument
+	query := db.Where("id = ?", id)
+	if learnerID != nil {
+		query = query.Where("owner_learner_user_id = ?", *learnerID)
+	}
+	if err := query.First(&model).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return storage.KnowledgeBaseDocument{}, errors.New("knowledge base document does not exist")
+		}
+		return storage.KnowledgeBaseDocument{}, err
+	}
+	return model, nil
+}
+
 func normalizeKnowledgeBaseDocumentStatus(value string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "", "active":
@@ -318,6 +438,20 @@ func normalizeKnowledgeBaseDocumentStatus(value string) (string, error) {
 		return "disabled", nil
 	default:
 		return "", errors.New("knowledge base document status must be active or disabled")
+	}
+}
+
+const (
+	knowledgeBaseVisibilityPublic  = "public"
+	knowledgeBaseVisibilityPrivate = "private"
+)
+
+func normalizeKnowledgeBaseVisibility(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case knowledgeBaseVisibilityPrivate:
+		return knowledgeBaseVisibilityPrivate
+	default:
+		return knowledgeBaseVisibilityPublic
 	}
 }
 
@@ -388,4 +522,11 @@ func firstCaseInsensitiveRuneMatch(content string, queryText string) (int, int) 
 		}
 	}
 	return -1, 0
+}
+
+func ownerIDValue(value *uint) uint {
+	if value == nil {
+		return 0
+	}
+	return *value
 }

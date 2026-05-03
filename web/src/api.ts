@@ -141,6 +141,7 @@ export interface LearnerUser {
   display_name: string;
   status: string;
   created_at: string;
+  invite_code?: string;
   membership?: SubscriptionStatus;
 }
 
@@ -251,8 +252,14 @@ export interface KnowledgeBaseChunk {
   document_id: number;
   subject_key: string;
   title: string;
+  document_title?: string;
+  source_file_name?: string;
+  source_type?: string;
+  status?: string;
   chunk_index: number;
   content: string;
+  snippet?: string;
+  highlighted_snippet?: string;
   character_count: number;
   created_at: string;
 }
@@ -272,6 +279,61 @@ export interface PagedKnowledgeBaseDocuments {
 
 export interface PagedKnowledgeBaseChunks {
   items: KnowledgeBaseChunk[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface MCPToolConfig {
+  id: number;
+  tool_name: string;
+  title: string;
+  description: string;
+  category: string;
+  source_type: string;
+  is_enabled: boolean;
+  requires_membership: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpdateMCPToolConfigInput {
+  is_enabled?: boolean;
+  requires_membership?: boolean;
+}
+
+export interface InviteeItem {
+  user_id: number;
+  username: string;
+  display_name: string;
+  created_at: string;
+  paid_order_count: number;
+  total_recharge_cents: number;
+  last_paid_at?: string;
+}
+
+export interface InviteSummary {
+  invite_code: string;
+  invited_count: number;
+  paid_invite_count: number;
+  total_recharge_cents: number;
+  items: InviteeItem[];
+}
+
+export interface AdminInviteStatItem {
+  inviter_user_id: number;
+  inviter_username: string;
+  inviter_display_name: string;
+  invite_code: string;
+  invited_count: number;
+  paid_invite_count: number;
+  total_recharge_cents: number;
+  last_invite_at?: string;
+  last_paid_at?: string;
+}
+
+export interface PagedAdminInviteStats {
+  items: AdminInviteStatItem[];
   total: number;
   page: number;
   page_size: number;
@@ -540,6 +602,11 @@ export interface MCPInfoTool {
   name: string;
   title?: string;
   description: string;
+  category?: string;
+  sourceType?: string;
+  enabled?: boolean;
+  requiresMembership?: boolean;
+  canUse?: boolean;
   inputSchema: Record<string, unknown>;
   outputSchema?: Record<string, unknown>;
 }
@@ -787,6 +854,17 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     });
   },
+  getLearnerMCPEndpointToolsWithSubject(token: string, id: number, subjectKey?: string) {
+    const search = new URLSearchParams();
+    if (subjectKey?.trim()) {
+      search.set("subject", subjectKey.trim());
+    }
+    const query = search.toString();
+    const path = query ? `/api/v1/auth/mcp/endpoints/${id}/tools?${query}` : `/api/v1/auth/mcp/endpoints/${id}/tools`;
+    return request<MCPEndpointToolsResponse>(path, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
   getLearnerMCPEndpointStatus(token: string, id: number) {
     return request<MCPEndpoint>(`/api/v1/auth/mcp/endpoints/${id}/status`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -824,6 +902,7 @@ export const api = {
     username: string;
     password: string;
     display_name: string;
+    invite_code?: string;
     captcha_id: string;
     captcha_answer: string;
   }) {
@@ -852,6 +931,53 @@ export const api = {
   learnerLogout(token: string) {
     return request<{ success: boolean }>("/api/v1/auth/logout", {
       method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerPaymentOrders(
+    token: string,
+    params: { page: number; pageSize: number; query?: string; status?: string; subject?: string },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.status) {
+      search.set("status", params.status);
+    }
+    if (params.subject) {
+      search.set("subject", params.subject);
+    }
+    return request<PagedPaymentOrders>(`/api/v1/auth/payments/orders?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerMemberships(
+    token: string,
+    params: { page: number; pageSize: number; query?: string; status?: string; subject?: string },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.status) {
+      search.set("status", params.status);
+    }
+    if (params.subject) {
+      search.set("subject", params.subject);
+    }
+    return request<PagedSubscriptions>(`/api/v1/auth/payments/subscriptions?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerInviteSummary(token: string) {
+    return request<InviteSummary>("/api/v1/auth/invite/summary", {
       headers: { Authorization: `Bearer ${token}` },
     });
   },
@@ -1057,6 +1183,19 @@ export const api = {
       search.set("subject", params.subjectKey);
     }
     return request<PagedKnowledgeBaseDocuments>(`/api/v1/admin/knowledge-base/documents?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminUpdateKnowledgeBaseDocumentStatus(token: string, id: number, status: "active" | "disabled") {
+    return request<KnowledgeBaseDocument>(`/api/v1/admin/knowledge-base/documents/${id}/status`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify({ status }),
+    });
+  },
+  adminDeleteKnowledgeBaseDocument(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/admin/knowledge-base/documents/${id}`, {
+      method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
   },
@@ -1274,6 +1413,30 @@ export const api = {
     }
     return request<PagedSubscriptions>(`/api/v1/admin/payments/subscriptions?${search.toString()}`, {
       headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminInviteStats(token: string, params: { page: number; pageSize: number; query?: string }) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    return request<PagedAdminInviteStats>(`/api/v1/admin/invite/stats?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminMCPToolConfigs(token: string) {
+    return request<MCPToolConfig[]>("/api/v1/admin/mcp/tools", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminUpdateMCPToolConfig(token: string, toolName: string, payload: UpdateMCPToolConfigInput) {
+    return request<MCPToolConfig>(`/api/v1/admin/mcp/tools/${encodeURIComponent(toolName)}`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
     });
   },
   adminSubscription(token: string, id: number) {

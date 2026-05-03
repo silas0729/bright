@@ -182,7 +182,7 @@ export default function MCPConsole(props: MCPConsoleProps) {
     setToolPreviewError("");
 
     try {
-      const payload = await api.getLearnerMCPEndpointTools(props.token, endpoint.id);
+      const payload = await api.getLearnerMCPEndpointToolsWithSubject(props.token, endpoint.id, props.subjectKey);
       setToolPreviewMap((current) => ({
         ...current,
         [endpoint.id]: payload.tools,
@@ -830,6 +830,7 @@ export default function MCPConsole(props: MCPConsoleProps) {
                         <th scope="col">工具名称</th>
                         <th scope="col">方法名</th>
                         <th scope="col">入参数量</th>
+                        <th scope="col">权限与分类</th>
                         <th scope="col">说明</th>
                       </tr>
                     </thead>
@@ -837,10 +838,22 @@ export default function MCPConsole(props: MCPConsoleProps) {
                       {selectedEndpointTools.map((tool) => (
                         <tr key={tool.name}>
                           <td>
-                            <strong>{tool.title || tool.name}</strong>
+                            <div className="mcp-cell-stack">
+                              <strong>{tool.title || tool.name}</strong>
+                              <span className="mcp-table-muted">{tool.sourceType || "builtin"}</span>
+                            </div>
                           </td>
                           <td className="mcp-cell-code">{tool.name}</td>
                           <td>{countSchemaFields(tool.inputSchema)}</td>
+                          <td>
+                            <div className="mcp-cell-stack">
+                              <span>{tool.category || "-"}</span>
+                              <span className="mcp-table-muted">
+                                {tool.requiresMembership ? "需要会员" : "无需会员"}
+                                {tool.canUse === false ? " / 当前不可用" : ""}
+                              </span>
+                            </div>
+                          </td>
                           <td>{tool.description || "暂无描述"}</td>
                         </tr>
                       ))}
