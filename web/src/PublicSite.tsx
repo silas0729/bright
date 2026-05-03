@@ -3038,6 +3038,135 @@ export default function PublicSite() {
                         <input readOnly value={currentInviteCode} />
                         <small className="helper-text">邀请码由系统自动生成，前台普通用户不可修改。</small>
                       </label>
+                      <div className="profile-overview">
+                        <div>
+                          <strong>{formatPrice(inviteSummary?.commission_available_cents ?? 0)}</strong>
+                          <span>可提现佣金</span>
+                        </div>
+                        <div>
+                          <strong>{formatPrice(inviteSummary?.commission_withdrawing_cents ?? 0)}</strong>
+                          <span>提现处理中</span>
+                        </div>
+                        <div>
+                          <strong>{formatPrice(inviteSummary?.commission_paid_cents ?? 0)}</strong>
+                          <span>已打款佣金</span>
+                        </div>
+                        <div>
+                          <strong>{formatCommissionRate(inviteCommissionRate)}</strong>
+                          <span>当前返佣比例</span>
+                        </div>
+                      </div>
+                      <div className="profile-grid">
+                        <form className="setup-form" onSubmit={handleSaveInvitePayoutProfile}>
+                          <div className="section-header">
+                            <div>
+                              <p className="section-eyebrow">返佣收款信息</p>
+                              <h3>保存微信提现或支付宝收款资料</h3>
+                            </div>
+                          </div>
+                          <label className="form-field">
+                            <span>收款人姓名</span>
+                            <input
+                              value={invitePayoutProfile.real_name}
+                              onChange={(event) => {
+                                setInvitePayoutProfile((current) => ({ ...current, real_name: event.target.value }));
+                              }}
+                              placeholder="例如：张三"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>微信收款账号</span>
+                            <input
+                              value={invitePayoutProfile.wechat_account}
+                              onChange={(event) => {
+                                setInvitePayoutProfile((current) => ({ ...current, wechat_account: event.target.value }));
+                              }}
+                              placeholder="可填写微信号、手机号或备注"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>微信收款码图片地址</span>
+                            <input
+                              value={invitePayoutProfile.wechat_qr_code}
+                              onChange={(event) => {
+                                setInvitePayoutProfile((current) => ({ ...current, wechat_qr_code: event.target.value }));
+                              }}
+                              placeholder="可选，填写收款码图片 URL"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>支付宝收款账号</span>
+                            <input
+                              value={invitePayoutProfile.alipay_account}
+                              onChange={(event) => {
+                                setInvitePayoutProfile((current) => ({ ...current, alipay_account: event.target.value }));
+                              }}
+                              placeholder="支付宝账号或手机号"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>支付宝收款码图片地址</span>
+                            <input
+                              value={invitePayoutProfile.alipay_qr_code}
+                              onChange={(event) => {
+                                setInvitePayoutProfile((current) => ({ ...current, alipay_qr_code: event.target.value }));
+                              }}
+                              placeholder="可选，填写收款码图片 URL"
+                            />
+                          </label>
+                          <button className="primary-button" disabled={profileBusyAction === "invite-payout-save"} type="submit">
+                            {profileBusyAction === "invite-payout-save" ? "保存中..." : "保存返佣收款信息"}
+                          </button>
+                        </form>
+                        <form className="setup-form" onSubmit={handleCreateInviteWithdraw}>
+                          <div className="section-header">
+                            <div>
+                              <p className="section-eyebrow">佣金提现</p>
+                              <h3>把可提现佣金提交给管理员审核打款</h3>
+                            </div>
+                          </div>
+                          <div className="feedback-banner">
+                            当前可提现金额 <strong>{formatPrice(inviteAvailableCommissionCents)}</strong>
+                            {inviteCommissionRate > 0 ? `，返佣比例 ${formatCommissionRate(inviteCommissionRate)}` : ""}
+                          </div>
+                          <label className="form-field">
+                            <span>提现方式</span>
+                            <select
+                              value={inviteWithdrawForm.paymentType}
+                              onChange={(event) => {
+                                setInviteWithdrawForm((current) => ({ ...current, paymentType: event.target.value }));
+                              }}
+                            >
+                              <option value="alipay">支付宝</option>
+                              <option value="wechat">微信</option>
+                            </select>
+                          </label>
+                          <label className="form-field">
+                            <span>提现金额</span>
+                            <input
+                              inputMode="decimal"
+                              value={inviteWithdrawForm.amount}
+                              onChange={(event) => {
+                                setInviteWithdrawForm((current) => ({ ...current, amount: event.target.value }));
+                              }}
+                              placeholder="例如 10.00"
+                            />
+                            <small className="helper-text">推荐直接提取全部可提现佣金；如果按部分金额提现，金额需要能和可用佣金记录精确匹配。</small>
+                          </label>
+                          <div className="button-row">
+                            <button className="secondary-button" onClick={handleFillInviteWithdrawAmount} type="button">
+                              填入全部可提现金额
+                            </button>
+                            <button
+                              className="primary-button"
+                              disabled={profileBusyAction === "invite-withdraw-create" || inviteAvailableCommissionCents <= 0}
+                              type="submit"
+                            >
+                              {profileBusyAction === "invite-withdraw-create" ? "提交中..." : "提交提现申请"}
+                            </button>
+                          </div>
+                        </form>
+                      </div>
                       <div className="table-wrap">
                         <table className="data-table">
                           <thead>
