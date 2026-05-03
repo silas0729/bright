@@ -287,6 +287,79 @@ export interface PagedKnowledgeBaseChunks {
   page_size: number;
 }
 
+export interface LearningWordProgress {
+  id: number;
+  learner_user_id: number;
+  word_id: number;
+  subject_key: string;
+  term: string;
+  translation: string;
+  classification: string;
+  source?: string;
+  phonetics?: string;
+  explanation?: string;
+  level: string;
+  difficulty: string;
+  review_count: number;
+  correct_count: number;
+  incorrect_count: number;
+  consecutive_correct: number;
+  last_reviewed_at?: string;
+  next_review_at?: string;
+  mastered_at?: string;
+  is_due: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LearningCountItem {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface LearningCurvePoint {
+  date: string;
+  review_count: number;
+  correct_count: number;
+  incorrect_count: number;
+  retention_rate: number;
+}
+
+export interface LearningSummary {
+  subject_key: string;
+  tracked_words: number;
+  due_reviews: number;
+  mastered_words: number;
+  review_count: number;
+  correct_rate: number;
+  level_counts: LearningCountItem[];
+  difficulty_counts: LearningCountItem[];
+  curve_points: LearningCurvePoint[];
+}
+
+export interface PagedLearningWordProgress {
+  items: LearningWordProgress[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface SaveLearningWordProgressInput {
+  word_id: number;
+  subject_key?: string;
+  level?: string;
+  difficulty?: string;
+}
+
+export interface ReviewLearningWordInput {
+  word_id: number;
+  subject_key?: string;
+  remembered: boolean;
+  level?: string;
+  difficulty?: string;
+}
+
 export interface APIConfig {
   id: number;
   name: string;
@@ -434,6 +507,9 @@ export interface XiaomiQRCheckResult {
   xiaomi_user_id?: string;
   ssecurity?: string;
   service_token?: string;
+  device_count?: number;
+  devices_synced?: boolean;
+  device_sync_error?: string;
   config?: XiaomiConfig;
 }
 
@@ -758,6 +834,7 @@ export interface MCPInfoTool {
   category?: string;
   sourceType?: string;
   enabled?: boolean;
+  requiresAuth?: boolean;
   requiresMembership?: boolean;
   canUse?: boolean;
   inputSchema: Record<string, unknown>;
@@ -1165,6 +1242,25 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     });
   },
+  learnerKnowledgeBaseDocumentChunks(
+    token: string,
+    id: number,
+    params?: { page?: number; pageSize?: number },
+  ) {
+    const search = new URLSearchParams();
+    if (params?.page) {
+      search.set("page", String(params.page));
+    }
+    if (params?.pageSize) {
+      search.set("page_size", String(params.pageSize));
+    }
+    return request<PagedKnowledgeBaseChunks>(
+      `/api/v1/auth/knowledge-base/documents/${id}/chunks${search.toString() ? `?${search.toString()}` : ""}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+  },
   learnerImportKnowledgeBase(
     token: string,
     payload: { file: File; subject_key: string; title: string },
@@ -1191,6 +1287,64 @@ export const api = {
   learnerDeleteKnowledgeBaseDocument(token: string, id: number) {
     return request<{ success: boolean }>(`/api/v1/auth/knowledge-base/documents/${id}`, {
       method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerLearningProgress(
+    token: string,
+    params: {
+      page: number;
+      pageSize: number;
+      query?: string;
+      subjectKey?: string;
+      level?: string;
+      difficulty?: string;
+      dueOnly?: boolean;
+    },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.subjectKey) {
+      search.set("subject", params.subjectKey);
+    }
+    if (params.level) {
+      search.set("level", params.level);
+    }
+    if (params.difficulty) {
+      search.set("difficulty", params.difficulty);
+    }
+    if (params.dueOnly) {
+      search.set("due_only", "true");
+    }
+    return request<PagedLearningWordProgress>(`/api/v1/auth/learning/progress?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerSaveLearningProgress(token: string, payload: SaveLearningWordProgressInput) {
+    return request<LearningWordProgress>("/api/v1/auth/learning/progress", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerReviewLearningWord(token: string, payload: ReviewLearningWordInput) {
+    return request<LearningWordProgress>("/api/v1/auth/learning/review", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerLearningSummary(token: string, subjectKey?: string) {
+    const search = new URLSearchParams();
+    if (subjectKey) {
+      search.set("subject", subjectKey);
+    }
+    return request<LearningSummary>(`/api/v1/auth/learning/summary${search.toString() ? `?${search.toString()}` : ""}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
   },
@@ -1582,6 +1736,25 @@ export const api = {
     return request<PagedKnowledgeBaseDocuments>(`/api/v1/admin/knowledge-base/documents?${search.toString()}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+  },
+  adminKnowledgeBaseDocumentChunks(
+    token: string,
+    id: number,
+    params?: { page?: number; pageSize?: number },
+  ) {
+    const search = new URLSearchParams();
+    if (params?.page) {
+      search.set("page", String(params.page));
+    }
+    if (params?.pageSize) {
+      search.set("page_size", String(params.pageSize));
+    }
+    return request<PagedKnowledgeBaseChunks>(
+      `/api/v1/admin/knowledge-base/documents/${id}/chunks${search.toString() ? `?${search.toString()}` : ""}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
   },
   adminUpdateKnowledgeBaseDocumentStatus(token: string, id: number, status: "active" | "disabled") {
     return request<KnowledgeBaseDocument>(`/api/v1/admin/knowledge-base/documents/${id}/status`, {

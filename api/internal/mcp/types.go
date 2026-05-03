@@ -57,6 +57,7 @@ type Tool struct {
 	Category           string                 `json:"category,omitempty"`
 	SourceType         string                 `json:"sourceType,omitempty"`
 	Enabled            bool                   `json:"enabled,omitempty"`
+	RequiresAuth       bool                   `json:"requiresAuth,omitempty"`
 	RequiresMembership bool                   `json:"requiresMembership,omitempty"`
 	CanUse             bool                   `json:"canUse,omitempty"`
 	InputSchema        map[string]interface{} `json:"inputSchema"`

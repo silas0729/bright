@@ -13,6 +13,7 @@ import {
   type Category,
   type CatalogStats,
   type Grade,
+  type KnowledgeBaseChunk,
   type MCPToolConfig,
   type PagedAPIConfigs,
   type PagedAdminUsers,
@@ -181,6 +182,8 @@ type ImportWorkspaceTab = "catalog-upload" | "knowledge-base-upload" | "knowledg
 type CatalogWorkspaceTab = "word-create" | "words" | "categories" | "grades";
 type PaymentWorkspaceTab = "plan-setup" | "wechat-pay" | "plans" | "orders";
 type AdminWorkspaceTab = "security" | "admins" | "roles";
+type MCPWorkspaceTab = "api-tools" | "tool-access" | "invite-stats";
+type WorkspaceTabItem<K extends string> = { key: K; label: string; helper?: string; count?: number };
 type ContentEditModal = "subject" | "category" | "grade" | "word" | null;
 type PanelEditModal = "plan" | "subscription" | "learner" | "admin" | "role" | null;
 type NoticeDialogTone = "info" | "success" | "error" | "warning";
@@ -265,6 +268,13 @@ export default function AdminPortal() {
   const [categories, setCategories] = useState<PagedCategories | null>(null);
   const [grades, setGrades] = useState<PagedGrades | null>(null);
   const [knowledgeBaseDocuments, setKnowledgeBaseDocuments] = useState<PagedKnowledgeBaseDocuments | null>(null);
+  const [knowledgeBasePreviewDocument, setKnowledgeBasePreviewDocument] = useState<{
+    id: number;
+    title: string;
+    sourceFileName: string;
+  } | null>(null);
+  const [knowledgeBasePreviewChunks, setKnowledgeBasePreviewChunks] = useState<KnowledgeBaseChunk[]>([]);
+  const [knowledgeBasePreviewLoading, setKnowledgeBasePreviewLoading] = useState(false);
   const [mcpToolConfigs, setMcpToolConfigs] = useState<MCPToolConfig[]>([]);
   const [apiConfigs, setAPIConfigs] = useState<PagedAPIConfigs | null>(null);
   const [inviteStats, setInviteStats] = useState<PagedAdminInviteStats | null>(null);
@@ -289,6 +299,7 @@ export default function AdminPortal() {
   const [activeCatalogTab, setActiveCatalogTab] = useState<CatalogWorkspaceTab>("words");
   const [activePaymentTab, setActivePaymentTab] = useState<PaymentWorkspaceTab>("plans");
   const [activeAdminTab, setActiveAdminTab] = useState<AdminWorkspaceTab>("admins");
+  const [activeMCPTab, setActiveMCPTab] = useState<MCPWorkspaceTab>("api-tools");
   const [contentEditModal, setContentEditModal] = useState<ContentEditModal>(null);
   const [panelEditModal, setPanelEditModal] = useState<PanelEditModal>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
@@ -685,6 +696,8 @@ export default function AdminPortal() {
       setPaymentOrders(null);
       setSubscriptions(null);
       setKnowledgeBaseDocuments(null);
+      setKnowledgeBasePreviewDocument(null);
+      setKnowledgeBasePreviewChunks([]);
       setMcpToolConfigs([]);
       setInviteStats(null);
       setSelectedOrderDetail(null);
@@ -1311,6 +1324,26 @@ export default function AdminPortal() {
       setDataError((err as Error).message);
     } finally {
       setBusyAction("");
+    }
+  }
+
+  async function handleViewKnowledgeBaseDocument(id: number, title: string, sourceFileName: string) {
+    if (!token || id <= 0) {
+      return;
+    }
+
+    setKnowledgeBasePreviewDocument({ id, title, sourceFileName });
+    setKnowledgeBasePreviewLoading(true);
+    setKnowledgeBasePreviewChunks([]);
+    setDataError("");
+    try {
+      const result = await api.adminKnowledgeBaseDocumentChunks(token, id, { page: 1, pageSize: 200 });
+      setKnowledgeBasePreviewChunks(result.items);
+    } catch (err) {
+      setDataError((err as Error).message);
+      setKnowledgeBasePreviewDocument(null);
+    } finally {
+      setKnowledgeBasePreviewLoading(false);
     }
   }
 
@@ -2605,7 +2638,7 @@ function startEditLearner(item: AdminLearnerUser) {
     { key: "mcp", label: "MCP 工具", hidden: !canViewMCPTools && !canViewInviteStats },
   ];
 
-  const importTabItems: Array<{ key: ImportWorkspaceTab; label: string; helper: string; count?: number }> = [
+  const importTabItems: Array<WorkspaceTabItem<ImportWorkspaceTab>> = [
     { key: "catalog-upload", label: "词库导入", helper: "CSV / Excel" },
     { key: "knowledge-base-upload", label: "知识库导入", helper: "TXT / Markdown / 表格" },
     { key: "knowledge-base-docs", label: "知识库文档", helper: "已上传文档", count: knowledgeBaseDocuments?.total ?? 0 },
@@ -2614,7 +2647,7 @@ function startEditLearner(item: AdminLearnerUser) {
     { key: "grades", label: "阶段管理", helper: "学习阶段", count: grades?.total ?? 0 },
   ];
 
-  const catalogTabItems: Array<{ key: CatalogWorkspaceTab; label: string; helper: string; count?: number }> = [
+  const catalogTabItems: Array<WorkspaceTabItem<CatalogWorkspaceTab>> = [
     { key: "word-create", label: "新增词条", helper: "手动录入内容" },
     { key: "words", label: "词库内容", helper: "筛选与批量整理", count: words?.total ?? 0 },
     { key: "categories", label: "内容分组", helper: "分类与批量处理", count: categories?.total ?? 0 },
@@ -2628,16 +2661,26 @@ function startEditLearner(item: AdminLearnerUser) {
     { key: "orders", label: "支付订单", helper: "订单跟进与详情", count: paymentOrders?.total ?? 0, hidden: !canViewPayments },
   ];
 
-  const adminTabItems: Array<{ key: AdminWorkspaceTab; label: string; helper: string; count?: number }> = [
+  const adminTabItems: Array<WorkspaceTabItem<AdminWorkspaceTab>> = [
     { key: "security", label: "我的安全", helper: "修改当前登录密码" },
     { key: "admins", label: "后台账号", helper: canManageAdmins ? "账号与岗位分配" : "查看团队账号", count: adminUsers?.total ?? 0 },
     { key: "roles", label: "岗位模板", helper: canManageAdmins ? "职责与权限模板" : "查看权限模板", count: roles.length },
+  ];
+
+  const mcpTabItems: Array<(WorkspaceTabItem<MCPWorkspaceTab> & { hidden?: boolean })> = [
+    { key: "api-tools", label: "API 工具", helper: "动态接口与测试", hidden: !canViewMCPTools, count: apiConfigs?.total ?? 0 },
+    { key: "tool-access", label: "工具权限", helper: "开关与会员门槛", hidden: !canViewMCPTools, count: mcpToolConfigs.length },
+    { key: "invite-stats", label: "邀请统计", helper: "邀请与付费转化", hidden: !canViewInviteStats, count: inviteStats?.total ?? 0 },
   ];
 
   const visiblePaymentTabItems = paymentTabItems.filter((item) => !item.hidden);
   const currentPaymentTab = visiblePaymentTabItems.some((item) => item.key === activePaymentTab)
     ? activePaymentTab
     : (visiblePaymentTabItems[0]?.key ?? "plans");
+  const visibleMCPTabItems = mcpTabItems.filter((item) => !item.hidden);
+  const currentMCPTab = visibleMCPTabItems.some((item) => item.key === activeMCPTab)
+    ? activeMCPTab
+    : (visibleMCPTabItems[0]?.key ?? "api-tools");
 
   return (
     <div className="admin-shell">
@@ -2768,22 +2811,12 @@ function startEditLearner(item: AdminLearnerUser) {
               </div>
 
               <div className="import-workbench">
-                <div className="import-tabbar" role="tablist" aria-label="内容导入内部导航">
-                  {importTabItems.map((item) => (
-                    <button
-                      aria-selected={activeImportTab === item.key}
-                      className={activeImportTab === item.key ? "import-tab-button import-tab-button-active" : "import-tab-button"}
-                      key={item.key}
-                      onClick={() => setActiveImportTab(item.key)}
-                      role="tab"
-                      type="button"
-                    >
-                      <span>{item.label}</span>
-                      <small>{item.helper}</small>
-                      {item.count !== undefined ? <em>{formatCount(item.count)}</em> : null}
-                    </button>
-                  ))}
-                </div>
+                <AdminSectionTabs
+                  ariaLabel="内容导入内部导航"
+                  currentKey={activeImportTab}
+                  items={importTabItems}
+                  onChange={setActiveImportTab}
+                />
 
                 {activeImportTab === "catalog-upload" ? (
                   <article className="content-card import-panel-card">
@@ -2967,7 +3000,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         ])}
                         emptyText="当前还没有知识库文档，先上传一份文本或表格文件试试。"
                       />
-                      {canManageCatalog ? (
+                      {(knowledgeBaseDocuments?.items ?? []).length > 0 ? (
                         <div className="table-wrap">
                           <table className="data-table">
                             <thead>
@@ -2981,6 +3014,7 @@ function startEditLearner(item: AdminLearnerUser) {
                               {(knowledgeBaseDocuments?.items ?? []).map((item) => {
                                 const statusActionBusy = busyAction === `kb-status-${item.id}`;
                                 const deleteActionBusy = busyAction === `kb-delete-${item.id}`;
+                                const viewActionBusy = knowledgeBasePreviewLoading && knowledgeBasePreviewDocument?.id === item.id;
                                 return (
                                   <tr key={`kb-manage-${item.id}`}>
                                     <td>
@@ -2997,7 +3031,17 @@ function startEditLearner(item: AdminLearnerUser) {
                                       <div className="button-row">
                                         <button
                                           className="secondary-button small-button"
-                                          disabled={statusActionBusy || deleteActionBusy}
+                                          disabled={statusActionBusy || deleteActionBusy || viewActionBusy}
+                                          onClick={() => {
+                                            void handleViewKnowledgeBaseDocument(item.id, item.title, item.source_file_name);
+                                          }}
+                                          type="button"
+                                        >
+                                          {viewActionBusy ? "加载中..." : "查看内容"}
+                                        </button>
+                                        <button
+                                          className="secondary-button small-button"
+                                          disabled={!canManageCatalog || statusActionBusy || deleteActionBusy}
                                           onClick={() => {
                                             void handleUpdateKnowledgeBaseDocumentStatus(
                                               item.id,
@@ -3010,7 +3054,7 @@ function startEditLearner(item: AdminLearnerUser) {
                                         </button>
                                         <button
                                           className="secondary-button small-button"
-                                          disabled={statusActionBusy || deleteActionBusy}
+                                          disabled={!canManageCatalog || statusActionBusy || deleteActionBusy}
                                           onClick={() => {
                                             void handleDeleteKnowledgeBaseDocument(item.id, item.title);
                                           }}
@@ -3416,22 +3460,12 @@ function startEditLearner(item: AdminLearnerUser) {
               </div>
 
               <div className="import-workbench">
-                <div className="import-tabbar" role="tablist" aria-label="内容整理内部导航">
-                  {catalogTabItems.map((item) => (
-                    <button
-                      aria-selected={activeCatalogTab === item.key}
-                      className={activeCatalogTab === item.key ? "import-tab-button import-tab-button-active" : "import-tab-button"}
-                      key={item.key}
-                      onClick={() => setActiveCatalogTab(item.key)}
-                      role="tab"
-                      type="button"
-                    >
-                      <span>{item.label}</span>
-                      <small>{item.helper}</small>
-                      {item.count !== undefined ? <em>{formatCount(item.count)}</em> : null}
-                    </button>
-                  ))}
-                </div>
+                <AdminSectionTabs
+                  ariaLabel="内容整理内部导航"
+                  currentKey={activeCatalogTab}
+                  items={catalogTabItems}
+                  onChange={setActiveCatalogTab}
+                />
 
                 {activeCatalogTab === "word-create" ? (
                   <div className="import-panel-stack">
@@ -4008,22 +4042,12 @@ function startEditLearner(item: AdminLearnerUser) {
               </div>
 
               <div className="import-workbench">
-                <div className="import-tabbar" role="tablist" aria-label="收费方案内部导航">
-                  {visiblePaymentTabItems.map((item) => (
-                    <button
-                      aria-selected={currentPaymentTab === item.key}
-                      className={currentPaymentTab === item.key ? "import-tab-button import-tab-button-active" : "import-tab-button"}
-                      key={item.key}
-                      onClick={() => setActivePaymentTab(item.key)}
-                      role="tab"
-                      type="button"
-                    >
-                      <span>{item.label}</span>
-                      <small>{item.helper}</small>
-                      {item.count !== undefined ? <em>{formatCount(item.count)}</em> : null}
-                    </button>
-                  ))}
-                </div>
+                <AdminSectionTabs
+                  ariaLabel="收费方案内部导航"
+                  currentKey={currentPaymentTab}
+                  items={visiblePaymentTabItems}
+                  onChange={setActivePaymentTab}
+                />
 
                 {currentPaymentTab === "plan-setup" ? (
                   <div className="import-panel-stack">
@@ -4526,7 +4550,15 @@ function startEditLearner(item: AdminLearnerUser) {
                 </div>
               </div>
 
-              {canViewMCPTools ? (
+              <div className="import-workbench">
+                <AdminSectionTabs
+                  ariaLabel="MCP 工具内部导航"
+                  currentKey={currentMCPTab}
+                  items={visibleMCPTabItems}
+                  onChange={setActiveMCPTab}
+                />
+
+              {canViewMCPTools && currentMCPTab === "api-tools" ? (
                 <article className="content-card">
                   <div className="section-toolbar">
                     <div>
@@ -4771,7 +4803,7 @@ function startEditLearner(item: AdminLearnerUser) {
                 </article>
               ) : null}
 
-              {canViewMCPTools ? (
+              {canViewMCPTools && currentMCPTab === "tool-access" ? (
                 <article className="content-card">
                   <div className="section-toolbar">
                     <div>
@@ -4827,7 +4859,7 @@ function startEditLearner(item: AdminLearnerUser) {
                 </article>
               ) : null}
 
-              {canViewInviteStats ? (
+              {canViewInviteStats && currentMCPTab === "invite-stats" ? (
                 <article className="content-card">
                   <div className="section-toolbar">
                     <div>
@@ -4869,6 +4901,7 @@ function startEditLearner(item: AdminLearnerUser) {
                   />
                 </article>
               ) : null}
+              </div>
             </section>
           ) : null}
 
@@ -4984,22 +5017,12 @@ function startEditLearner(item: AdminLearnerUser) {
               </div>
 
               <div className="import-workbench">
-                <div className="import-tabbar" role="tablist" aria-label="团队与权限内部导航">
-                  {adminTabItems.map((item) => (
-                    <button
-                      aria-selected={activeAdminTab === item.key}
-                      className={activeAdminTab === item.key ? "import-tab-button import-tab-button-active" : "import-tab-button"}
-                      key={item.key}
-                      onClick={() => setActiveAdminTab(item.key)}
-                      role="tab"
-                      type="button"
-                    >
-                      <span>{item.label}</span>
-                      <small>{item.helper}</small>
-                      {item.count !== undefined ? <em>{formatCount(item.count)}</em> : null}
-                    </button>
-                  ))}
-                </div>
+                <AdminSectionTabs
+                  ariaLabel="团队与权限内部导航"
+                  currentKey={activeAdminTab}
+                  items={adminTabItems}
+                  onChange={setActiveAdminTab}
+                />
 
                 {activeAdminTab === "security" ? (
                   <div className="import-panel-stack">
@@ -5177,6 +5200,64 @@ function startEditLearner(item: AdminLearnerUser) {
                 ) : null}
               </div>
             </section>
+          ) : null}
+
+          {knowledgeBasePreviewDocument ? (
+            <div
+              className="admin-edit-modal-backdrop"
+              onClick={() => {
+                setKnowledgeBasePreviewDocument(null);
+                setKnowledgeBasePreviewChunks([]);
+                setKnowledgeBasePreviewLoading(false);
+              }}
+              role="presentation"
+            >
+              <section
+                aria-modal="true"
+                className="document-preview-card"
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
+                role="dialog"
+              >
+                <div className="section-header">
+                  <div>
+                    <p className="section-eyebrow">知识库文档内容</p>
+                    <h2>{knowledgeBasePreviewDocument.title || knowledgeBasePreviewDocument.sourceFileName}</h2>
+                    <p className="helper-text">{knowledgeBasePreviewDocument.sourceFileName}</p>
+                  </div>
+                  <button
+                    className="secondary-button"
+                    onClick={() => {
+                      setKnowledgeBasePreviewDocument(null);
+                      setKnowledgeBasePreviewChunks([]);
+                      setKnowledgeBasePreviewLoading(false);
+                    }}
+                    type="button"
+                  >
+                    关闭
+                  </button>
+                </div>
+                {knowledgeBasePreviewLoading ? (
+                  <div className="feedback-banner">正在加载文档内容...</div>
+                ) : (
+                  <div className="document-preview-body">
+                    {knowledgeBasePreviewChunks.map((chunk) => (
+                      <article className="document-preview-chunk" key={chunk.id}>
+                        <div className="document-preview-chunk-meta">
+                          <strong>{chunk.title || knowledgeBasePreviewDocument.title}</strong>
+                          <span>片段 #{chunk.chunk_index}</span>
+                        </div>
+                        <pre>{chunk.content}</pre>
+                      </article>
+                    ))}
+                    {knowledgeBasePreviewChunks.length === 0 ? (
+                      <div className="feedback-banner">这份文档暂时没有可展示的内容片段。</div>
+                    ) : null}
+                  </div>
+                )}
+              </section>
+            </div>
           ) : null}
 
           {panelEditModal ? (
@@ -6132,6 +6213,32 @@ function DataTable(props: { columns: string[]; rows: ReactNode[][]; emptyText: s
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function AdminSectionTabs<K extends string>(props: {
+  ariaLabel: string;
+  currentKey: K;
+  items: Array<WorkspaceTabItem<K>>;
+  onChange: (key: K) => void;
+}) {
+  return (
+    <div aria-label={props.ariaLabel} className="import-tabbar" role="tablist">
+      {props.items.map((item) => (
+        <button
+          aria-selected={props.currentKey === item.key}
+          className={props.currentKey === item.key ? "import-tab-button import-tab-button-active" : "import-tab-button"}
+          key={item.key}
+          onClick={() => props.onChange(item.key)}
+          role="tab"
+          type="button"
+        >
+          <span>{item.label}</span>
+          {item.helper ? <small>{item.helper}</small> : null}
+          {item.count !== undefined ? <em>{formatCount(item.count)}</em> : null}
+        </button>
+      ))}
     </div>
   );
 }

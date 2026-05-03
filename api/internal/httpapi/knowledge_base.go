@@ -29,6 +29,26 @@ func (s *Server) handleAdminKnowledgeBaseDocuments(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+func (s *Server) handleAdminKnowledgeBaseDocumentChunks(c *gin.Context) {
+	documentID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || documentID == 0 {
+		writeError(c, http.StatusBadRequest, domainError("invalid knowledge base document id"))
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "200"))
+	result, err := s.service.ListKnowledgeBaseDocumentChunks(c.Request.Context(), uint(documentID), domain.KnowledgeBaseChunkFilter{
+		Page:     page,
+		PageSize: pageSize,
+	})
+	if err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 func (s *Server) handleAdminImportKnowledgeBase(c *gin.Context) {
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
@@ -143,6 +163,37 @@ func (s *Server) handleLearnerKnowledgeBaseDocuments(c *gin.Context) {
 		OnlyOwned:          true,
 		OwnerLearnerUserID: claims.UserID,
 	})
+	if err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+func (s *Server) handleLearnerKnowledgeBaseDocumentChunks(c *gin.Context) {
+	claims, err := learnerClaimsFromContext(c)
+	if err != nil {
+		writeError(c, http.StatusUnauthorized, err)
+		return
+	}
+
+	documentID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || documentID == 0 {
+		writeError(c, http.StatusBadRequest, domainError("invalid knowledge base document id"))
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "200"))
+	result, err := s.service.ListLearnerKnowledgeBaseDocumentChunks(
+		c.Request.Context(),
+		claims.UserID,
+		uint(documentID),
+		domain.KnowledgeBaseChunkFilter{
+			Page:     page,
+			PageSize: pageSize,
+		},
+	)
 	if err != nil {
 		writeError(c, http.StatusBadRequest, err)
 		return

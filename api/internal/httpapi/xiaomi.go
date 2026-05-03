@@ -306,20 +306,49 @@ func (s *Server) handleLearnerXiaomiQRCheck(c *gin.Context) {
 		return
 	}
 
+	deviceCount := savedConfig.DeviceCount
+	devicesSynced := false
+	deviceSyncError := ""
+	if savedConfig.HasCredentials && savedConfig.DeviceCount == 0 {
+		devices, refreshErr := s.service.RefreshLearnerXiaomiDevices(c.Request.Context(), claims.UserID)
+		if refreshErr != nil {
+			deviceSyncError = refreshErr.Error()
+		} else {
+			devicesSynced = true
+			deviceCount = len(devices)
+			if refreshedConfig, err := s.service.GetLearnerXiaomiConfig(c.Request.Context(), claims.UserID); err == nil {
+				savedConfig = refreshedConfig
+				deviceCount = savedConfig.DeviceCount
+			}
+		}
+	}
+
 	go func(id string) {
 		time.Sleep(10 * time.Second)
 		deleteLearnerXiaomiQRSession(id)
 	}(sessionID)
 
+	message := "xiaomi login succeeded"
+	if devicesSynced {
+		message = fmt.Sprintf("xiaomi login succeeded, synced %d devices", deviceCount)
+	} else if deviceSyncError != "" {
+		message = "xiaomi login succeeded, device sync pending"
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success":        true,
 		"status":         "success",
-		"message":        "xiaomi login succeeded",
+		"message":        message,
 		"user_id":        session.UserID,
 		"xiaomi_user_id": xiaomiUserID,
 		"ssecurity":      session.Ssecurity,
 		"service_token":  session.ServiceToken,
-		"config":         savedConfig,
+		"device_count":   deviceCount,
+		"devices_synced": devicesSynced,
+		"device_sync_error": func() string {
+			return deviceSyncError
+		}(),
+		"config": savedConfig,
 	})
 }
 

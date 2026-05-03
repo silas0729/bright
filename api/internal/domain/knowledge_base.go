@@ -53,6 +53,11 @@ type SearchKnowledgeBaseInput struct {
 	LearnerUserID uint
 }
 
+type KnowledgeBaseChunkFilter struct {
+	Page     int
+	PageSize int
+}
+
 type ImportKnowledgeBaseInput struct {
 	Path               string
 	SubjectKey         string

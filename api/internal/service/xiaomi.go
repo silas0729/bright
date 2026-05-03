@@ -104,11 +104,11 @@ func (s *Service) ClearLearnerXiaomiTokens(ctx context.Context, learnerID uint) 
 		return nil
 	}
 	updates := map[string]interface{}{
-		"ssecurity":    "",
+		"ssecurity":     "",
 		"service_token": "",
-		"device_list":  "",
-		"is_active":    false,
-		"last_sync_at": nil,
+		"device_list":   "",
+		"is_active":     false,
+		"last_sync_at":  nil,
 	}
 	return s.db.WithContext(ctx).Model(&model).Updates(updates).Error
 }
@@ -150,7 +150,7 @@ func (s *Service) ListLearnerXiaomiDevices(ctx context.Context, learnerID uint, 
 	}
 
 	refreshed := false
-	if refresh || strings.TrimSpace(model.DeviceList) == "" {
+	if refresh {
 		if _, err := s.RefreshLearnerXiaomiDevices(ctx, learnerID); err != nil {
 			return domain.XiaomiDeviceListResult{}, err
 		}
@@ -187,9 +187,9 @@ func (s *Service) RefreshLearnerXiaomiDevices(ctx context.Context, learnerID uin
 
 	now := time.Now().UTC()
 	updates := map[string]interface{}{
-		"device_list":   deviceListJSON,
-		"last_sync_at":  &now,
-		"is_active":     true,
+		"device_list":  deviceListJSON,
+		"last_sync_at": &now,
+		"is_active":    true,
 	}
 	if err := s.db.WithContext(ctx).Model(&cfg).Updates(updates).Error; err != nil {
 		return nil, err
@@ -748,22 +748,35 @@ func (s *Service) newLearnerXiaomiCloudClient(ctx context.Context, learnerID uin
 	if err != nil {
 		return nil, "", storage.XiaomiConfig{}, err
 	}
+
 	apiBaseURL := getXiaomiAPIURL(model.Server)
-	parsed, err := url.Parse(apiBaseURL)
+	rootAPIURL, err := url.Parse("https://api.io.mi.com")
 	if err != nil {
 		return nil, "", storage.XiaomiConfig{}, err
 	}
-	jar.SetCookies(parsed, []*http.Cookie{{
-		Name:     "serviceToken",
-		Value:    model.ServiceToken,
-		Path:     "/",
-		Domain:   parsed.Hostname(),
-		HttpOnly: true,
-		Secure:   parsed.Scheme == "https",
-	}})
+	regionalAPIURL, err := url.Parse(apiBaseURL)
+	if err != nil {
+		return nil, "", storage.XiaomiConfig{}, err
+	}
+
+	userIDValue := firstNonEmpty(strings.TrimSpace(model.XiaomiUserID), strings.TrimSpace(model.Username))
+	cookies := []*http.Cookie{
+		{Name: "userId", Value: userIDValue},
+		{Name: "serviceToken", Value: model.ServiceToken},
+		{Name: "yetAnotherServiceToken", Value: model.ServiceToken},
+		{Name: "locale", Value: "en_GB"},
+		{Name: "timezone", Value: "GMT+02:00"},
+		{Name: "is_daylight", Value: "1"},
+		{Name: "dst_offset", Value: "3600000"},
+		{Name: "channel", Value: "MI_APP_STORE"},
+	}
+	jar.SetCookies(rootAPIURL, cookies)
+	if regionalAPIURL.Host != rootAPIURL.Host {
+		jar.SetCookies(regionalAPIURL, cookies)
+	}
 
 	return &http.Client{
-		Timeout: 20 * time.Second,
+		Timeout: 30 * time.Second,
 		Jar:     jar,
 	}, apiBaseURL, model, nil
 }
@@ -1562,4 +1575,3 @@ func toFloat64Value(value interface{}) (float64, bool) {
 		return 0, false
 	}
 }
-

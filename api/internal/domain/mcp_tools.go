@@ -25,6 +25,20 @@ type MCPToolConfig struct {
 	UpdatedAt          time.Time `json:"updated_at"`
 }
 
+type MCPToolConfigFilter struct {
+	Query    string
+	Category string
+	Page     int
+	PageSize int
+}
+
+type PagedMCPToolConfigs struct {
+	Items    []MCPToolConfig `json:"items"`
+	Total    int64           `json:"total"`
+	Page     int             `json:"page"`
+	PageSize int             `json:"page_size"`
+}
+
 type UpdateMCPToolConfigInput struct {
 	IsEnabled          *bool `json:"is_enabled"`
 	RequiresMembership *bool `json:"requires_membership"`
@@ -105,6 +119,24 @@ func DefaultMCPToolDefinitions() []MCPToolDefinition {
 			DefaultRequiresMembership: false,
 		},
 		{
+			Name:                      "list_my_knowledge_base_documents",
+			Title:                     "List My Knowledge Base Documents",
+			Description:               "List the current learner's uploaded knowledge base documents.",
+			Category:                  "knowledge",
+			SourceType:                "builtin",
+			DefaultEnabled:            true,
+			DefaultRequiresMembership: false,
+		},
+		{
+			Name:                      "view_knowledge_base_document",
+			Title:                     "View Knowledge Base Document",
+			Description:               "View chunks and original content for one uploaded knowledge base document.",
+			Category:                  "knowledge",
+			SourceType:                "builtin",
+			DefaultEnabled:            true,
+			DefaultRequiresMembership: false,
+		},
+		{
 			Name:                      "list_my_payment_orders",
 			Title:                     "List My Payment Orders",
 			Description:               "List the current learner's recharge or purchase records.",
@@ -127,6 +159,42 @@ func DefaultMCPToolDefinitions() []MCPToolDefinition {
 			Title:                     "Get Invite Summary",
 			Description:               "Get the current learner's invite code and invite statistics.",
 			Category:                  "account",
+			SourceType:                "builtin",
+			DefaultEnabled:            true,
+			DefaultRequiresMembership: false,
+		},
+		{
+			Name:                      "get_learning_summary",
+			Title:                     "Get Learning Summary",
+			Description:               "Get level counts, difficulty counts, and memory curve statistics for the current learner.",
+			Category:                  "learning",
+			SourceType:                "builtin",
+			DefaultEnabled:            true,
+			DefaultRequiresMembership: false,
+		},
+		{
+			Name:                      "list_learning_progress",
+			Title:                     "List Learning Progress",
+			Description:               "List tracked learning words with level, difficulty, and next review time.",
+			Category:                  "learning",
+			SourceType:                "builtin",
+			DefaultEnabled:            true,
+			DefaultRequiresMembership: false,
+		},
+		{
+			Name:                      "save_learning_word_progress",
+			Title:                     "Save Learning Word Progress",
+			Description:               "Create or update the current learner's level and difficulty for a word.",
+			Category:                  "learning",
+			SourceType:                "builtin",
+			DefaultEnabled:            true,
+			DefaultRequiresMembership: false,
+		},
+		{
+			Name:                      "review_learning_word",
+			Title:                     "Review Learning Word",
+			Description:               "Record whether the current learner remembered a word and schedule the next review.",
+			Category:                  "learning",
 			SourceType:                "builtin",
 			DefaultEnabled:            true,
 			DefaultRequiresMembership: false,

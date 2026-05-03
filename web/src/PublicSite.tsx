@@ -9,12 +9,16 @@ import {
   type CatalogStats,
   type ClassificationStat,
   type InviteSummary,
+  type KnowledgeBaseChunk,
   type KnowledgeBaseDocument,
+  type LearningSummary,
   type LearnerSession,
   type LearnerUser,
+  type MCPInfoTool,
   type PagedAPIConfigs,
   type PagedClassificationStats,
   type PagedKnowledgeBaseDocuments,
+  type PagedLearningWordProgress,
   type PagedPaymentOrders,
   type PagedSubscriptions,
   type PagedWords,
@@ -24,6 +28,7 @@ import {
   type SiteSetting,
   type SubscriptionStatus,
   type Subject,
+  type XiaomiDevice,
   type XiaomiConfig,
   type XiaomiDeviceListResult,
   type XiaomiHome,
@@ -39,7 +44,7 @@ const publicUIStateStorageKey = "brights_public_ui_state";
 const publicSessionStorageKey = "brights_public_session";
 
 type AuthMode = "login" | "register";
-type PublicView = "home" | "profile" | "mcp";
+type PublicView = "home" | "profile" | "mcp" | "market";
 type ProfileWorkspaceTab =
   | "overview"
   | "memberships"
@@ -154,6 +159,9 @@ export default function PublicSite() {
   const [paymentOrders, setPaymentOrders] = useState<PagedPaymentOrders | null>(null);
   const [membershipHistory, setMembershipHistory] = useState<PagedSubscriptions | null>(null);
   const [knowledgeBaseDocuments, setKnowledgeBaseDocuments] = useState<PagedKnowledgeBaseDocuments | null>(null);
+  const [knowledgeBaseDocumentPreview, setKnowledgeBaseDocumentPreview] = useState<KnowledgeBaseDocument | null>(null);
+  const [knowledgeBaseDocumentChunks, setKnowledgeBaseDocumentChunks] = useState<KnowledgeBaseChunk[]>([]);
+  const [knowledgeBaseDocumentPreviewLoading, setKnowledgeBaseDocumentPreviewLoading] = useState(false);
   const [profileBusyAction, setProfileBusyAction] = useState("");
   const [profileError, setProfileError] = useState("");
   const [profileNotice, setProfileNotice] = useState("");
@@ -179,10 +187,22 @@ export default function PublicSite() {
   const [xiaomiSearchQuery, setXiaomiSearchQuery] = useState("");
   const [xiaomiQRSession, setXiaomiQRSession] = useState<XiaomiQRLoginResult | null>(null);
   const [xiaomiQRStatus, setXiaomiQRStatus] = useState("");
+  const [marketTools, setMarketTools] = useState<MCPInfoTool[]>([]);
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [marketError, setMarketError] = useState("");
+  const [marketQuery, setMarketQuery] = useState("");
+  const [marketCategory, setMarketCategory] = useState("");
+  const [learningSummary, setLearningSummary] = useState<LearningSummary | null>(null);
+  const [learningProgress, setLearningProgress] = useState<PagedLearningWordProgress | null>(null);
+  const [learningPage, setLearningPage] = useState(1);
+  const [learningQuery, setLearningQuery] = useState("");
+  const [learningLevelFilter, setLearningLevelFilter] = useState("");
+  const [learningDifficultyFilter, setLearningDifficultyFilter] = useState("");
 
   const deferredQuery = useDeferredValue(query);
   const deferredKnowledgeBaseQuery = useDeferredValue(knowledgeBaseQuery);
   const deferredAPIConfigQuery = useDeferredValue(apiConfigQuery);
+  const deferredLearningQuery = useDeferredValue(learningQuery);
   const activeCheckoutOrder = checkoutStatus?.order ?? checkoutOrder;
   const currentSettings = siteSettings ?? fallbackSiteSettings;
   const learnerName = currentUser?.display_name || currentUser?.username || "";
@@ -200,6 +220,24 @@ export default function PublicSite() {
   const currentProfileTab: ProfileWorkspaceTab = resolveProfileWorkspaceTab(currentHash);
   const classifications = classificationResult?.items ?? [];
   const classificationTotal = classificationResult?.total ?? 0;
+  const marketCategories = Array.from(new Set(marketTools.map((item) => (item.category || "general").trim()).filter(Boolean))).sort();
+  const filteredMarketTools = marketTools.filter((item) => {
+    const selectedCategory = marketCategory.trim().toLowerCase();
+    const searchText = marketQuery.trim().toLowerCase();
+    if (selectedCategory && (item.category || "").trim().toLowerCase() !== selectedCategory) {
+      return false;
+    }
+    if (!searchText) {
+      return true;
+    }
+    const haystack = [item.title, item.name, item.description, item.category, item.sourceType].join(" ").toLowerCase();
+    return haystack.includes(searchText);
+  });
+  const learningLevelCounts = learningSummary?.level_counts ?? [];
+  const learningDifficultyCounts = learningSummary?.difficulty_counts ?? [];
+  const learningCurvePoints = learningSummary?.curve_points ?? [];
+  const learningCountByKey = (items: Array<{ key: string; count: number }>, key: string) =>
+    items.find((item) => item.key === key)?.count ?? 0;
   const speakTimerRef = useRef<number | null>(null);
   const speechTokenRef = useRef(0);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
@@ -266,7 +304,7 @@ export default function PublicSite() {
   useEffect(() => {
     const targetId = currentHash.replace(/^#/, "");
     window.requestAnimationFrame(() => {
-      if (!targetId || targetId === "home" || targetId === "profile" || targetId === "account" || targetId === "mcp") {
+      if (!targetId || targetId === "home" || targetId === "profile" || targetId === "account" || targetId === "mcp" || targetId === "mcp-market") {
         window.scrollTo({ top: 0, left: 0, behavior: "auto" });
         return;
       }
@@ -356,6 +394,8 @@ export default function PublicSite() {
       setPaymentOrders(null);
       setMembershipHistory(null);
       setKnowledgeBaseDocuments(null);
+      setKnowledgeBaseDocumentPreview(null);
+      setKnowledgeBaseDocumentChunks([]);
       return;
     }
 
@@ -454,6 +494,87 @@ export default function PublicSite() {
   }, [currentProfileTab, profileReloadKey, session?.access_token]);
 
   useEffect(() => {
+    if (activeView !== "market") {
+      return;
+    }
+
+    let active = true;
+    setMarketLoading(true);
+    setMarketError("");
+    api
+      .getMCPInfo(subjectKey, learnerAccessToken || undefined)
+      .then((result) => {
+        if (!active) {
+          return;
+        }
+        setMarketTools(result.tools ?? []);
+      })
+      .catch((err: Error) => {
+        if (active) {
+          setMarketError(err.message);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setMarketLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [activeView, learnerAccessToken, profileReloadKey, subjectKey]);
+
+  useEffect(() => {
+    if (!session?.access_token) {
+      setLearningSummary(null);
+      setLearningProgress(null);
+      return;
+    }
+    if (currentProfileTab !== "insights") {
+      return;
+    }
+
+    let active = true;
+    Promise.all([
+      api.learnerLearningSummary(session.access_token, subjectKey),
+      api.learnerLearningProgress(session.access_token, {
+        page: learningPage,
+        pageSize: profilePageSize,
+        query: deferredLearningQuery,
+        subjectKey,
+        level: learningLevelFilter || undefined,
+        difficulty: learningDifficultyFilter || undefined,
+      }),
+    ])
+      .then(([summaryData, progressData]) => {
+        if (!active) {
+          return;
+        }
+        setLearningSummary(summaryData);
+        setLearningProgress(progressData);
+      })
+      .catch((err: Error) => {
+        if (active) {
+          setProfileError(err.message);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    currentProfileTab,
+    deferredLearningQuery,
+    learningDifficultyFilter,
+    learningLevelFilter,
+    learningPage,
+    profileReloadKey,
+    session?.access_token,
+    subjectKey,
+  ]);
+
+  useEffect(() => {
     if (!session?.access_token || !xiaomiQRSession?.session_id) {
       return;
     }
@@ -470,8 +591,12 @@ export default function PublicSite() {
           setXiaomiQRStatus(result.message || nextStatus);
           if (nextStatus === "success" || result.success) {
             setXiaomiQRSession(null);
-            setProfileNotice("小米账号扫码登录成功。");
-            void loadXiaomiWorkspace(true);
+            setProfileNotice(
+              result.devices_synced
+                ? `小米账号扫码登录成功，已同步 ${result.device_count ?? 0} 台设备。`
+                : "小米账号扫码登录成功，正在载入设备列表。",
+            );
+            void loadXiaomiWorkspace(false);
           }
         })
         .catch((err: Error) => {
@@ -492,6 +617,7 @@ export default function PublicSite() {
     setOrderHistoryPage(1);
     setMembershipHistoryPage(1);
     setKnowledgeBasePage(1);
+    setLearningPage(1);
   }, [subjectKey]);
 
   useEffect(() => {
@@ -1122,6 +1248,83 @@ export default function PublicSite() {
     }
   }
 
+  async function handleViewKnowledgeBaseDocument(item: KnowledgeBaseDocument) {
+    if (!session?.access_token) {
+      return;
+    }
+
+    setKnowledgeBaseDocumentPreview(item);
+    setKnowledgeBaseDocumentPreviewLoading(true);
+    setKnowledgeBaseDocumentChunks([]);
+    try {
+      const result = await api.learnerKnowledgeBaseDocumentChunks(session.access_token, item.id, {
+        page: 1,
+        pageSize: 200,
+      });
+      setKnowledgeBaseDocumentChunks(result.items);
+    } catch (err) {
+      setProfileError((err as Error).message);
+      setKnowledgeBaseDocumentPreview(null);
+    } finally {
+      setKnowledgeBaseDocumentPreviewLoading(false);
+    }
+  }
+
+  function closeKnowledgeBaseDocumentPreview() {
+    setKnowledgeBaseDocumentPreview(null);
+    setKnowledgeBaseDocumentChunks([]);
+    setKnowledgeBaseDocumentPreviewLoading(false);
+  }
+
+  async function handleSaveLearningProgress(wordID: number, level: string, difficulty: string) {
+    if (!session?.access_token || wordID <= 0) {
+      return;
+    }
+
+    setProfileBusyAction(`learning-save-${wordID}`);
+    try {
+      await api.learnerSaveLearningProgress(session.access_token, {
+        word_id: wordID,
+        subject_key: subjectKey,
+        level,
+        difficulty,
+      });
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice("学习级别与难度已更新。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleReviewLearningWord(
+    word: { id: number },
+    remembered: boolean,
+    options?: { level?: string; difficulty?: string },
+  ) {
+    if (!session?.access_token || word.id <= 0) {
+      return;
+    }
+
+    setProfileBusyAction(`learning-review-${word.id}`);
+    try {
+      await api.learnerReviewLearningWord(session.access_token, {
+        word_id: word.id,
+        subject_key: subjectKey,
+        remembered,
+        level: options?.level,
+        difficulty: options?.difficulty,
+      });
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice(remembered ? "已记录为记住，系统已生成下一次复习时间。" : "已记录为待复习，稍后会更早提醒。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
   async function loadXiaomiWorkspace(refreshDevices: boolean) {
     if (!session?.access_token) {
       return;
@@ -1133,9 +1336,30 @@ export default function PublicSite() {
       ]);
       setXiaomiConfig(configResult);
       setXiaomiDevices(deviceResult);
+      setXiaomiHomes(buildXiaomiHomesFromDevices(deviceResult.devices));
     } catch (err) {
       setProfileError((err as Error).message);
     }
+  }
+
+  function buildXiaomiHomesFromDevices(devices: XiaomiDevice[]): XiaomiHome[] {
+    const homes = new Map<string, XiaomiHome>();
+    for (const item of devices) {
+      const homeID = item.home_id?.trim() || "";
+      const homeName = item.home_name?.trim() || "";
+      if (!homeID && !homeName) {
+        continue;
+      }
+      const key = homeID || homeName;
+      if (homes.has(key)) {
+        continue;
+      }
+      homes.set(key, {
+        id: homeID || key,
+        name: homeName || homeID || "未命名家庭",
+      });
+    }
+    return Array.from(homes.values()).sort((left, right) => left.name.localeCompare(right.name, "zh-CN"));
   }
 
   function resetAPIConfigEditor() {
@@ -1354,6 +1578,7 @@ export default function PublicSite() {
             }
           : null,
       );
+      setXiaomiHomes(buildXiaomiHomesFromDevices(result.devices));
       await loadXiaomiWorkspace(false);
       setProfileNotice(`设备列表已刷新，共 ${result.device_count} 台。`);
     } catch (err) {
@@ -1553,6 +1778,14 @@ export default function PublicSite() {
     setAPIConfigTestArguments,
     apiConfigTestResult,
     setAPIConfigTestResult,
+    knowledgeBaseDocumentPreview,
+    knowledgeBaseDocumentChunks,
+    knowledgeBaseDocumentPreviewLoading,
+    setKnowledgeBaseDocumentPreviewLoading,
+    handleViewKnowledgeBaseDocument,
+    closeKnowledgeBaseDocumentPreview,
+    handleSaveLearningProgress,
+    handleReviewLearningWord,
     xiaomiConfig,
     setXiaomiConfig,
     xiaomiHomes,
@@ -1565,6 +1798,17 @@ export default function PublicSite() {
     setXiaomiQRSession,
     xiaomiQRStatus,
     setXiaomiQRStatus,
+    marketLoading,
+    marketError,
+    setMarketQuery,
+    setMarketCategory,
+    marketCategories,
+    filteredMarketTools,
+    learningSummary,
+    learningProgress,
+    setLearningQuery,
+    setLearningLevelFilter,
+    setLearningDifficultyFilter,
     deferredAPIConfigQuery,
     apiConfigs?.items?.[0] as APIConfig | undefined,
   ];
@@ -1586,6 +1830,9 @@ export default function PublicSite() {
           </div>
         </a>
         <div className="site-header-actions">
+          <a className="secondary-button site-account-link" href="#mcp-market">
+            MCP 工具市场
+          </a>
           {currentUser ? (
             <div className="site-account-menu" ref={accountMenuRef}>
               <button
@@ -1662,6 +1909,16 @@ export default function PublicSite() {
                     </a>
                     <a
                       className="site-account-dropdown-link"
+                      href="#mcp-market"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                      }}
+                      role="menuitem"
+                    >
+                      MCP 工具市场
+                    </a>
+                    <a
+                      className="site-account-dropdown-link"
                       href="#profile-xiaomi"
                       onClick={() => {
                         setAccountMenuOpen(false);
@@ -1689,6 +1946,16 @@ export default function PublicSite() {
                       role="menuitem"
                     >
                       购买记录
+                    </a>
+                    <a
+                      className="site-account-dropdown-link"
+                      href="#profile-insights"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                      }}
+                      role="menuitem"
+                    >
+                      学习进度
                     </a>
                     <a
                       className="site-account-dropdown-link"
@@ -2154,6 +2421,11 @@ export default function PublicSite() {
                           <span>累计邀请充值</span>
                         </div>
                       </div>
+                      <label className="form-field">
+                        <span>邀请码</span>
+                        <input readOnly value={inviteSummary?.invite_code || currentUser.invite_code || ""} />
+                        <small className="helper-text">邀请码由系统自动生成，前台普通用户不可修改。</small>
+                      </label>
                       <div className="table-wrap">
                         <table className="data-table">
                           <thead>
@@ -2299,6 +2571,7 @@ export default function PublicSite() {
                             {(knowledgeBaseDocuments?.items ?? []).map((item) => {
                               const statusBusy = profileBusyAction === `knowledge-base-status-${item.id}`;
                               const deleteBusy = profileBusyAction === `knowledge-base-delete-${item.id}`;
+                              const viewBusy = knowledgeBaseDocumentPreviewLoading && knowledgeBaseDocumentPreview?.id === item.id;
                               return (
                                 <tr key={item.id}>
                                   <td>{item.title}</td>
@@ -2313,6 +2586,14 @@ export default function PublicSite() {
                                   <td>{formatDateTime(item.updated_at)}</td>
                                   <td>
                                     <div className="button-row">
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={statusBusy || deleteBusy || viewBusy}
+                                        onClick={() => void handleViewKnowledgeBaseDocument(item)}
+                                        type="button"
+                                      >
+                                        {viewBusy ? "加载中..." : "查看内容"}
+                                      </button>
                                       <button
                                         className="secondary-button small-button"
                                         disabled={statusBusy || deleteBusy}
@@ -2933,51 +3214,342 @@ export default function PublicSite() {
 
               {currentProfileTab === "insights" ? (
                 <div className="profile-panel-stack" id="profile-insights">
-                  <div className="profile-grid">
-                    <section className="content-card profile-card profile-panel-card">
-                      <div className="section-header">
-                        <div>
-                          <p className="section-eyebrow">学习概况</p>
-                          <h2>当前词库与学习方向一目了然</h2>
-                        </div>
+                  {currentUser ? (
+                    <>
+                      <div className="profile-snapshot-grid">
+                        <article className="profile-snapshot-card">
+                          <span>待复习</span>
+                          <strong>{formatCount(learningSummary?.due_reviews ?? 0)}</strong>
+                          <small>到期的词条会优先出现在下面列表里。</small>
+                        </article>
+                        <article className="profile-snapshot-card">
+                          <span>已追踪</span>
+                          <strong>{formatCount(learningSummary?.tracked_words ?? 0)}</strong>
+                          <small>在词库页点“记住了 / 待复习”后，这里会持续累计。</small>
+                        </article>
+                        <article className="profile-snapshot-card">
+                          <span>已掌握</span>
+                          <strong>{formatCount(learningSummary?.mastered_words ?? 0)}</strong>
+                          <small>进入“已掌握”的词会获得更长的复习间隔。</small>
+                        </article>
+                        <article className="profile-snapshot-card">
+                          <span>记忆正确率</span>
+                          <strong>{formatPercent(learningSummary?.correct_rate ?? 0)}</strong>
+                          <small>基于你的复习记录自动计算。</small>
+                        </article>
                       </div>
-                      <dl className="metric-list">
-                        <div>
-                          <dt>科目数量</dt>
-                          <dd>{stats?.subject_count ?? 0}</dd>
-                        </div>
-                        <div>
-                          <dt>词汇数量</dt>
-                          <dd>{formatCount(stats?.word_count ?? 0)}</dd>
-                        </div>
-                        <div>
-                          <dt>场景分类</dt>
-                          <dd>{stats?.classification_count ?? 0}</dd>
-                        </div>
-                        <div>
-                          <dt>年级维度</dt>
-                          <dd>{stats?.grade_count ?? 0}</dd>
-                        </div>
-                      </dl>
-                      <p className="helper-text">{currentSettings.footer_text}</p>
-                    </section>
 
-                    <section className="content-card profile-card profile-panel-card">
-                      <div className="section-header">
-                        <div>
-                          <p className="section-eyebrow">学习建议</p>
-                          <h2>先学会用得上的，再慢慢学得更广</h2>
-                        </div>
+                      <div className="profile-grid">
+                        <section className="content-card profile-card profile-panel-card">
+                          <div className="section-header">
+                            <div>
+                              <p className="section-eyebrow">学习等级</p>
+                              <h2>初级、中级、高级、已掌握一眼看清</h2>
+                            </div>
+                          </div>
+                          <div className="profile-overview">
+                            <div>
+                              <strong>{formatCount(learningCountByKey(learningLevelCounts, "beginner"))}</strong>
+                              <span>初级</span>
+                            </div>
+                            <div>
+                              <strong>{formatCount(learningCountByKey(learningLevelCounts, "intermediate"))}</strong>
+                              <span>中级</span>
+                            </div>
+                            <div>
+                              <strong>{formatCount(learningCountByKey(learningLevelCounts, "advanced"))}</strong>
+                              <span>高级</span>
+                            </div>
+                            <div>
+                              <strong>{formatCount(learningCountByKey(learningLevelCounts, "mastered"))}</strong>
+                              <span>已掌握</span>
+                            </div>
+                          </div>
+                          <div className="tag-list">
+                            {learningDifficultyCounts.map((item) => (
+                              <span className="tag" key={item.key}>
+                                {item.label} {formatCount(item.count)}
+                              </span>
+                            ))}
+                          </div>
+                        </section>
+
+                        <section className="content-card profile-card profile-panel-card">
+                          <div className="section-header">
+                            <div>
+                              <p className="section-eyebrow">记忆曲线</p>
+                              <h2>最近 14 天复习走势</h2>
+                            </div>
+                          </div>
+                          <LearningCurveChart points={learningCurvePoints} />
+                          <p className="helper-text">
+                            绿色越高代表当天记住比例越高；如果你在词库页持续点击“记住了 / 待复习”，这条线会越来越有参考价值。
+                          </p>
+                        </section>
                       </div>
-                      <p className="helper-text">
-                        {currentSettings.seo_description}
-                        {currentSettings.contact_email ? ` 如需合作或内容支持，可联系：${currentSettings.contact_email}` : ""}
-                      </p>
-                    </section>
-                  </div>
+
+                      <section className="content-card profile-card profile-panel-card">
+                        <div className="section-toolbar">
+                          <div>
+                            <h2>我的学习词条</h2>
+                            <p className="helper-text">可以直接调整难度、等级，并记录本次是否记住。</p>
+                          </div>
+                          <div className="button-row learning-toolbar">
+                            <input
+                              className="toolbar-search"
+                              onChange={(event) => {
+                                setLearningQuery(event.target.value);
+                                setLearningPage(1);
+                              }}
+                              placeholder="搜索单词或释义"
+                              value={learningQuery}
+                            />
+                            <select
+                              value={learningLevelFilter}
+                              onChange={(event) => {
+                                setLearningLevelFilter(event.target.value);
+                                setLearningPage(1);
+                              }}
+                            >
+                              <option value="">全部等级</option>
+                              <option value="beginner">初级</option>
+                              <option value="intermediate">中级</option>
+                              <option value="advanced">高级</option>
+                              <option value="mastered">已掌握</option>
+                            </select>
+                            <select
+                              value={learningDifficultyFilter}
+                              onChange={(event) => {
+                                setLearningDifficultyFilter(event.target.value);
+                                setLearningPage(1);
+                              }}
+                            >
+                              <option value="">全部难度</option>
+                              <option value="easy">简单</option>
+                              <option value="medium">中等</option>
+                              <option value="hard">困难</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="table-wrap">
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th>单词</th>
+                                <th>释义</th>
+                                <th>等级</th>
+                                <th>难度</th>
+                                <th>复习状态</th>
+                                <th>操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(learningProgress?.items ?? []).map((item) => {
+                                const saveBusy = profileBusyAction === `learning-save-${item.word_id}`;
+                                const reviewBusy = profileBusyAction === `learning-review-${item.word_id}`;
+                                return (
+                                  <tr key={item.id}>
+                                    <td>
+                                      <strong>{item.term}</strong>
+                                      <div className="helper-text">{item.classification || "-"}</div>
+                                    </td>
+                                    <td>{item.translation || "-"}</td>
+                                    <td>
+                                      <select
+                                        disabled={saveBusy || reviewBusy}
+                                        value={item.level}
+                                        onChange={(event) =>
+                                          void handleSaveLearningProgress(item.word_id, event.target.value, item.difficulty)
+                                        }
+                                      >
+                                        <option value="beginner">初级</option>
+                                        <option value="intermediate">中级</option>
+                                        <option value="advanced">高级</option>
+                                        <option value="mastered">已掌握</option>
+                                      </select>
+                                    </td>
+                                    <td>
+                                      <select
+                                        disabled={saveBusy || reviewBusy}
+                                        value={item.difficulty}
+                                        onChange={(event) =>
+                                          void handleSaveLearningProgress(item.word_id, item.level, event.target.value)
+                                        }
+                                      >
+                                        <option value="easy">简单</option>
+                                        <option value="medium">中等</option>
+                                        <option value="hard">困难</option>
+                                      </select>
+                                    </td>
+                                    <td>
+                                      <div>{formatLearningReviewStatus(item.next_review_at, item.is_due)}</div>
+                                      <small className="helper-text">
+                                        复习 {formatCount(item.review_count)} 次，连续记住 {formatCount(item.consecutive_correct)} 次
+                                      </small>
+                                    </td>
+                                    <td>
+                                      <div className="button-row">
+                                        <button
+                                          className="secondary-button small-button"
+                                          disabled={saveBusy || reviewBusy}
+                                          onClick={() =>
+                                            void handleReviewLearningWord({ id: item.word_id }, true, {
+                                              level: item.level,
+                                              difficulty: item.difficulty,
+                                            })
+                                          }
+                                          type="button"
+                                        >
+                                          {reviewBusy ? "处理中..." : "记住了"}
+                                        </button>
+                                        <button
+                                          className="secondary-button small-button"
+                                          disabled={saveBusy || reviewBusy}
+                                          onClick={() =>
+                                            void handleReviewLearningWord({ id: item.word_id }, false, {
+                                              level: item.level,
+                                              difficulty: item.difficulty,
+                                            })
+                                          }
+                                          type="button"
+                                        >
+                                          {reviewBusy ? "处理中..." : "待复习"}
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        {(learningProgress?.items ?? []).length === 0 ? (
+                          <div className="feedback-banner">
+                            还没有学习记录。先去词库页点击“记住了 / 待复习”，系统就会开始记录你的等级、难度和记忆曲线。
+                          </div>
+                        ) : null}
+                        <PagerControls
+                          onChange={setLearningPage}
+                          page={learningProgress?.page ?? learningPage}
+                          pageSize={learningProgress?.page_size ?? profilePageSize}
+                          total={learningProgress?.total ?? 0}
+                        />
+                      </section>
+                    </>
+                  ) : (
+                    <div className="feedback-banner">登录后可查看学习等级、难度分布、记忆曲线和个人复习记录。</div>
+                  )}
                 </div>
               ) : null}
             </div>
+          </main>
+        </div>
+      ) : activeView === "market" ? (
+        <div className="site-main site-main-profile">
+          <main className="site-content profile-page mcp-page">
+            <section className="content-card profile-hero-card mcp-page-hero" id="mcp-market">
+              <div className="section-header profile-hero-header">
+                <div>
+                  <p className="section-eyebrow">MCP 工具市场</p>
+                  <h1>把当前项目里的 MCP 能力单独展示出来</h1>
+                  <p className="helper-text">
+                    这里集中查看内置工具、知识库工具、学习工具、米家工具和你自己的 API 工具，同时会标出是否需要登录、是否需要会员、当前能否直接使用。
+                  </p>
+                </div>
+                <div className="button-row">
+                  <a className="secondary-button" href="#profile">
+                    返回个人中心
+                  </a>
+                  <a className="primary-button" href="#mcp">
+                    去连接中心
+                  </a>
+                </div>
+              </div>
+
+              <div className="mcp-page-toolbar">
+                <label className="form-field mcp-page-subject-field">
+                  <span>当前工具学科</span>
+                  <select
+                    value={subjectKey}
+                    onChange={(event) => {
+                      setSubjectKey(event.target.value);
+                    }}
+                  >
+                    {subjects.map((subject) => (
+                      <option key={subject.key} value={subject.key}>
+                        {subject.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <input
+                  className="toolbar-search"
+                  onChange={(event) => {
+                    setMarketQuery(event.target.value);
+                  }}
+                  placeholder="搜索工具名称、描述或分类"
+                  value={marketQuery}
+                />
+                <select
+                  value={marketCategory}
+                  onChange={(event) => {
+                    setMarketCategory(event.target.value);
+                  }}
+                >
+                  <option value="">全部分类</option>
+                  {marketCategories.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="tag-list">
+                <span className="tag">工具总数 {formatCount(marketTools.length)}</span>
+                <span className="tag">当前可见 {formatCount(filteredMarketTools.length)}</span>
+                <span className="tag">{currentUser ? `当前账号：${learnerName}` : "未登录访客"}</span>
+              </div>
+            </section>
+
+            {marketError ? <div className="feedback-banner feedback-error">{marketError}</div> : null}
+            {marketLoading ? <div className="feedback-banner">正在加载 MCP 工具市场...</div> : null}
+
+            <section className="market-grid">
+              {filteredMarketTools.map((tool) => (
+                <article className="content-card market-card" key={tool.name}>
+                  <div className="market-card-header">
+                    <div>
+                      <strong>{tool.title || tool.name}</strong>
+                      <span>{tool.name}</span>
+                    </div>
+                    <span className={tool.canUse ? "pill pill-success" : "pill pill-warning"}>
+                      {tool.canUse ? "可调用" : "受限"}
+                    </span>
+                  </div>
+                  <p>{tool.description}</p>
+                  <div className="tag-list">
+                    <span className="tag">{tool.category || "general"}</span>
+                    <span className="tag">{tool.sourceType || "builtin"}</span>
+                    {tool.requiresAuth ? <span className="tag">需登录</span> : null}
+                    {tool.requiresMembership ? <span className="tag">需会员</span> : null}
+                  </div>
+                  <div className="helper-text">
+                    {tool.canUse
+                      ? "当前条件下可以直接被 MCP 调用。"
+                      : tool.requiresMembership
+                        ? "管理员已配置为会员工具，未满足会员条件时不能调用。"
+                        : tool.requiresAuth
+                          ? "需要先登录学习账号后才能调用。"
+                          : "当前工具暂不可用。"}
+                  </div>
+                </article>
+              ))}
+            </section>
+            {!marketLoading && filteredMarketTools.length === 0 ? (
+              <div className="feedback-banner">当前筛选条件下没有匹配的 MCP 工具。</div>
+            ) : null}
           </main>
         </div>
       ) : activeView === "mcp" ? (
@@ -3263,6 +3835,26 @@ export default function PublicSite() {
                             <small>{speakingTerm === word.term ? "朗读中" : "点读"}</small>
                           </button>
                           {word.explanation ? <p>{word.explanation}</p> : null}
+                          {currentUser ? (
+                            <div className="button-row word-learning-actions">
+                              <button
+                                className="secondary-button small-button"
+                                disabled={profileBusyAction === `learning-review-${word.id}`}
+                                onClick={() => void handleReviewLearningWord(word, true)}
+                                type="button"
+                              >
+                                {profileBusyAction === `learning-review-${word.id}` ? "处理中..." : "记住了"}
+                              </button>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={profileBusyAction === `learning-review-${word.id}`}
+                                onClick={() => void handleReviewLearningWord(word, false)}
+                                type="button"
+                              >
+                                {profileBusyAction === `learning-review-${word.id}` ? "处理中..." : "待复习"}
+                              </button>
+                            </div>
+                          ) : null}
                         </td>
                         <td>{word.translation || "-"}</td>
                         <td>{word.classification || "-"}</td>
@@ -3290,6 +3882,50 @@ export default function PublicSite() {
           </main>
         </div>
       )}
+
+      {knowledgeBaseDocumentPreview ? (
+        <div
+          className="document-preview-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeKnowledgeBaseDocumentPreview();
+            }
+          }}
+        >
+          <section className="document-preview-card">
+            <div className="section-header">
+              <div>
+                <p className="section-eyebrow">知识库文档内容</p>
+                <h2>{knowledgeBaseDocumentPreview.title || knowledgeBaseDocumentPreview.source_file_name}</h2>
+                <p className="helper-text">
+                  {knowledgeBaseDocumentPreview.source_file_name} · {formatCount(knowledgeBaseDocumentPreview.chunk_count)} 个片段
+                </p>
+              </div>
+              <button className="secondary-button" onClick={closeKnowledgeBaseDocumentPreview} type="button">
+                关闭
+              </button>
+            </div>
+            {knowledgeBaseDocumentPreviewLoading ? (
+              <div className="feedback-banner">正在加载文档内容...</div>
+            ) : (
+              <div className="document-preview-body">
+                {knowledgeBaseDocumentChunks.map((chunk) => (
+                  <article className="document-preview-chunk" key={chunk.id}>
+                    <div className="document-preview-chunk-meta">
+                      <strong>{chunk.title || knowledgeBaseDocumentPreview.title}</strong>
+                      <span>片段 #{chunk.chunk_index}</span>
+                    </div>
+                    <pre>{chunk.content}</pre>
+                  </article>
+                ))}
+                {knowledgeBaseDocumentChunks.length === 0 ? (
+                  <div className="feedback-banner">这份文档暂时没有可展示的内容片段。</div>
+                ) : null}
+              </div>
+            )}
+          </section>
+        </div>
+      ) : null}
 
       {noticeDialog ? (
         <div
@@ -3488,6 +4124,51 @@ function PagerControls(props: {
   );
 }
 
+function LearningCurveChart(props: { points: Array<{ date: string; retention_rate: number; review_count: number }> }) {
+  if (props.points.length === 0) {
+    return <div className="feedback-banner">还没有复习记录，记忆曲线会在你开始复习后自动生成。</div>;
+  }
+
+  const width = 640;
+  const height = 220;
+  const paddingX = 24;
+  const paddingY = 24;
+  const usableWidth = width - paddingX * 2;
+  const usableHeight = height - paddingY * 2;
+  const stepX = props.points.length > 1 ? usableWidth / (props.points.length - 1) : usableWidth;
+  const points = props.points.map((item, index) => {
+    const x = paddingX + index * stepX;
+    const y = paddingY + usableHeight - Math.max(0, Math.min(1, item.retention_rate)) * usableHeight;
+    return { ...item, x, y };
+  });
+  const linePath = points
+    .map((item, index) => `${index === 0 ? "M" : "L"} ${item.x.toFixed(2)} ${item.y.toFixed(2)}`)
+    .join(" ");
+
+  return (
+    <div className="learning-curve-card">
+      <svg aria-label="学习记忆曲线" className="learning-curve-svg" viewBox={`0 0 ${width} ${height}`} role="img">
+        <path className="learning-curve-grid" d={`M ${paddingX} ${paddingY} H ${width - paddingX}`} />
+        <path className="learning-curve-grid" d={`M ${paddingX} ${paddingY + usableHeight / 2} H ${width - paddingX}`} />
+        <path className="learning-curve-grid" d={`M ${paddingX} ${height - paddingY} H ${width - paddingX}`} />
+        <path className="learning-curve-line" d={linePath} />
+        {points.map((item) => (
+          <g key={item.date}>
+            <circle className="learning-curve-point" cx={item.x} cy={item.y} r={4} />
+          </g>
+        ))}
+      </svg>
+      <div className="learning-curve-labels">
+        {points.map((item) => (
+          <span key={item.date}>
+            {item.date.slice(5)} · {formatPercent(item.retention_rate)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function applyMetaTag(name: string, content: string) {
   const trimmed = content.trim();
   let meta = document.querySelector(`meta[name="${name}"]`);
@@ -3536,6 +4217,10 @@ function formatPrice(value: number) {
   return `${(value / 100).toFixed(2)} 元`;
 }
 
+function formatPercent(value: number) {
+  return `${Math.round(Math.max(0, value) * 100)}%`;
+}
+
 function formatFileSize(value: number) {
   if (value <= 0) {
     return "0 B";
@@ -3564,6 +4249,17 @@ function formatMembershipExpiry(membership?: SubscriptionStatus | null) {
   return `有效期至 ${formatDateTime(membership.current_period_end)}`;
 }
 
+function formatLearningReviewStatus(value?: string, isDue?: boolean) {
+  if (!value) {
+    return "尚未安排复习";
+  }
+  const text = formatDateTime(value);
+  if (isDue) {
+    return `待复习 · ${text}`;
+  }
+  return `下次复习 · ${text}`;
+}
+
 function getCurrentHash() {
   if (typeof window === "undefined") {
     return "#home";
@@ -3572,6 +4268,9 @@ function getCurrentHash() {
 }
 
 function resolvePublicView(hash: string): PublicView {
+  if (hash === "#mcp-market") {
+    return "market";
+  }
   if (hash === "#mcp") {
     return "mcp";
   }

@@ -173,6 +173,69 @@ func (s *Service) ListKnowledgeBaseDocuments(ctx context.Context, filter domain.
 	}, nil
 }
 
+func (s *Service) ListKnowledgeBaseDocumentChunks(
+	ctx context.Context,
+	documentID uint,
+	filter domain.KnowledgeBaseChunkFilter,
+) (domain.PagedKnowledgeBaseChunks, error) {
+	return s.listKnowledgeBaseDocumentChunks(ctx, documentID, filter, nil)
+}
+
+func (s *Service) ListLearnerKnowledgeBaseDocumentChunks(
+	ctx context.Context,
+	learnerID uint,
+	documentID uint,
+	filter domain.KnowledgeBaseChunkFilter,
+) (domain.PagedKnowledgeBaseChunks, error) {
+	if learnerID == 0 {
+		return domain.PagedKnowledgeBaseChunks{}, errors.New("learner id is required")
+	}
+	return s.listKnowledgeBaseDocumentChunks(ctx, documentID, filter, uintPtr(learnerID))
+}
+
+func (s *Service) listKnowledgeBaseDocumentChunks(
+	ctx context.Context,
+	documentID uint,
+	filter domain.KnowledgeBaseChunkFilter,
+	learnerID *uint,
+) (domain.PagedKnowledgeBaseChunks, error) {
+	if documentID == 0 {
+		return domain.PagedKnowledgeBaseChunks{}, errors.New("document id is required")
+	}
+
+	page, pageSize := normalizePage(filter.Page, filter.PageSize, 50)
+	document, err := s.findKnowledgeBaseDocumentForActor(s.db.WithContext(ctx), documentID, learnerID)
+	if err != nil {
+		return domain.PagedKnowledgeBaseChunks{}, err
+	}
+
+	query := s.db.WithContext(ctx).
+		Model(&storage.KnowledgeBaseChunk{}).
+		Where("document_id = ?", document.ID)
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return domain.PagedKnowledgeBaseChunks{}, err
+	}
+
+	var models []storage.KnowledgeBaseChunk
+	if err := query.Order("chunk_index asc, id asc").Limit(pageSize).Offset((page - 1) * pageSize).Find(&models).Error; err != nil {
+		return domain.PagedKnowledgeBaseChunks{}, err
+	}
+
+	items := make([]domain.KnowledgeBaseChunk, 0, len(models))
+	for _, model := range models {
+		items = append(items, toKnowledgeBaseChunk(model, document, ""))
+	}
+
+	return domain.PagedKnowledgeBaseChunks{
+		Items:    items,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+	}, nil
+}
+
 func (s *Service) SearchKnowledgeBase(ctx context.Context, input domain.SearchKnowledgeBaseInput) (domain.PagedKnowledgeBaseChunks, error) {
 	page, pageSize := normalizePage(input.Page, input.PageSize, 10)
 

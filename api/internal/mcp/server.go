@@ -530,6 +530,36 @@ func (s *Server) tools(ctx context.Context, session *Session) []Tool {
 			OutputSchema: toolResultSchema,
 		},
 		{
+			Name:        "list_my_knowledge_base_documents",
+			Title:       "List My Knowledge Base Documents",
+			Description: "List the current learner's uploaded knowledge base documents.",
+			Category:    "knowledge",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"subject_key": map[string]interface{}{"type": "string"},
+				"query":       map[string]interface{}{"type": "string"},
+				"q":           map[string]interface{}{"type": "string"},
+				"page":        map[string]interface{}{"type": "integer"},
+				"page_size":   map[string]interface{}{"type": "integer"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "view_knowledge_base_document",
+			Title:       "View Knowledge Base Document",
+			Description: "View chunks and original content for one uploaded knowledge base document.",
+			Category:    "knowledge",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"document_id": map[string]interface{}{"type": "integer"},
+				"page":        map[string]interface{}{"type": "integer"},
+				"page_size":   map[string]interface{}{"type": "integer"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
 			Name:        "list_my_payment_orders",
 			Title:       "List My Payment Orders",
 			Description: "List the current learner's recharge or purchase records.",
@@ -573,6 +603,68 @@ func (s *Server) tools(ctx context.Context, session *Session) []Tool {
 			InputSchema:  objectSchema(nil),
 			OutputSchema: toolResultSchema,
 		},
+		{
+			Name:        "get_learning_summary",
+			Title:       "Get Learning Summary",
+			Description: "Get level counts, difficulty counts, and memory curve statistics for the current learner.",
+			Category:    "learning",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"subject_key": map[string]interface{}{"type": "string"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "list_learning_progress",
+			Title:       "List Learning Progress",
+			Description: "List tracked learning words with level, difficulty, and next review time.",
+			Category:    "learning",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"subject_key": map[string]interface{}{"type": "string"},
+				"query":       map[string]interface{}{"type": "string"},
+				"q":           map[string]interface{}{"type": "string"},
+				"level":       map[string]interface{}{"type": "string"},
+				"difficulty":  map[string]interface{}{"type": "string"},
+				"due_only":    map[string]interface{}{"type": "boolean"},
+				"page":        map[string]interface{}{"type": "integer"},
+				"page_size":   map[string]interface{}{"type": "integer"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "save_learning_word_progress",
+			Title:       "Save Learning Word Progress",
+			Description: "Create or update the current learner's level and difficulty for a word.",
+			Category:    "learning",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"word_id":     map[string]interface{}{"type": "integer"},
+				"subject_key": map[string]interface{}{"type": "string"},
+				"level":       map[string]interface{}{"type": "string"},
+				"difficulty":  map[string]interface{}{"type": "string"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "review_learning_word",
+			Title:       "Review Learning Word",
+			Description: "Record whether the current learner remembered a word and schedule the next review.",
+			Category:    "learning",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"word_id":     map[string]interface{}{"type": "integer"},
+				"subject_key": map[string]interface{}{"type": "string"},
+				"remembered":  map[string]interface{}{"type": "boolean"},
+				"level":       map[string]interface{}{"type": "string"},
+				"difficulty":  map[string]interface{}{"type": "string"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
 	}
 	tools = append(tools, xiaomiBuiltinTools()...)
 	tools = append(tools, s.dynamicAPITools(ctx, session)...)
@@ -592,6 +684,7 @@ func (s *Server) tools(ctx context.Context, session *Session) []Tool {
 
 	items := make([]Tool, 0, len(tools))
 	for _, tool := range tools {
+		tool.RequiresAuth = toolRequiresAuthenticatedSession(tool)
 		if config, ok := configMap[tool.Name]; ok {
 			if strings.TrimSpace(config.Title) != "" {
 				tool.Title = config.Title
@@ -612,7 +705,7 @@ func (s *Server) tools(ctx context.Context, session *Session) []Tool {
 			continue
 		}
 		switch {
-		case toolRequiresAuthenticatedSession(tool) && !hasSession:
+		case tool.RequiresAuth && !hasSession:
 			tool.CanUse = false
 		case tool.RequiresMembership:
 			tool.CanUse = hasMembership
@@ -701,6 +794,22 @@ func (s *Server) callTool(ctx context.Context, session Session, req CallToolRequ
 			LearnerUserID: session.UserID,
 		})
 		return knowledgeBaseToolResult(canonicalName, data, err)
+	case "list_my_knowledge_base_documents":
+		data, err := s.service.ListKnowledgeBaseDocuments(ctx, domain.KnowledgeBaseDocumentFilter{
+			SubjectKey:         stringArg(req.Arguments, "subject_key", session.SubjectKey),
+			Query:              firstNonEmpty(stringArg(req.Arguments, "query", ""), stringArg(req.Arguments, "q", "")),
+			Page:               intArg(req.Arguments, "page", 1),
+			PageSize:           intArg(req.Arguments, "page_size", 20),
+			OnlyOwned:          true,
+			OwnerLearnerUserID: session.UserID,
+		})
+		return newToolResult(canonicalName, data, err)
+	case "view_knowledge_base_document":
+		data, err := s.service.ListLearnerKnowledgeBaseDocumentChunks(ctx, session.UserID, uint(intArg(req.Arguments, "document_id", 0)), domain.KnowledgeBaseChunkFilter{
+			Page:     intArg(req.Arguments, "page", 1),
+			PageSize: intArg(req.Arguments, "page_size", 200),
+		})
+		return newToolResult(canonicalName, data, err)
 	case "list_my_payment_orders":
 		data, err := s.service.ListLearnerPaymentOrders(ctx, session.Username, domain.PaymentOrderFilter{
 			SubjectKey: stringArg(req.Arguments, "subject_key", session.SubjectKey),
@@ -721,6 +830,37 @@ func (s *Server) callTool(ctx context.Context, session Session, req CallToolRequ
 		return newToolResult(canonicalName, data, err)
 	case "get_invite_summary":
 		data, err := s.service.GetInviteSummary(ctx, session.UserID)
+		return newToolResult(canonicalName, data, err)
+	case "get_learning_summary":
+		data, err := s.service.GetLearnerLearningSummary(ctx, session.UserID, stringArg(req.Arguments, "subject_key", session.SubjectKey))
+		return newToolResult(canonicalName, data, err)
+	case "list_learning_progress":
+		data, err := s.service.ListLearnerWordProgress(ctx, session.UserID, domain.LearnerWordProgressFilter{
+			SubjectKey: stringArg(req.Arguments, "subject_key", session.SubjectKey),
+			Query:      firstNonEmpty(stringArg(req.Arguments, "query", ""), stringArg(req.Arguments, "q", "")),
+			Level:      stringArg(req.Arguments, "level", ""),
+			Difficulty: stringArg(req.Arguments, "difficulty", ""),
+			Page:       intArg(req.Arguments, "page", 1),
+			PageSize:   intArg(req.Arguments, "page_size", 20),
+			DueOnly:    boolArg(req.Arguments, "due_only", false),
+		})
+		return newToolResult(canonicalName, data, err)
+	case "save_learning_word_progress":
+		data, err := s.service.SaveLearnerWordProgress(ctx, session.UserID, domain.SaveLearnerWordProgressInput{
+			WordID:     uint64(intArg(req.Arguments, "word_id", 0)),
+			SubjectKey: stringArg(req.Arguments, "subject_key", session.SubjectKey),
+			Level:      stringArg(req.Arguments, "level", ""),
+			Difficulty: stringArg(req.Arguments, "difficulty", ""),
+		})
+		return newToolResult(canonicalName, data, err)
+	case "review_learning_word":
+		data, err := s.service.ReviewLearnerWord(ctx, session.UserID, domain.ReviewLearnerWordInput{
+			WordID:     uint64(intArg(req.Arguments, "word_id", 0)),
+			SubjectKey: stringArg(req.Arguments, "subject_key", session.SubjectKey),
+			Remembered: boolArg(req.Arguments, "remembered", false),
+			Level:      stringArg(req.Arguments, "level", ""),
+			Difficulty: stringArg(req.Arguments, "difficulty", ""),
+		})
 		return newToolResult(canonicalName, data, err)
 	default:
 		if result, handled, err := s.handleXiaomiTool(ctx, session, req); handled {
@@ -884,12 +1024,24 @@ func canonicalToolName(name string) string {
 		return "get_catalog_stats"
 	case "search_knowledge_base", "brights_search_knowledge_base", "search_kb":
 		return "search_knowledge_base"
+	case "list_my_knowledge_base_documents", "my_knowledge_base_documents":
+		return "list_my_knowledge_base_documents"
+	case "view_knowledge_base_document", "knowledge_base_document_view":
+		return "view_knowledge_base_document"
 	case "list_my_payment_orders", "my_payment_orders", "brights_list_my_payment_orders":
 		return "list_my_payment_orders"
 	case "list_my_memberships", "my_memberships", "brights_list_my_memberships":
 		return "list_my_memberships"
 	case "get_invite_summary", "my_invite_summary", "brights_get_invite_summary":
 		return "get_invite_summary"
+	case "get_learning_summary", "my_learning_summary":
+		return "get_learning_summary"
+	case "list_learning_progress", "my_learning_progress":
+		return "list_learning_progress"
+	case "save_learning_word_progress", "update_learning_word_progress":
+		return "save_learning_word_progress"
+	case "review_learning_word", "remember_learning_word":
+		return "review_learning_word"
 	default:
 		return strings.TrimSpace(name)
 	}
@@ -900,7 +1052,9 @@ func toolRequiresAuthenticatedSession(tool Tool) bool {
 		return true
 	}
 	switch canonicalToolName(tool.Name) {
-	case "list_my_payment_orders", "list_my_memberships", "get_invite_summary",
+	case "list_my_knowledge_base_documents", "view_knowledge_base_document",
+		"list_my_payment_orders", "list_my_memberships", "get_invite_summary",
+		"get_learning_summary", "list_learning_progress", "save_learning_word_progress", "review_learning_word",
 		"xiaomi_get_devices", "xiaomi_extract_tokens", "xiaomi_miot_prop_get", "xiaomi_miot_prop_set",
 		"xiaomi_miot_action", "xiaomi_miot_prop_get_batch", "xiaomi_find_device", "xiaomi_control_device",
 		"list_mijia_homes", "get_mijia_devices", "get_device_status", "control_device", "get_device_spec",
