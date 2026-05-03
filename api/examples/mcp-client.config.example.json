@@ -1,12 +1,12 @@
 {
-  "endpoint": "ws://localhost:8080/mcp",
+  "server_url": "ws://localhost:8080/mcp",
+  "access_token": "replace-with-learner-access-token",
   "subject_key": "english",
-  "access_token": "paste_learner_access_token_here",
   "tool_name": "search_words",
   "arguments": {
     "subject_key": "english",
     "query": "travel",
     "page": 1,
-    "page_size": 5
+    "page_size": 10
   }
 }

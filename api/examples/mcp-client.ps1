@@ -1,116 +1,79 @@
 param(
-    [string]$Config = "api/examples/mcp-client.config.example.json",
+    [string]$Config = ".\api\examples\mcp-client.config.json",
     [switch]$ListToolsOnly
 )
 
-Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Read-JsonFile {
-    param([string]$Path)
-
-    if (-not (Test-Path -LiteralPath $Path)) {
-        throw "Config file not found: $Path"
-    }
-
-    return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 100
+if (-not (Test-Path -LiteralPath $Config)) {
+    throw "Config file not found: $Config"
 }
 
-function Build-McpUri {
-    param($ConfigObject)
+$cfg = Get-Content -LiteralPath $Config -Raw | ConvertFrom-Json
 
-    if ([string]::IsNullOrWhiteSpace($ConfigObject.endpoint)) {
-        throw "Config field 'endpoint' is required."
-    }
-
-    $builder = [System.UriBuilder]::new($ConfigObject.endpoint)
-    $query = [System.Web.HttpUtility]::ParseQueryString($builder.Query)
-    if (-not [string]::IsNullOrWhiteSpace($ConfigObject.subject_key)) {
-        $query["subject"] = $ConfigObject.subject_key
-    }
-    $builder.Query = $query.ToString()
-    return $builder.Uri
+if ([string]::IsNullOrWhiteSpace($cfg.server_url)) {
+    throw "server_url is required"
+}
+if ([string]::IsNullOrWhiteSpace($cfg.access_token)) {
+    throw "access_token is required"
+}
+if ([string]::IsNullOrWhiteSpace($cfg.subject_key)) {
+    throw "subject_key is required"
 }
 
-function Send-JsonRpcMessage {
-    param(
-        [System.Net.WebSockets.ClientWebSocket]$Socket,
-        [hashtable]$Payload
-    )
-
-    $json = $Payload | ConvertTo-Json -Depth 100 -Compress
-    $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
-    $segment = [System.ArraySegment[byte]]::new($bytes)
-    $Socket.SendAsync(
-        $segment,
-        [System.Net.WebSockets.WebSocketMessageType]::Text,
-        $true,
-        [System.Threading.CancellationToken]::None
-    ).GetAwaiter().GetResult()
+$uriBuilder = [System.UriBuilder]::new($cfg.server_url)
+$queryPairs = @()
+if (-not [string]::IsNullOrWhiteSpace($uriBuilder.Query)) {
+    $queryPairs += $uriBuilder.Query.TrimStart("?")
 }
+$queryPairs += "subject=$([System.Uri]::EscapeDataString([string]$cfg.subject_key))"
+$uriBuilder.Query = ($queryPairs -join "&")
+$wsUrl = $uriBuilder.Uri.AbsoluteUri
 
-function Receive-JsonRpcMessage {
-    param([System.Net.WebSockets.ClientWebSocket]$Socket)
-
-    $buffer = New-Object byte[] 4096
-    $stream = New-Object System.IO.MemoryStream
-
-    while ($true) {
-        $segment = [System.ArraySegment[byte]]::new($buffer)
-        $result = $Socket.ReceiveAsync(
-            $segment,
-            [System.Threading.CancellationToken]::None
-        ).GetAwaiter().GetResult()
-
-        if ($result.MessageType -eq [System.Net.WebSockets.WebSocketMessageType]::Close) {
-            return $null
-        }
-
-        if ($result.Count -gt 0) {
-            $stream.Write($buffer, 0, $result.Count)
-        }
-
-        if ($result.EndOfMessage) {
-            break
-        }
-    }
-
-    $json = [System.Text.Encoding]::UTF8.GetString($stream.ToArray())
-    if ([string]::IsNullOrWhiteSpace($json)) {
-        return $null
-    }
-    return $json | ConvertFrom-Json -Depth 100
-}
-
-function Write-Section {
-    param(
-        [string]$Title,
-        $Value
-    )
-
-    Write-Host ""
-    Write-Host "=== $Title ==="
-    $Value | ConvertTo-Json -Depth 100
-}
-
-Add-Type -AssemblyName System.Web
-
-$configPath = Resolve-Path -LiteralPath $Config
-$configObject = Read-JsonFile -Path $configPath
-
-if ([string]::IsNullOrWhiteSpace($configObject.access_token)) {
-    throw "Config field 'access_token' is required."
-}
-
-$uri = Build-McpUri -ConfigObject $configObject
 $socket = [System.Net.WebSockets.ClientWebSocket]::new()
-$socket.Options.SetRequestHeader("Authorization", "Bearer $($configObject.access_token)")
+$socket.Options.SetRequestHeader("Authorization", "Bearer $($cfg.access_token)")
 
 try {
-    Write-Host "Connecting to $uri"
-    $socket.ConnectAsync($uri, [System.Threading.CancellationToken]::None).GetAwaiter().GetResult()
+    Write-Host "Connecting to $wsUrl"
+    $socket.ConnectAsync($uriBuilder.Uri, [Threading.CancellationToken]::None).GetAwaiter().GetResult()
 
-    Send-JsonRpcMessage -Socket $socket -Payload @{
+    function Send-JsonMessage {
+        param([object]$Payload)
+        $json = $Payload | ConvertTo-Json -Depth 20 -Compress
+        $bytes = [Text.Encoding]::UTF8.GetBytes($json)
+        $segment = [ArraySegment[byte]]::new($bytes)
+        $socket.SendAsync(
+            $segment,
+            [System.Net.WebSockets.WebSocketMessageType]::Text,
+            $true,
+            [Threading.CancellationToken]::None
+        ).GetAwaiter().GetResult()
+        Write-Host ">> $json"
+    }
+
+    function Receive-JsonMessage {
+        $buffer = New-Object byte[] 65536
+        $ms = New-Object System.IO.MemoryStream
+        try {
+            do {
+                $segment = [ArraySegment[byte]]::new($buffer)
+                $result = $socket.ReceiveAsync($segment, [Threading.CancellationToken]::None).GetAwaiter().GetResult()
+                if ($result.MessageType -eq [System.Net.WebSockets.WebSocketMessageType]::Close) {
+                    throw "Server closed websocket: $($result.CloseStatus) $($result.CloseStatusDescription)"
+                }
+                $ms.Write($buffer, 0, $result.Count)
+            } while (-not $result.EndOfMessage)
+
+            $json = [Text.Encoding]::UTF8.GetString($ms.ToArray())
+            Write-Host "<< $json"
+            return $json | ConvertFrom-Json -Depth 30
+        }
+        finally {
+            $ms.Dispose()
+        }
+    }
+
+    Send-JsonMessage @{
         jsonrpc = "2.0"
         id = 1
         method = "initialize"
@@ -118,55 +81,64 @@ try {
             protocolVersion = "2024-11-05"
             capabilities = @{}
             clientInfo = @{
-                name = "brights-powershell-demo"
+                name = "brights-powershell-client"
                 version = "1.0.0"
             }
         }
     }
-    $initializeResponse = Receive-JsonRpcMessage -Socket $socket
-    Write-Section -Title "initialize" -Value $initializeResponse
+    [void](Receive-JsonMessage)
 
-    Send-JsonRpcMessage -Socket $socket -Payload @{
+    Send-JsonMessage @{
         jsonrpc = "2.0"
         method = "notifications/initialized"
     }
 
-    Send-JsonRpcMessage -Socket $socket -Payload @{
+    Send-JsonMessage @{
         jsonrpc = "2.0"
         id = 2
         method = "tools/list"
     }
-    $toolsResponse = Receive-JsonRpcMessage -Socket $socket
-    Write-Section -Title "tools/list" -Value $toolsResponse
+    $toolsResponse = Receive-JsonMessage
 
-    if (-not $ListToolsOnly -and -not [string]::IsNullOrWhiteSpace($configObject.tool_name)) {
-        $arguments = @{}
-        if ($null -ne $configObject.arguments) {
-            $arguments = @{}
-            foreach ($property in $configObject.arguments.PSObject.Properties) {
-                $arguments[$property.Name] = $property.Value
-            }
-        }
-
-        Send-JsonRpcMessage -Socket $socket -Payload @{
-            jsonrpc = "2.0"
-            id = 3
-            method = "tools/call"
-            params = @{
-                name = $configObject.tool_name
-                arguments = $arguments
-            }
-        }
-        $toolResponse = Receive-JsonRpcMessage -Socket $socket
-        Write-Section -Title "tools/call" -Value $toolResponse
+    if ($ListToolsOnly) {
+        return
     }
 
-    $socket.CloseAsync(
-        [System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure,
-        "done",
-        [System.Threading.CancellationToken]::None
-    ).GetAwaiter().GetResult()
+    $toolName = [string]$cfg.tool_name
+    if ([string]::IsNullOrWhiteSpace($toolName)) {
+        throw "tool_name is required"
+    }
+
+    $arguments = @{}
+    if ($null -ne $cfg.arguments) {
+        foreach ($property in $cfg.arguments.PSObject.Properties) {
+            $arguments[$property.Name] = $property.Value
+        }
+    }
+    if (-not $arguments.ContainsKey("subject_key")) {
+        $arguments["subject_key"] = [string]$cfg.subject_key
+    }
+
+    Send-JsonMessage @{
+        jsonrpc = "2.0"
+        id = 3
+        method = "tools/call"
+        params = @{
+            name = $toolName
+            arguments = $arguments
+        }
+    }
+    [void](Receive-JsonMessage)
 }
 finally {
-    $socket.Dispose()
+    if ($null -ne $socket) {
+        if ($socket.State -eq [System.Net.WebSockets.WebSocketState]::Open) {
+            $socket.CloseAsync(
+                [System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure,
+                "done",
+                [Threading.CancellationToken]::None
+            ).GetAwaiter().GetResult()
+        }
+        $socket.Dispose()
+    }
 }

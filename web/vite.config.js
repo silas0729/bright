@@ -9,6 +9,11 @@ export default defineConfig({
                 target: "http://localhost:8080",
                 changeOrigin: true,
             },
+            "/mcp": {
+                target: "ws://localhost:8080",
+                changeOrigin: true,
+                ws: true,
+            },
         },
     },
 });

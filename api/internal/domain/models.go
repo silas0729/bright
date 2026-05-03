@@ -101,11 +101,12 @@ type AdminRole struct {
 }
 
 type LearnerUser struct {
-	ID          uint      `json:"id"`
-	Username    string    `json:"username"`
-	DisplayName string    `json:"display_name"`
-	Status      string    `json:"status"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          uint                `json:"id"`
+	Username    string              `json:"username"`
+	DisplayName string              `json:"display_name"`
+	Status      string              `json:"status"`
+	CreatedAt   time.Time           `json:"created_at"`
+	Membership  *SubscriptionStatus `json:"membership,omitempty"`
 }
 
 type AdminLoginInput struct {

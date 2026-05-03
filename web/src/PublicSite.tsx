@@ -13,9 +13,11 @@ import {
   type PaymentOrderStatus,
   type Plan,
   type SiteSetting,
+  type SubscriptionStatus,
   type Subject,
   type WechatOrder,
 } from "./api";
+import MCPConsole from "./MCPConsole";
 
 const publicPageSize = 18;
 const publicClassificationPageSize = 8;
@@ -110,6 +112,14 @@ export default function PublicSite() {
   const activeCheckoutOrder = checkoutStatus?.order ?? checkoutOrder;
   const currentSettings = siteSettings ?? fallbackSiteSettings;
   const learnerName = currentUser?.display_name || currentUser?.username || "";
+  const currentMembership = currentUser?.membership ?? null;
+  const hasActiveMembership = currentMembership?.status === "active";
+  const membershipExpiryText = formatMembershipExpiry(currentMembership);
+  const membershipBadgeText = currentMembership
+    ? hasActiveMembership
+      ? "\u4f1a\u5458\u5df2\u5f00\u901a"
+      : subscriptionStatusLabel(currentMembership.status)
+    : "\u666e\u901a\u7528\u6237";
   const learnerAccessToken = session?.access_token ?? "";
   const speechSupported = canUseBrowserSpeech();
   const activeView: PublicView = resolvePublicView(currentHash);
@@ -225,7 +235,7 @@ export default function PublicSite() {
 
     let active = true;
     api
-      .learnerMe(session.access_token)
+      .learnerMe(session.access_token, subjectKey)
       .then((user) => {
         if (!active) {
           return;
@@ -252,7 +262,7 @@ export default function PublicSite() {
     return () => {
       active = false;
     };
-  }, [session]);
+  }, [session, subjectKey]);
 
   useEffect(() => {
     if (currentUser) {
@@ -539,6 +549,40 @@ export default function PublicSite() {
       actionHref: "#catalog",
     });
   }, [checkoutStatus]);
+
+  useEffect(() => {
+    const order = checkoutStatus?.order;
+    if (!session?.access_token || !currentUser?.username || !order || order.status !== "success") {
+      return;
+    }
+    if (order.customer_ref !== currentUser.username || order.subject_key !== subjectKey) {
+      return;
+    }
+
+    let active = true;
+    api
+      .learnerMe(session.access_token, subjectKey)
+      .then((user) => {
+        if (!active) {
+          return;
+        }
+        setCurrentUser(user);
+        window.localStorage.setItem(
+          publicSessionStorageKey,
+          JSON.stringify({
+            ...session,
+            user,
+          }),
+        );
+      })
+      .catch(() => {
+        // Keep the checkout success state visible even if the profile refresh is delayed.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [checkoutStatus, currentUser?.username, session, subjectKey]);
 
   function openNoticeDialog(nextNotice: NoticeDialogState) {
     setNoticeDialog(nextNotice);
@@ -865,15 +909,28 @@ export default function PublicSite() {
                 aria-controls="site-account-dropdown"
                 aria-expanded={accountMenuOpen}
                 aria-haspopup="menu"
-                className={accountMenuOpen ? "site-account-trigger site-account-trigger-open" : "site-account-trigger"}
+                className={
+                  accountMenuOpen
+                    ? hasActiveMembership
+                      ? "site-account-trigger site-account-trigger-open site-account-trigger-member"
+                      : "site-account-trigger site-account-trigger-open"
+                    : hasActiveMembership
+                      ? "site-account-trigger site-account-trigger-member"
+                      : "site-account-trigger"
+                }
                 onClick={() => {
                   setAccountMenuOpen((current) => !current);
                 }}
                 type="button"
               >
                 <div className="site-account-meta">
-                  <strong>{learnerName}</strong>
-                  <span>{currentUser.username}</span>
+                  <div className="site-account-name-row">
+                    <strong>{learnerName}</strong>
+                    <span className={hasActiveMembership ? "site-membership-badge site-membership-badge-active" : "site-membership-badge"}>
+                      {membershipBadgeText}
+                    </span>
+                  </div>
+                  <span>{hasActiveMembership && membershipExpiryText ? membershipExpiryText : currentUser.username}</span>
                 </div>
                 <span aria-hidden="true" className="site-account-caret" />
               </button>
@@ -881,8 +938,13 @@ export default function PublicSite() {
               {accountMenuOpen ? (
                 <div className="site-account-dropdown" id="site-account-dropdown" role="menu">
                   <div className="site-account-dropdown-header">
-                    <strong>{learnerName}</strong>
-                    <span>{currentUser.username}</span>
+                    <div className="site-account-name-row">
+                      <strong>{learnerName}</strong>
+                      <span className={hasActiveMembership ? "site-membership-badge site-membership-badge-active" : "site-membership-badge"}>
+                        {membershipBadgeText}
+                      </span>
+                    </div>
+                    <span>{hasActiveMembership && membershipExpiryText ? membershipExpiryText : currentUser.username}</span>
                   </div>
                   <div className="site-account-dropdown-links">
                     <a
@@ -980,6 +1042,17 @@ export default function PublicSite() {
                   <span>会员购买入口</span>
                 </div>
               </div>
+              {currentUser ? (
+                <div className={hasActiveMembership ? "membership-highlight-card membership-highlight-card-active" : "membership-highlight-card"}>
+                  <div className="membership-highlight-head">
+                    <span className={hasActiveMembership ? "site-membership-badge site-membership-badge-active" : "site-membership-badge"}>
+                      {membershipBadgeText}
+                    </span>
+                    <strong>{selectedSubjectLabel}</strong>
+                  </div>
+                  <p>{hasActiveMembership ? (membershipExpiryText || "当前会员为长期有效。") : "当前账号还没有生效中的会员权益。"}</p>
+                </div>
+              ) : null}
             </section>
 
             <div className="profile-grid">
@@ -1001,6 +1074,20 @@ export default function PublicSite() {
                         <dt>学习账号</dt>
                         <dd>{currentUser.username}</dd>
                       </div>
+                      <div>
+                        <dt>会员状态</dt>
+                        <dd>
+                          <span className={hasActiveMembership ? "site-membership-badge site-membership-badge-active" : "site-membership-badge"}>
+                            {membershipBadgeText}
+                          </span>
+                        </dd>
+                      </div>
+                      {membershipExpiryText ? (
+                        <div>
+                          <dt>会员到期</dt>
+                          <dd>{membershipExpiryText.replace("有效期至 ", "")}</dd>
+                        </div>
+                      ) : null}
                       <div>
                         <dt>账号昵称</dt>
                         <dd>{currentUser.display_name || "-"}</dd>
@@ -1153,6 +1240,21 @@ export default function PublicSite() {
                   </form>
                 ) : (
                   <div className="profile-card-body">
+                    <div className={hasActiveMembership ? "feedback-banner feedback-success membership-summary-banner" : "feedback-banner membership-summary-banner"}>
+                      <div className="membership-summary-banner-head">
+                        <span className={hasActiveMembership ? "site-membership-badge site-membership-badge-active" : "site-membership-badge"}>
+                          {membershipBadgeText}
+                        </span>
+                        <strong>{currentMembership ? subscriptionStatusLabel(currentMembership.status) : "\u672a\u5f00\u901a"}</strong>
+                      </div>
+                      <p>
+                        {hasActiveMembership
+                          ? membershipExpiryText
+                            ? `你当前是按月会员，${membershipExpiryText}。`
+                            : "你当前会员权益已生效，当前为长期有效。"
+                          : "当前账号还没有生效中的会员权益，购买后会自动关联到你的学习账号。"}
+                      </p>
+                    </div>
                     <div className="feedback-banner">
                       购买会员后，后台会直接把会员状态和有效期关联到账号 <strong>{currentUser.username}</strong>，你在前台继续学习时就能一直使用同一个账号。
                     </div>
@@ -1255,6 +1357,12 @@ export default function PublicSite() {
                 {currentSettings.contact_email ? ` 如需合作或内容支持，可联系：${currentSettings.contact_email}` : ""}
               </p>
             </section>
+
+            <MCPConsole
+              learnerName={learnerName || currentUser?.username || ""}
+              subjectKey={subjectKey}
+              token={learnerAccessToken}
+            />
           </main>
         </div>
       ) : (
@@ -1763,6 +1871,13 @@ function formatDateTime(value: string) {
     return "-";
   }
   return date.toLocaleString("zh-CN");
+}
+
+function formatMembershipExpiry(membership?: SubscriptionStatus | null) {
+  if (!membership?.current_period_end) {
+    return "";
+  }
+  return `有效期至 ${formatDateTime(membership.current_period_end)}`;
 }
 
 function getCurrentHash() {

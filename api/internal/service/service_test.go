@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"brights/api/internal/domain"
 	"brights/api/internal/storage"
@@ -154,6 +155,61 @@ func TestEnsureClassificationSummariesBackfillsAndPages(t *testing.T) {
 	}
 	if pageTwo.Items[0].Name != "Unclassified" || pageTwo.Items[0].Count != 1 {
 		t.Fatalf("unexpected page 2 item: %+v", pageTwo.Items[0])
+	}
+}
+
+func TestGetLearnerByIDWithMembership(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	user, err := svc.RegisterLearner(ctx, domain.LearnerRegisterInput{
+		Username:    "xiaoming",
+		Password:    "ChangeMe1",
+		DisplayName: "小明",
+	})
+	if err != nil {
+		t.Fatalf("register learner: %v", err)
+	}
+
+	startedAt := time.Now().UTC().Add(-2 * time.Hour).Truncate(time.Second)
+	currentPeriodStart := startedAt
+	currentPeriodEnd := startedAt.AddDate(0, 1, 0)
+	if err := svc.db.WithContext(ctx).Create(&storage.MemberSubscription{
+		CustomerRef:        user.Username,
+		PlanKey:            "english-monthly",
+		SubjectKey:         "english",
+		Status:             "active",
+		Provider:           "wechat",
+		StartedAt:          &startedAt,
+		CurrentPeriodStart: &currentPeriodStart,
+		CurrentPeriodEnd:   &currentPeriodEnd,
+	}).Error; err != nil {
+		t.Fatalf("seed membership: %v", err)
+	}
+
+	profile, err := svc.GetLearnerByIDWithMembership(ctx, user.ID, "english")
+	if err != nil {
+		t.Fatalf("get learner with membership: %v", err)
+	}
+	if profile.Membership == nil {
+		t.Fatal("expected learner membership to be returned")
+	}
+	if profile.Membership.Status != "active" {
+		t.Fatalf("expected active membership status, got %q", profile.Membership.Status)
+	}
+	if profile.Membership.CurrentPeriodEnd == nil {
+		t.Fatal("expected current period end to be returned for monthly membership")
+	}
+	if got, want := profile.Membership.CurrentPeriodEnd.UTC().Format(time.RFC3339), currentPeriodEnd.UTC().Format(time.RFC3339); got != want {
+		t.Fatalf("expected current period end %s, got %s", want, got)
+	}
+
+	otherSubject, err := svc.GetLearnerByIDWithMembership(ctx, user.ID, "math")
+	if err != nil {
+		t.Fatalf("get learner for other subject: %v", err)
+	}
+	if otherSubject.Membership != nil {
+		t.Fatalf("expected no membership for other subject, got %+v", otherSubject.Membership)
 	}
 }
 

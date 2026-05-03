@@ -93,6 +93,25 @@ func (s *Service) GetLearnerByID(ctx context.Context, id uint) (domain.LearnerUs
 	return toLearnerUser(model), nil
 }
 
+func (s *Service) GetLearnerByIDWithMembership(ctx context.Context, id uint, subjectKey string) (domain.LearnerUser, error) {
+	user, err := s.GetLearnerByID(ctx, id)
+	if err != nil {
+		return domain.LearnerUser{}, err
+	}
+
+	subjectKey = normalizeKey(subjectKey)
+	if subjectKey == "" {
+		return user, nil
+	}
+
+	subscription, err := s.findLatestSubscriptionStatus(ctx, user.Username, subjectKey)
+	if err != nil {
+		return domain.LearnerUser{}, err
+	}
+	user.Membership = subscription
+	return user, nil
+}
+
 func toLearnerUser(model storage.LearnerUser) domain.LearnerUser {
 	return domain.LearnerUser{
 		ID:          model.ID,

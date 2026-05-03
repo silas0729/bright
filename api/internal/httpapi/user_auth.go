@@ -131,7 +131,7 @@ func (s *Server) handleLearnerMe(c *gin.Context) {
 		writeError(c, http.StatusUnauthorized, err)
 		return
 	}
-	user, err := s.service.GetLearnerByID(c.Request.Context(), claims.UserID)
+	user, err := s.service.GetLearnerByIDWithMembership(c.Request.Context(), claims.UserID, c.Query("subject"))
 	if err != nil {
 		writeError(c, http.StatusUnauthorized, err)
 		return

@@ -558,6 +558,12 @@ textarea {
   box-shadow: var(--shadow-card);
 }
 
+.site-account-trigger-member {
+  border-color: #e8cd8c;
+  background: linear-gradient(180deg, #fffdfa 0%, #fff7e6 100%);
+  box-shadow: 0 14px 32px rgba(123, 93, 45, 0.12);
+}
+
 .site-account-caret {
   width: 8px;
   height: 8px;
@@ -588,6 +594,13 @@ textarea {
   gap: 2px;
 }
 
+.site-account-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .site-account-meta strong {
   font-size: 0.94rem;
   font-weight: 800;
@@ -596,6 +609,25 @@ textarea {
 .site-account-meta span {
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.site-membership-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border: 1px solid #d9dee8;
+  border-radius: 999px;
+  color: #586174;
+  font-size: 0.74rem;
+  font-weight: 800;
+  background: #f4f6fa;
+}
+
+.site-membership-badge-active {
+  border-color: #e8cd8c;
+  color: #7a5a1e;
+  background: linear-gradient(180deg, #fff5d9 0%, #ffefc2 100%);
 }
 
 .site-account-dropdown {
@@ -894,6 +926,49 @@ textarea {
   font-size: 0.84rem;
 }
 
+.membership-highlight-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px 20px;
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-soft);
+}
+
+.membership-highlight-card-active {
+  border-color: #e8cd8c;
+  background: linear-gradient(180deg, #fffdf6 0%, #fff5df 100%);
+}
+
+.membership-highlight-head,
+.membership-summary-banner-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.membership-highlight-card strong,
+.membership-summary-banner-head strong {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.membership-highlight-card p,
+.membership-summary-banner p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.membership-summary-banner {
+  display: grid;
+  gap: 12px;
+}
+
 .profile-grid {
   display: grid;
   grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
@@ -905,6 +980,100 @@ textarea {
 .profile-card-body {
   display: grid;
   gap: 18px;
+}
+
+.mcp-console-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 20px;
+}
+
+.mcp-console-panel {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-soft);
+}
+
+.mcp-info-card,
+.mcp-output-card,
+.mcp-log-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-soft);
+}
+
+.mcp-output-card strong,
+.mcp-log-card h3 {
+  margin: 0;
+}
+
+.mcp-json-editor {
+  min-height: 220px;
+  font-family: "Consolas", "SFMono-Regular", "Courier New", monospace;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.mcp-inline-break {
+  font-size: 0.92rem;
+  line-height: 1.7;
+  word-break: break-all;
+}
+
+.mcp-output-card pre,
+.mcp-log-entry pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "Consolas", "SFMono-Regular", "Courier New", monospace;
+  font-size: 0.84rem;
+  line-height: 1.65;
+}
+
+.mcp-log-list {
+  display: grid;
+  gap: 12px;
+}
+
+.mcp-log-entry {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.mcp-log-entry-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.mcp-log-entry-sent {
+  border-color: #dce7f3;
+}
+
+.mcp-log-entry-received {
+  border-color: #dbe9de;
+}
+
+.mcp-log-entry-status {
+  border-color: #eadfca;
+}
+
+.mcp-log-entry-error {
+  border-color: var(--danger-line);
+  background: var(--danger-bg);
 }
 
 .account-panel-grid {
@@ -1701,6 +1870,7 @@ textarea {
   .hero-card,
   .profile-grid,
   .account-panel-grid,
+  .mcp-console-grid,
   .dashboard-grid,
   .admin-card-grid,
   .role-grid,

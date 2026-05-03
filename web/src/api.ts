@@ -141,6 +141,7 @@ export interface LearnerUser {
   display_name: string;
   status: string;
   created_at: string;
+  membership?: SubscriptionStatus;
 }
 
 export interface CaptchaChallenge {
@@ -491,6 +492,31 @@ export interface UpdateSubscriptionInput {
 export const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const baseUrl = apiBaseUrl;
 
+export interface MCPInfoTool {
+  name: string;
+  title?: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+}
+
+export interface MCPInfo {
+  name: string;
+  version: string;
+  protocolVersion: string;
+  websocketPath: string;
+  websocketURL: string;
+  availableMethods: string[];
+  tools: MCPInfoTool[];
+  auth?: {
+    mode?: string;
+    queryTokenParam?: string;
+    querySubjectParam?: string;
+    requiresMembership?: boolean;
+  };
+  examples?: Record<string, unknown>;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${baseUrl}${path}`, init);
   if (!response.ok) {
@@ -513,6 +539,35 @@ function authHeaders(token: string) {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
   };
+}
+
+function resolveHttpBase() {
+  if (baseUrl) {
+    return baseUrl;
+  }
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  return "";
+}
+
+export function buildMCPWebSocketUrl(subjectKey: string) {
+  const httpBase = resolveHttpBase();
+  if (!httpBase) {
+    return "";
+  }
+
+  const url = new URL(httpBase);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = "/mcp";
+  url.search = "";
+
+  const trimmedSubject = subjectKey.trim();
+  if (trimmedSubject) {
+    url.searchParams.set("subject", trimmedSubject);
+  }
+
+  return url.toString();
 }
 
 export const api = {
@@ -576,6 +631,14 @@ export const api = {
   getPlans() {
     return request<Plan[]>("/api/v1/plans");
   },
+  getMCPInfo(subjectKey?: string) {
+    const search = new URLSearchParams();
+    if (subjectKey?.trim()) {
+      search.set("subject", subjectKey.trim());
+    }
+    const query = search.toString();
+    return request<MCPInfo>(query ? `/mcp/info?${query}` : "/mcp/info");
+  },
   getSiteSettings() {
     return request<SiteSetting>("/api/v1/site/settings");
   },
@@ -612,8 +675,12 @@ export const api = {
       body: JSON.stringify({ username, password, captcha_id, captcha_answer }),
     });
   },
-  learnerMe(token: string) {
-    return request<LearnerUser>("/api/v1/auth/me", {
+  learnerMe(token: string, subjectKey?: string) {
+    const search = new URLSearchParams();
+    if (subjectKey) {
+      search.set("subject", subjectKey);
+    }
+    return request<LearnerUser>(`/api/v1/auth/me${search.toString() ? `?${search.toString()}` : ""}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
   },
