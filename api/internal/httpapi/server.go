@@ -68,6 +68,7 @@ func (s *Server) Routes() http.Handler {
 	v1.GET("/words", s.handleWords)
 	v1.GET("/knowledge-base/search", s.handleSearchKnowledgeBase)
 	v1.GET("/api-configs/market", s.handleAccessibleAPIConfigMarket)
+	v1.GET("/mcp/tools/market", s.mcpServer.HandleToolMarket)
 	v1.GET("/plans", s.handlePlans)
 	v1.GET("/site/settings", s.handleSiteSettings)
 	v1.GET("/auth/captcha", s.handleLearnerCaptcha)

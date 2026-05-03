@@ -69,6 +69,15 @@ type ListToolsResult struct {
 	Tools []Tool `json:"tools"`
 }
 
+// ToolMarketResponse contains a paged MCP tool market result for the web UI.
+type ToolMarketResponse struct {
+	Items      []Tool   `json:"items"`
+	Total      int      `json:"total"`
+	Page       int      `json:"page"`
+	PageSize   int      `json:"page_size"`
+	Categories []string `json:"categories"`
+}
+
 // CallToolRequest is the request payload for tools/call.
 type CallToolRequest struct {
 	Name      string                 `json:"name"`

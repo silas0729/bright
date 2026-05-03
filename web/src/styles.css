@@ -1146,79 +1146,115 @@ textarea {
 }
 
 .profile-tabbar {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 4px;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0;
   position: sticky;
   top: 70px;
   z-index: 24;
   align-self: start;
-  padding: 4px;
-  border: 1px solid rgba(216, 226, 238, 0.92);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.8);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0;
+  border: 1px solid rgba(216, 226, 238, 0.95);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(14px);
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+  scrollbar-width: thin;
+  scrollbar-color: #d4dfeb transparent;
+}
+
+.profile-tabbar::-webkit-scrollbar {
+  height: 7px;
+}
+
+.profile-tabbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #d4dfeb;
 }
 
 .profile-tab-link {
+  position: relative;
+  flex: 1 0 0;
+  min-width: 132px;
   display: grid;
-  gap: 1px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label count"
+    "helper helper";
+  gap: 4px 10px;
+  align-items: center;
   min-width: 0;
-  padding: 8px 10px 7px;
-  border: 1px solid transparent;
-  border-radius: 12px;
+  padding: 13px 16px;
+  border: none;
+  border-radius: 0;
   color: #435367;
   text-decoration: none;
-  background: transparent;
-  line-height: 1.3;
+  background: #ffffff;
+  box-shadow: inset -1px -1px 0 #edf2f7;
+  line-height: 1.25;
+  scroll-snap-align: start;
   transition:
-    border-color 140ms ease,
     background-color 140ms ease,
+    color 140ms ease,
     box-shadow 140ms ease;
 }
 
+.profile-tab-link:last-child {
+  box-shadow: inset 0 -1px 0 #edf2f7;
+}
+
 .profile-tab-link:hover {
-  border-color: #d7e2ee;
-  background: rgba(245, 249, 252, 0.94);
+  color: #223247;
+  background: #f8fbff;
 }
 
 .profile-tab-link span {
+  grid-area: label;
   min-width: 0;
-  font-size: 0.8rem;
+  font-size: 0.86rem;
   font-weight: 700;
-  color: var(--text);
+  color: inherit;
+  line-height: 1.12;
+  white-space: nowrap;
 }
 
 .profile-tab-link small {
+  grid-area: helper;
   color: var(--muted);
   min-width: 0;
-  font-size: 0.64rem;
-  line-height: 1.28;
+  overflow: hidden;
+  font-size: 0.68rem;
+  line-height: 1.18;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .profile-tab-link em {
+  grid-area: count;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: fit-content;
-  min-height: 16px;
-  padding: 0 5px;
+  justify-self: end;
+  min-width: 22px;
+  min-height: 20px;
+  padding: 0 7px;
   border-radius: 999px;
-  color: #37506d;
+  color: #274260;
   font-style: normal;
-  font-size: 0.62rem;
-  font-weight: 700;
-  background: #edf3f8;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  background: #dfe9f4;
 }
 
 .profile-tab-link-active {
   color: inherit;
-  border-color: #d5e1ec;
-  background: linear-gradient(180deg, #f9fcfe 0%, #f1f6fa 100%);
+  background: #f7fbff;
   box-shadow:
-    inset 0 2px 0 #183650,
-    0 4px 10px rgba(16, 37, 59, 0.04);
+    inset 0 -2px 0 #143a60,
+    inset -1px -1px 0 #edf2f7;
 }
 
 .profile-tab-link-active span,
@@ -1235,9 +1271,8 @@ textarea {
 }
 
 .profile-tab-link-active em {
-  color: #183650;
-  background: #ffffff;
-  box-shadow: inset 0 0 0 1px rgba(211, 224, 236, 0.92);
+  color: #10253b;
+  background: #edf3f9;
 }
 
 .profile-panel-stack {
@@ -3075,6 +3110,14 @@ textarea {
   width: 100%;
 }
 
+.api-parameter-example {
+  margin-top: 12px;
+}
+
+.api-parameter-example .form-field {
+  margin: 0;
+}
+
 .api-parameter-required {
   min-width: 64px;
   align-items: center;
@@ -3145,6 +3188,30 @@ textarea {
   word-break: break-word;
 }
 
+.api-test-parameter-builder {
+  display: grid;
+  gap: 14px;
+}
+
+.api-test-parameter-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.api-test-parameter-field {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+
+.api-test-parameter-field textarea,
+.api-test-parameter-field input,
+.api-test-parameter-field select {
+  width: 100%;
+}
+
 .api-test-response {
   display: grid;
   gap: 12px;
@@ -3206,6 +3273,7 @@ textarea {
   .admin-card-grid,
   .role-grid,
   .api-test-meta,
+  .api-test-parameter-list,
   .payment-panel-grid {
     grid-template-columns: 1fr;
   }
@@ -3218,8 +3286,9 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .profile-tabbar {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .profile-tab-link {
+    min-width: 124px;
+    padding: 12px 14px;
   }
 
   .profile-snapshot-grid {
@@ -3268,7 +3337,6 @@ textarea {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .profile-tabbar,
   .profile-snapshot-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3439,13 +3507,13 @@ textarea {
     padding: 24px;
   }
 
-  .profile-tabbar,
-  .profile-snapshot-grid {
-    grid-template-columns: 1fr;
+  .profile-tab-link {
+    min-width: 116px;
+    padding: 11px 12px;
   }
 
-  .profile-tab-link {
-    padding: 12px 13px;
+  .profile-tab-link small {
+    font-size: 0.64rem;
   }
 
   .admin-edit-modal-header {

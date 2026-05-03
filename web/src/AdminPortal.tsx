@@ -206,12 +206,16 @@ type APIParameterEditorRow = {
   type: APIParameterValueType;
   location: APIParameterLocation;
   description: string;
+  exampleValue: string;
   required: boolean;
 };
 type APIParameterDraft = {
   name?: unknown;
   type?: unknown;
   description?: unknown;
+  example?: unknown;
+  default?: unknown;
+  sample?: unknown;
   required?: unknown;
   in?: unknown;
   location?: unknown;
@@ -514,6 +518,7 @@ export default function AdminPortal() {
   const [apiConfigAdvancedBody, setAPIConfigAdvancedBody] = useState("");
   const [apiConfigAdvancedOpen, setAPIConfigAdvancedOpen] = useState(false);
   const [apiConfigTestArguments, setAPIConfigTestArguments] = useState("{}");
+  const [apiConfigTestValues, setAPIConfigTestValues] = useState<Record<string, string>>({});
   const [apiConfigTestResult, setAPIConfigTestResult] = useState<APIConfigTestResult | null>(null);
   const [apiConfigTestTarget, setAPIConfigTestTarget] = useState<APIConfig | null>(null);
 
@@ -621,6 +626,7 @@ export default function AdminPortal() {
     type: "string",
     location: "url",
     description: "",
+    exampleValue: "",
     required: false,
     ...overrides,
   });
@@ -752,6 +758,7 @@ export default function AdminPortal() {
           ...partial,
           name: normalizedName,
           description: partial.description !== undefined ? partial.description : existing.description,
+          exampleValue: partial.exampleValue !== undefined ? partial.exampleValue : existing.exampleValue,
         });
         return;
       }
@@ -762,6 +769,7 @@ export default function AdminPortal() {
           type: normalizeAPIParameterType(partial.type),
           location: normalizeAPIParameterLocation(partial.location),
           description: partial.description ?? "",
+          exampleValue: partial.exampleValue ?? "",
           required: partial.required ?? false,
         }),
       );
@@ -776,6 +784,7 @@ export default function AdminPortal() {
         type: normalizeAPIParameterType(definition.type),
         location: normalizeAPIParameterLocation(definition.in ?? definition.location),
         description: String(definition.description ?? "").trim(),
+        exampleValue: String(definition.example ?? definition.default ?? definition.sample ?? "").trim(),
         required: Boolean(definition.required),
       });
     }
@@ -840,6 +849,104 @@ export default function AdminPortal() {
       advancedBody,
       advancedOpen: Boolean(advancedHeaders || advancedBody),
     };
+  };
+
+  const getAPIConfigTestRows = (item: APIConfig | null) =>
+    item ? buildAPIParameterEditorState(item).rows.filter((row) => row.name.trim()) : [];
+
+  const buildAPIConfigTestValuePreset = (item: APIConfig) => {
+    const rows = getAPIConfigTestRows(item);
+    const values: Record<string, string> = {};
+    rows.forEach((row) => {
+      if (values[row.name] !== undefined) {
+        return;
+      }
+      if (row.exampleValue.trim()) {
+        values[row.name] = row.exampleValue.trim();
+        return;
+      }
+      if (row.type === "boolean") {
+        values[row.name] = "true";
+        return;
+      }
+      values[row.name] = "";
+    });
+    return values;
+  };
+
+  const buildAPIConfigTestArgumentPreview = (item: APIConfig, values: Record<string, string>) => {
+    const payload: Record<string, unknown> = {};
+    getAPIConfigTestRows(item).forEach((row) => {
+      if (payload[row.name] !== undefined) {
+        return;
+      }
+      const rawValue = values[row.name] ?? "";
+      const trimmedValue = rawValue.trim();
+      if (!trimmedValue) {
+        payload[row.name] = row.type === "boolean" ? false : "";
+        return;
+      }
+      switch (row.type) {
+        case "number": {
+          const numeric = Number(trimmedValue);
+          payload[row.name] = Number.isFinite(numeric) ? numeric : rawValue;
+          return;
+        }
+        case "boolean":
+          payload[row.name] = trimmedValue.toLowerCase() === "true";
+          return;
+        case "object":
+          payload[row.name] = safeParseJSONValue(rawValue) ?? rawValue;
+          return;
+        default:
+          payload[row.name] = rawValue;
+      }
+    });
+    return JSON.stringify(payload, null, 2);
+  };
+
+  const buildAPIConfigTestPayload = (item: APIConfig, values: Record<string, string>) => {
+    const payload: Record<string, unknown> = {};
+    getAPIConfigTestRows(item).forEach((row) => {
+      if (payload[row.name] !== undefined) {
+        return;
+      }
+      const rawValue = values[row.name] ?? "";
+      const trimmedValue = rawValue.trim();
+      if (!trimmedValue) {
+        if (row.required) {
+          throw new Error(`请填写“${row.name}”测试值。`);
+        }
+        return;
+      }
+      switch (row.type) {
+        case "number": {
+          const numeric = Number(trimmedValue);
+          if (!Number.isFinite(numeric)) {
+            throw new Error(`参数“${row.name}”必须填写数字。`);
+          }
+          payload[row.name] = numeric;
+          return;
+        }
+        case "boolean":
+          if (trimmedValue !== "true" && trimmedValue !== "false") {
+            throw new Error(`参数“${row.name}”只能选择 true 或 false。`);
+          }
+          payload[row.name] = trimmedValue === "true";
+          return;
+        case "object": {
+          const parsed = safeParseJSONValue(rawValue);
+          if (parsed === null && trimmedValue !== "null") {
+            throw new Error(`参数“${row.name}”必须是有效 JSON。`);
+          }
+          payload[row.name] = parsed;
+          return;
+        }
+        default:
+          payload[row.name] = rawValue;
+      }
+    });
+    return payload;
   };
 
   async function refreshLoginCaptcha() {
@@ -1661,6 +1768,7 @@ export default function AdminPortal() {
     setAPIConfigAdvancedBody("");
     setAPIConfigAdvancedOpen(false);
     setAPIConfigTestArguments("{}");
+    setAPIConfigTestValues({});
     setAPIConfigTestResult(null);
   }
 
@@ -1707,13 +1815,31 @@ export default function AdminPortal() {
   }
 
   function openAPIConfigTestModal(item: APIConfig) {
+    const presetValues = buildAPIConfigTestValuePreset(item);
     setAPIConfigTestTarget(item);
+    setAPIConfigTestValues(presetValues);
+    setAPIConfigTestArguments(buildAPIConfigTestArgumentPreview(item, presetValues));
     setAPIConfigTestResult(null);
   }
 
   function closeAPIConfigTestModal() {
     setAPIConfigTestTarget(null);
+    setAPIConfigTestValues({});
+    setAPIConfigTestArguments("{}");
     setAPIConfigTestResult(null);
+  }
+
+  function updateAPIConfigTestValue(name: string, value: string) {
+    setAPIConfigTestValues((current) => {
+      const nextValues = {
+        ...current,
+        [name]: value,
+      };
+      if (apiConfigTestTarget) {
+        setAPIConfigTestArguments(buildAPIConfigTestArgumentPreview(apiConfigTestTarget, nextValues));
+      }
+      return nextValues;
+    });
   }
 
   function toAPIConfigPayload(item: APIConfig | (SaveAPIConfigInput & { id?: number })): SaveAPIConfigInput {
@@ -1741,6 +1867,7 @@ export default function AdminPortal() {
         ...row,
         name: row.name.trim(),
         description: row.description.trim(),
+        exampleValue: row.exampleValue.trim(),
       }))
       .filter((row) => row.name);
 
@@ -1813,6 +1940,7 @@ export default function AdminPortal() {
         name: row.name,
         type: row.type,
         description: row.description || `参数：${row.name}`,
+        example: row.exampleValue || undefined,
         required: row.required,
         in: row.location,
       })),
@@ -1897,9 +2025,10 @@ export default function AdminPortal() {
     }
     let argumentsPayload: Record<string, unknown> = {};
     try {
-      argumentsPayload = apiConfigTestArguments.trim() ? (JSON.parse(apiConfigTestArguments) as Record<string, unknown>) : {};
-    } catch {
-      setDataError("测试参数必须是有效 JSON。");
+      argumentsPayload = buildAPIConfigTestPayload(item, apiConfigTestValues);
+      setAPIConfigTestArguments(buildAPIConfigTestArgumentPreview(item, apiConfigTestValues));
+    } catch (err) {
+      setDataError((err as Error).message);
       return;
     }
     setBusyAction(`admin-api-config-test-${item.id}`);
@@ -6132,6 +6261,56 @@ function startEditLearner(item: AdminLearnerUser) {
                     </label>
                   </div>
 
+                  <div className="feedback-banner">这里按参数逐项填写即可，下面的 JSON 会自动生成，不需要手动写。</div>
+
+                  {getAPIConfigTestRows(apiConfigTestTarget).length > 0 ? (
+                    <section className="api-test-parameter-builder">
+                      <div className="api-test-parameter-list">
+                        {getAPIConfigTestRows(apiConfigTestTarget).map((row) => (
+                          <label className="form-field api-test-parameter-field" key={row.name}>
+                            <span>
+                              {row.name}
+                              {row.required ? " *" : ""}
+                            </span>
+                            <small className="helper-text">
+                              {row.description || (row.location === "url" ? "URL 参数" : row.location === "body" ? "请求体参数" : "请求头参数")}
+                            </small>
+
+                            {row.type === "object" ? (
+                              <textarea
+                                rows={6}
+                                value={apiConfigTestValues[row.name] ?? ""}
+                                onChange={(event) => {
+                                  updateAPIConfigTestValue(row.name, event.target.value);
+                                }}
+                                placeholder='{"key":"value"}'
+                              />
+                            ) : row.type === "boolean" ? (
+                              <select
+                                value={apiConfigTestValues[row.name] ?? "true"}
+                                onChange={(event) => {
+                                  updateAPIConfigTestValue(row.name, event.target.value);
+                                }}
+                              >
+                                <option value="true">true</option>
+                                <option value="false">false</option>
+                              </select>
+                            ) : (
+                              <input
+                                type={row.type === "number" ? "number" : "text"}
+                                value={apiConfigTestValues[row.name] ?? ""}
+                                onChange={(event) => {
+                                  updateAPIConfigTestValue(row.name, event.target.value);
+                                }}
+                                placeholder={row.exampleValue || `请输入 ${row.name}`}
+                              />
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
                   <label className="form-field">
                     <span>请求地址</span>
                     <input
@@ -6300,6 +6479,18 @@ function startEditLearner(item: AdminLearnerUser) {
                               删除
                             </button>
                           </div>
+                          <div className="api-parameter-example">
+                            <label className="form-field">
+                              <span>测试示例值</span>
+                              <input
+                                placeholder={row.type === "object" ? '{"keyword":"value"}' : "保存后点测试会自动带出这个值"}
+                                value={row.exampleValue}
+                                onChange={(event) => {
+                                  updateAPIConfigParameterRow(row.id, { exampleValue: event.target.value });
+                                }}
+                              />
+                            </label>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -6404,15 +6595,22 @@ function startEditLearner(item: AdminLearnerUser) {
                     void handleTestAPIConfig(apiConfigTestTarget);
                   }}
                 >
+                  <div className="feedback-banner">
+                    真实参数值要填在这里，不是填在上面的“参数描述”里。当前接口至少需要传
+                    {` ${buildAPIParameterEditorState(apiConfigTestTarget)
+                      .rows.filter((row) => row.name.trim())
+                      .map((row) => row.name)
+                      .join("、") || "测试参数"}`}
+                    。
+                  </div>
+
                   <label className="form-field">
-                    <span>测试参数 JSON</span>
+                    <span>生成的测试参数 JSON（自动生成）</span>
                     <textarea
                       rows={12}
                       value={apiConfigTestArguments}
-                      onChange={(event) => {
-                        setAPIConfigTestArguments(event.target.value);
-                      }}
-                      placeholder='{"query":"hello"}'
+                      readOnly
+                      placeholder='{"keyword":"请输入真实题目"}'
                     />
                   </label>
 

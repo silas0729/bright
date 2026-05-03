@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -192,6 +193,19 @@ func (s *Server) HandleInfo(c *gin.Context) {
 			},
 		},
 	})
+}
+
+// HandleToolMarket returns a paged MCP tool market response for the public site.
+func (s *Server) HandleToolMarket(c *gin.Context) {
+	session, err := s.authenticateOptionalRequest(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "12"))
+	c.JSON(http.StatusOK, s.toolMarket(c.Request.Context(), session, strings.TrimSpace(c.Query("q")), strings.TrimSpace(c.Query("category")), page, pageSize))
 }
 
 func (s *Server) keepAlive(conn *websocket.Conn, done <-chan struct{}) {
@@ -1146,6 +1160,89 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func (s *Server) toolMarket(ctx context.Context, session *Session, queryText, category string, page, pageSize int) ToolMarketResponse {
+	page, pageSize = normalizeToolMarketPage(page, pageSize)
+	tools := s.tools(ctx, session)
+	categories := toolMarketCategories(tools)
+
+	selectedCategory := strings.ToLower(strings.TrimSpace(category))
+	searchText := strings.ToLower(strings.TrimSpace(queryText))
+	filtered := make([]Tool, 0, len(tools))
+	for _, tool := range tools {
+		if selectedCategory != "" && strings.ToLower(strings.TrimSpace(tool.Category)) != selectedCategory {
+			continue
+		}
+		if searchText != "" {
+			haystack := strings.ToLower(strings.Join([]string{
+				tool.Title,
+				tool.Name,
+				tool.Description,
+				tool.Category,
+				tool.SourceType,
+			}, " "))
+			if !strings.Contains(haystack, searchText) {
+				continue
+			}
+		}
+		filtered = append(filtered, tool)
+	}
+
+	total := len(filtered)
+	start := (page - 1) * pageSize
+	if start > total {
+		start = total
+	}
+	end := start + pageSize
+	if end > total {
+		end = total
+	}
+
+	items := make([]Tool, 0, end-start)
+	if start < end {
+		items = append(items, filtered[start:end]...)
+	}
+
+	return ToolMarketResponse{
+		Items:      items,
+		Total:      total,
+		Page:       page,
+		PageSize:   pageSize,
+		Categories: categories,
+	}
+}
+
+func normalizeToolMarketPage(page, pageSize int) (int, int) {
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 12
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	return page, pageSize
+}
+
+func toolMarketCategories(tools []Tool) []string {
+	seen := make(map[string]struct{}, len(tools))
+	items := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		category := strings.TrimSpace(tool.Category)
+		if category == "" {
+			category = "general"
+		}
+		key := strings.ToLower(category)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		items = append(items, category)
+	}
+	sort.Strings(items)
+	return items
 }
 
 func requestHTTPBaseURL(r *http.Request) string {

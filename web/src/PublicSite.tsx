@@ -14,11 +14,11 @@ import {
   type LearningSummary,
   type LearnerSession,
   type LearnerUser,
-  type MCPInfoTool,
   type PagedAPIConfigs,
   type PagedClassificationStats,
   type PagedKnowledgeBaseDocuments,
   type PagedLearningWordProgress,
+  type PagedMCPMarketTools,
   type PagedPaymentOrders,
   type PagedSubscriptions,
   type PagedWords,
@@ -40,6 +40,7 @@ import MCPConsole from "./MCPConsole";
 const publicPageSize = 18;
 const publicClassificationPageSize = 8;
 const profilePageSize = 5;
+const marketPageSize = 12;
 const publicUIStateStorageKey = "brights_public_ui_state";
 const publicSessionStorageKey = "brights_public_session";
 const inviteCodeSessionStorageKey = "brights_invite_code";
@@ -189,9 +190,10 @@ export default function PublicSite() {
   const [xiaomiSearchQuery, setXiaomiSearchQuery] = useState("");
   const [xiaomiQRSession, setXiaomiQRSession] = useState<XiaomiQRLoginResult | null>(null);
   const [xiaomiQRStatus, setXiaomiQRStatus] = useState("");
-  const [marketTools, setMarketTools] = useState<MCPInfoTool[]>([]);
+  const [marketResult, setMarketResult] = useState<PagedMCPMarketTools | null>(null);
   const [marketLoading, setMarketLoading] = useState(false);
   const [marketError, setMarketError] = useState("");
+  const [marketPage, setMarketPage] = useState(1);
   const [marketQuery, setMarketQuery] = useState("");
   const [marketCategory, setMarketCategory] = useState("");
   const [learningSummary, setLearningSummary] = useState<LearningSummary | null>(null);
@@ -204,6 +206,7 @@ export default function PublicSite() {
   const deferredQuery = useDeferredValue(query);
   const deferredKnowledgeBaseQuery = useDeferredValue(knowledgeBaseQuery);
   const deferredAPIConfigQuery = useDeferredValue(apiConfigQuery);
+  const deferredMarketQuery = useDeferredValue(marketQuery);
   const deferredLearningQuery = useDeferredValue(learningQuery);
   const activeCheckoutOrder = checkoutStatus?.order ?? checkoutOrder;
   const currentSettings = siteSettings ?? fallbackSiteSettings;
@@ -224,25 +227,15 @@ export default function PublicSite() {
   const currentProfileTab: ProfileWorkspaceTab = resolveProfileWorkspaceTab(currentHash);
   const classifications = classificationResult?.items ?? [];
   const classificationTotal = classificationResult?.total ?? 0;
-  const marketCategories = Array.from(new Set(marketTools.map((item) => (item.category || "general").trim()).filter(Boolean))).sort();
-  const filteredMarketTools = marketTools.filter((item) => {
-    const selectedCategory = marketCategory.trim().toLowerCase();
-    const searchText = marketQuery.trim().toLowerCase();
-    if (selectedCategory && (item.category || "").trim().toLowerCase() !== selectedCategory) {
-      return false;
-    }
-    if (!searchText) {
-      return true;
-    }
-    const haystack = [item.title, item.name, item.description, item.category, item.sourceType].join(" ").toLowerCase();
-    return haystack.includes(searchText);
-  });
+  const marketTools = marketResult?.items ?? [];
+  const marketCategories = marketResult?.categories ?? [];
   const learningLevelCounts = learningSummary?.level_counts ?? [];
   const learningDifficultyCounts = learningSummary?.difficulty_counts ?? [];
   const learningCurvePoints = learningSummary?.curve_points ?? [];
   const learningCountByKey = (items: Array<{ key: string; count: number }>, key: string) =>
     items.find((item) => item.key === key)?.count ?? 0;
   const speakTimerRef = useRef<number | null>(null);
+  const filteredMarketTools = marketTools;
   const speechTokenRef = useRef(0);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const checkoutNoticeKeyRef = useRef("");
@@ -517,6 +510,10 @@ export default function PublicSite() {
   }, [currentProfileTab, profileReloadKey, session?.access_token]);
 
   useEffect(() => {
+    setMarketPage(1);
+  }, [deferredMarketQuery, marketCategory, subjectKey]);
+
+  useEffect(() => {
     if (activeView !== "market") {
       return;
     }
@@ -525,12 +522,19 @@ export default function PublicSite() {
     setMarketLoading(true);
     setMarketError("");
     api
-      .getMCPInfo(subjectKey, learnerAccessToken || undefined)
+      .getMCPToolMarket({
+        page: marketPage,
+        pageSize: marketPageSize,
+        query: deferredMarketQuery,
+        category: marketCategory || undefined,
+        subjectKey,
+        token: learnerAccessToken || undefined,
+      })
       .then((result) => {
         if (!active) {
           return;
         }
-        setMarketTools(result.tools ?? []);
+        setMarketResult(result);
       })
       .catch((err: Error) => {
         if (active) {
@@ -546,7 +550,7 @@ export default function PublicSite() {
     return () => {
       active = false;
     };
-  }, [activeView, learnerAccessToken, profileReloadKey, subjectKey]);
+  }, [activeView, deferredMarketQuery, learnerAccessToken, marketCategory, marketPage, profileReloadKey, subjectKey]);
 
   useEffect(() => {
     if (!session?.access_token) {
@@ -1836,18 +1840,22 @@ export default function PublicSite() {
     setXiaomiQRSession,
     xiaomiQRStatus,
     setXiaomiQRStatus,
+    marketResult,
     marketLoading,
     marketError,
+    marketPage,
+    setMarketPage,
     setMarketQuery,
     setMarketCategory,
     marketCategories,
-    filteredMarketTools,
+    marketTools,
     learningSummary,
     learningProgress,
     setLearningQuery,
     setLearningLevelFilter,
     setLearningDifficultyFilter,
     deferredAPIConfigQuery,
+    deferredMarketQuery,
     apiConfigs?.items?.[0] as APIConfig | undefined,
   ];
 
@@ -3542,6 +3550,7 @@ export default function PublicSite() {
                     value={subjectKey}
                     onChange={(event) => {
                       setSubjectKey(event.target.value);
+                      setMarketPage(1);
                     }}
                   >
                     {subjects.map((subject) => (
@@ -3555,6 +3564,7 @@ export default function PublicSite() {
                   className="toolbar-search"
                   onChange={(event) => {
                     setMarketQuery(event.target.value);
+                    setMarketPage(1);
                   }}
                   placeholder="搜索工具名称、描述或分类"
                   value={marketQuery}
@@ -3563,6 +3573,7 @@ export default function PublicSite() {
                   value={marketCategory}
                   onChange={(event) => {
                     setMarketCategory(event.target.value);
+                    setMarketPage(1);
                   }}
                 >
                   <option value="">全部分类</option>
@@ -3615,6 +3626,15 @@ export default function PublicSite() {
                 </article>
               ))}
             </section>
+            {marketResult && marketResult.total > 0 ? (
+              <PagerControls
+                disabled={marketLoading}
+                onChange={setMarketPage}
+                page={marketResult.page}
+                pageSize={marketResult.page_size}
+                total={marketResult.total}
+              />
+            ) : null}
             {!marketLoading && filteredMarketTools.length === 0 ? (
               <div className="feedback-banner">当前筛选条件下没有匹配的 MCP 工具。</div>
             ) : null}

@@ -878,6 +878,14 @@ export interface MCPInfo {
   examples?: Record<string, unknown>;
 }
 
+export interface PagedMCPMarketTools {
+  items: MCPInfoTool[];
+  total: number;
+  page: number;
+  page_size: number;
+  categories: string[];
+}
+
 export interface MCPEndpoint {
   id: number;
   learner_user_id?: number;
@@ -1082,6 +1090,35 @@ export const api = {
       headers: token?.trim()
         ? {
             Authorization: `Bearer ${token.trim()}`,
+          }
+        : undefined,
+    });
+  },
+  getMCPToolMarket(params: {
+    page: number;
+    pageSize: number;
+    query?: string;
+    category?: string;
+    subjectKey?: string;
+    token?: string;
+  }) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.category) {
+      search.set("category", params.category);
+    }
+    if (params.subjectKey?.trim()) {
+      search.set("subject", params.subjectKey.trim());
+    }
+    return request<PagedMCPMarketTools>(`/api/v1/mcp/tools/market?${search.toString()}`, {
+      headers: params.token?.trim()
+        ? {
+            Authorization: `Bearer ${params.token.trim()}`,
           }
         : undefined,
     });
