@@ -47,7 +47,7 @@ type Server struct {
 	service  *service.Service
 	userAuth *userauth.Manager
 	upgrader websocket.Upgrader
-	writeMu   sync.Mutex
+	writeMu  sync.Mutex
 }
 
 // NewServer creates an MCP server instance.
@@ -461,6 +461,19 @@ func (s *Server) tools() []Tool {
 			InputSchema:  objectSchema(nil),
 			OutputSchema: toolResultSchema,
 		},
+		{
+			Name:        "search_knowledge_base",
+			Title:       "Search Knowledge Base",
+			Description: "Search uploaded text or spreadsheet knowledge base content.",
+			InputSchema: objectSchema(map[string]interface{}{
+				"subject_key": map[string]interface{}{"type": "string"},
+				"query":       map[string]interface{}{"type": "string", "description": "Knowledge base search keyword."},
+				"q":           map[string]interface{}{"type": "string", "description": "Knowledge base search keyword alias."},
+				"page":        map[string]interface{}{"type": "integer"},
+				"page_size":   map[string]interface{}{"type": "integer"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
 	}
 }
 
@@ -518,6 +531,14 @@ func (s *Server) callTool(ctx context.Context, session Session, req CallToolRequ
 		return newToolResult(canonicalName, data, err)
 	case "get_catalog_stats":
 		data, err := s.service.Stats(ctx)
+		return newToolResult(canonicalName, data, err)
+	case "search_knowledge_base":
+		data, err := s.service.SearchKnowledgeBase(ctx, domain.SearchKnowledgeBaseInput{
+			SubjectKey: stringArg(req.Arguments, "subject_key", session.SubjectKey),
+			Query:      firstNonEmpty(stringArg(req.Arguments, "query", ""), stringArg(req.Arguments, "q", "")),
+			Page:       intArg(req.Arguments, "page", 1),
+			PageSize:   intArg(req.Arguments, "page_size", 10),
+		})
 		return newToolResult(canonicalName, data, err)
 	default:
 		return CallToolResult{}, fmt.Errorf("unknown tool: %s", req.Name)
@@ -595,6 +616,8 @@ func canonicalToolName(name string) string {
 		return "list_membership_plans"
 	case "get_catalog_stats", "brights_get_catalog_stats":
 		return "get_catalog_stats"
+	case "search_knowledge_base", "brights_search_knowledge_base", "search_kb":
+		return "search_knowledge_base"
 	default:
 		return strings.TrimSpace(name)
 	}

@@ -25,7 +25,7 @@ const publicUIStateStorageKey = "brights_public_ui_state";
 const publicSessionStorageKey = "brights_public_session";
 
 type AuthMode = "login" | "register";
-type PublicView = "home" | "profile";
+type PublicView = "home" | "profile" | "mcp";
 type NoticeDialogTone = "info" | "success" | "error";
 
 type NoticeDialogState = {
@@ -1368,6 +1368,56 @@ export default function PublicSite() {
                 {currentSettings.contact_email ? ` 如需合作或内容支持，可联系：${currentSettings.contact_email}` : ""}
               </p>
             </section>
+          </main>
+        </div>
+      ) : activeView === "mcp" ? (
+        <div className="site-main site-main-profile">
+          <main className="site-content profile-page mcp-page">
+            <section className="content-card profile-hero-card mcp-page-hero" id="mcp">
+              <div className="section-header profile-hero-header">
+                <div>
+                  <p className="section-eyebrow">MCP 连接中心</p>
+                  <h1>{currentUser ? "单独管理 Brights 到小智 AI 的远程 WSS 连接" : "先登录账号，再管理远程 MCP 连接"}</h1>
+                  <p className="helper-text">
+                    这里是独立的 MCP 页面，只负责维护 Brights 主动连接小智 AI 的远程 ws / wss 地址、连接状态和工具暴露情况，不再和个人中心内容混在一起。
+                  </p>
+                </div>
+                <div className="button-row">
+                  <a className="secondary-button" href="#profile">
+                    返回个人中心
+                  </a>
+                  <a className="primary-button" href="#catalog">
+                    返回词库学习
+                  </a>
+                </div>
+              </div>
+
+              <div className="mcp-page-toolbar">
+                <label className="form-field mcp-page-subject-field">
+                  <span>当前连接学科</span>
+                  <select
+                    value={subjectKey}
+                    onChange={(event) => {
+                      setSubjectKey(event.target.value);
+                      setClassification("");
+                      setClassificationPage(1);
+                      setPage(1);
+                    }}
+                  >
+                    {subjects.map((subject) => (
+                      <option key={subject.key} value={subject.key}>
+                        {subject.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="mcp-page-identity-card">
+                  <strong>{currentUser ? learnerName || currentUser.username : "未登录学员"}</strong>
+                  <span>{currentUser ? `${selectedSubjectLabel} · ${membershipBadgeText}` : "登录后按当前学员会员权限返回数据"}</span>
+                </div>
+              </div>
+            </section>
 
             <MCPConsole
               learnerName={learnerName || currentUser?.username || ""}
@@ -1899,7 +1949,10 @@ function getCurrentHash() {
 }
 
 function resolvePublicView(hash: string): PublicView {
-  if (hash === "#profile" || hash === "#account" || hash === "#plans" || hash === "#mcp") {
+  if (hash === "#mcp") {
+    return "mcp";
+  }
+  if (hash === "#profile" || hash === "#account" || hash === "#plans") {
     return "profile";
   }
   return "home";

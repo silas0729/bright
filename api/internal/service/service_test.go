@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -210,6 +212,52 @@ func TestGetLearnerByIDWithMembership(t *testing.T) {
 	}
 	if otherSubject.Membership != nil {
 		t.Fatalf("expected no membership for other subject, got %+v", otherSubject.Membership)
+	}
+}
+
+func TestImportKnowledgeBaseFromFileAndSearch(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+	if err := svc.SeedDefaults(ctx); err != nil {
+		t.Fatalf("seed defaults: %v", err)
+	}
+
+	tempDir := t.TempDir()
+	path := filepath.Join(tempDir, "kb.txt")
+	content := "Brights 知识库示例。\n按月会员会显示到期时间。\n开放接口可以通过 MCP 检索知识库内容。"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write temp file: %v", err)
+	}
+
+	result, err := svc.ImportKnowledgeBaseFromFile(ctx, domain.ImportKnowledgeBaseInput{
+		Path:       path,
+		SubjectKey: "english",
+		Title:      "会员知识库",
+	})
+	if err != nil {
+		t.Fatalf("import knowledge base: %v", err)
+	}
+	if result.ChunkCount == 0 {
+		t.Fatal("expected imported knowledge base to create chunks")
+	}
+	if result.Document.Title != "会员知识库" {
+		t.Fatalf("unexpected document title: %q", result.Document.Title)
+	}
+
+	searchResult, err := svc.SearchKnowledgeBase(ctx, domain.SearchKnowledgeBaseInput{
+		SubjectKey: "english",
+		Query:      "MCP",
+		Page:       1,
+		PageSize:   10,
+	})
+	if err != nil {
+		t.Fatalf("search knowledge base: %v", err)
+	}
+	if searchResult.Total == 0 || len(searchResult.Items) == 0 {
+		t.Fatal("expected search to return imported knowledge base content")
+	}
+	if searchResult.Items[0].DocumentID != result.Document.ID {
+		t.Fatalf("expected search result to belong to document %d, got %d", result.Document.ID, searchResult.Items[0].DocumentID)
 	}
 }
 

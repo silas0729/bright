@@ -269,6 +269,32 @@ type ImportJob struct {
 	UpdatedAt     time.Time
 }
 
+type KnowledgeBaseDocument struct {
+	ID             uint   `gorm:"primaryKey"`
+	SubjectKey     string `gorm:"size:80;not null;index"`
+	Title          string `gorm:"size:255;not null;index"`
+	SourceFileName string `gorm:"size:255;not null"`
+	SourceType     string `gorm:"size:32;not null;index"`
+	Status         string `gorm:"size:32;not null;default:active;index"`
+	ChunkCount     int    `gorm:"not null;default:0"`
+	CharacterCount int    `gorm:"not null;default:0"`
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+type KnowledgeBaseChunk struct {
+	ID             uint   `gorm:"primaryKey"`
+	DocumentID     uint   `gorm:"not null;index;index:idx_kb_document_chunk,priority:1"`
+	SubjectKey     string `gorm:"size:80;not null;index"`
+	Title          string `gorm:"size:255;not null;index"`
+	ChunkIndex     int    `gorm:"not null;index:idx_kb_document_chunk,priority:2"`
+	Content        string `gorm:"type:text;not null"`
+	ContentSearch  string `gorm:"type:text"`
+	CharacterCount int    `gorm:"not null;default:0"`
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
 func Open(driverName, dsn string, autoCreateDatabase bool) (*gorm.DB, error) {
 	gormConfig := &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
@@ -310,6 +336,8 @@ func AutoMigrate(db *gorm.DB) error {
 		&MemberSubscription{},
 		&LearnerMCPEndpoint{},
 		&ImportJob{},
+		&KnowledgeBaseDocument{},
+		&KnowledgeBaseChunk{},
 	)
 }
 

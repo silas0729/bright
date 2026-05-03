@@ -1,0 +1,67 @@
+package domain
+
+import "time"
+
+type KnowledgeBaseDocument struct {
+	ID             uint      `json:"id"`
+	SubjectKey     string    `json:"subject_key"`
+	Title          string    `json:"title"`
+	SourceFileName string    `json:"source_file_name"`
+	SourceType     string    `json:"source_type"`
+	Status         string    `json:"status"`
+	ChunkCount     int       `json:"chunk_count"`
+	CharacterCount int       `json:"character_count"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type KnowledgeBaseChunk struct {
+	ID             uint      `json:"id"`
+	DocumentID     uint      `json:"document_id"`
+	SubjectKey     string    `json:"subject_key"`
+	Title          string    `json:"title"`
+	ChunkIndex     int       `json:"chunk_index"`
+	Content        string    `json:"content"`
+	CharacterCount int       `json:"character_count"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type KnowledgeBaseDocumentFilter struct {
+	SubjectKey string
+	Query      string
+	Page       int
+	PageSize   int
+}
+
+type SearchKnowledgeBaseInput struct {
+	SubjectKey string
+	Query      string
+	Page       int
+	PageSize   int
+}
+
+type ImportKnowledgeBaseInput struct {
+	Path       string
+	SubjectKey string
+	Title      string
+}
+
+type ImportKnowledgeBaseResult struct {
+	Document       KnowledgeBaseDocument `json:"document"`
+	ChunkCount     int                   `json:"chunk_count"`
+	CharacterCount int                   `json:"character_count"`
+}
+
+type PagedKnowledgeBaseDocuments struct {
+	Items    []KnowledgeBaseDocument `json:"items"`
+	Total    int64                   `json:"total"`
+	Page     int                     `json:"page"`
+	PageSize int                     `json:"page_size"`
+}
+
+type PagedKnowledgeBaseChunks struct {
+	Items    []KnowledgeBaseChunk `json:"items"`
+	Total    int64                `json:"total"`
+	Page     int                  `json:"page"`
+	PageSize int                  `json:"page_size"`
+}

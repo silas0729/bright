@@ -14,6 +14,7 @@ import {
   type PagedAdminUsers,
   type PagedCategories,
   type PagedGrades,
+  type PagedKnowledgeBaseDocuments,
   type PagedLearnerUsers,
   type PagedPaymentOrders,
   type PagedSubscriptions,
@@ -98,6 +99,7 @@ export default function AdminPortal() {
   const [words, setWords] = useState<PagedWords | null>(null);
   const [categories, setCategories] = useState<PagedCategories | null>(null);
   const [grades, setGrades] = useState<PagedGrades | null>(null);
+  const [knowledgeBaseDocuments, setKnowledgeBaseDocuments] = useState<PagedKnowledgeBaseDocuments | null>(null);
   const [wordFilterCategories, setWordFilterCategories] = useState<Category[]>([]);
   const [wordEditorCategories, setWordEditorCategories] = useState<Category[]>([]);
   const [stats, setStats] = useState<CatalogStats | null>(null);
@@ -139,6 +141,12 @@ export default function AdminPortal() {
     fileName: "",
     subjectKey: "english",
     replace: true,
+  });
+  const [knowledgeBaseForm, setKnowledgeBaseForm] = useState({
+    file: null as File | null,
+    fileName: "",
+    title: "",
+    subjectKey: "english",
   });
   const [subjectForm, setSubjectForm] = useState({
     id: 0,
@@ -247,6 +255,7 @@ export default function AdminPortal() {
   const [wordPage, setWordPage] = useState(persistedUIState.wordPage ?? 1);
   const [categoryPage, setCategoryPage] = useState(persistedUIState.categoryPage ?? 1);
   const [gradePage, setGradePage] = useState(persistedUIState.gradePage ?? 1);
+  const [knowledgeBasePage, setKnowledgeBasePage] = useState(1);
   const [paymentPage, setPaymentPage] = useState(persistedUIState.paymentPage ?? 1);
   const [subscriptionPage, setSubscriptionPage] = useState(persistedUIState.subscriptionPage ?? 1);
   const [adminUserQuery, setAdminUserQuery] = useState(persistedUIState.adminUserQuery ?? "");
@@ -257,6 +266,7 @@ export default function AdminPortal() {
   );
   const [categoryQuery, setCategoryQuery] = useState(persistedUIState.categoryQuery ?? "");
   const [gradeQuery, setGradeQuery] = useState(persistedUIState.gradeQuery ?? "");
+  const [knowledgeBaseQuery, setKnowledgeBaseQuery] = useState("");
   const [paymentQuery, setPaymentQuery] = useState(persistedUIState.paymentQuery ?? "");
   const [subscriptionQuery, setSubscriptionQuery] = useState(persistedUIState.subscriptionQuery ?? "");
   const [learnerStatusFilter, setLearnerStatusFilter] = useState(persistedUIState.learnerStatusFilter ?? "");
@@ -270,6 +280,7 @@ export default function AdminPortal() {
   const deferredWordQuery = useDeferredValue(wordQuery);
   const deferredCategoryQuery = useDeferredValue(categoryQuery);
   const deferredGradeQuery = useDeferredValue(gradeQuery);
+  const deferredKnowledgeBaseQuery = useDeferredValue(knowledgeBaseQuery);
   const deferredPaymentQuery = useDeferredValue(paymentQuery);
   const deferredSubscriptionQuery = useDeferredValue(subscriptionQuery);
 
@@ -474,6 +485,7 @@ export default function AdminPortal() {
       setWechatPayConfigExists(false);
       setPaymentOrders(null);
       setSubscriptions(null);
+      setKnowledgeBaseDocuments(null);
       setSelectedOrderDetail(null);
       return;
     }
@@ -510,6 +522,12 @@ export default function AdminPortal() {
         page: gradePage,
         pageSize: adminPageSize,
         query: deferredGradeQuery,
+      }),
+      api.adminKnowledgeBaseDocuments(token, {
+        page: knowledgeBasePage,
+        pageSize: adminPageSize,
+        query: deferredKnowledgeBaseQuery,
+        subjectKey: subjectFilter,
       }),
       canViewSiteSettings ? api.adminSiteSettings(token) : Promise.resolve(null),
       canViewLearners
@@ -550,6 +568,7 @@ export default function AdminPortal() {
           wordData,
           categoryData,
           gradeData,
+          knowledgeBaseData,
           siteData,
           learnerData,
           configResult,
@@ -567,6 +586,7 @@ export default function AdminPortal() {
           setWords(wordData);
           setCategories(categoryData);
           setGrades(gradeData);
+          setKnowledgeBaseDocuments(knowledgeBaseData);
           setSiteSettings((siteData as SiteSetting | null) ?? null);
           if (siteData) {
             setSiteForm(siteData as SiteSetting);
@@ -610,11 +630,13 @@ export default function AdminPortal() {
     deferredAdminUserQuery,
     deferredCategoryQuery,
     deferredGradeQuery,
+    deferredKnowledgeBaseQuery,
     deferredLearnerQuery,
     deferredPaymentQuery,
     deferredSubscriptionQuery,
     deferredWordQuery,
     gradePage,
+    knowledgeBasePage,
     learnerPage,
     learnerStatusFilter,
     paymentPage,
@@ -640,6 +662,10 @@ export default function AdminPortal() {
     }
 
     setImportForm((current) => ({
+      ...current,
+      subjectKey: hasSubject(current.subjectKey) ? current.subjectKey : defaultSubjectKey,
+    }));
+    setKnowledgeBaseForm((current) => ({
       ...current,
       subjectKey: hasSubject(current.subjectKey) ? current.subjectKey : defaultSubjectKey,
     }));
@@ -965,6 +991,42 @@ export default function AdminPortal() {
       setReloadKey((current) => current + 1);
       setNotice(
         `导入完成：文件 ${result.path} 共处理 ${result.imported_count} 条学习内容，自动匹配或创建 ${result.created_categories} 个内容分组。`,
+      );
+    } catch (err) {
+      setDataError((err as Error).message);
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function handleImportKnowledgeBase(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+    if (!knowledgeBaseForm.file) {
+      setDataError("请先选择要导入的知识库文件。");
+      return;
+    }
+
+    setBusyAction("knowledge-base-import");
+    setDataError("");
+    setNotice("");
+    try {
+      const result = await api.adminImportKnowledgeBase(token, {
+        file: knowledgeBaseForm.file,
+        subject_key: knowledgeBaseForm.subjectKey || subjectFilter || "english",
+        title: knowledgeBaseForm.title,
+      });
+      setKnowledgeBaseForm((current) => ({
+        ...current,
+        file: null,
+        fileName: "",
+        title: "",
+      }));
+      setReloadKey((current) => current + 1);
+      setNotice(
+        `知识库导入完成：${result.document.source_file_name}，生成 ${result.chunk_count} 个片段，共 ${result.character_count} 字。`,
       );
     } catch (err) {
       setDataError((err as Error).message);
@@ -2300,6 +2362,76 @@ function startEditLearner(item: AdminLearnerUser) {
                 </article>
 
                 <article className="content-card">
+                  <h2>上传知识库文件</h2>
+                  <form className="setup-form" onSubmit={handleImportKnowledgeBase}>
+                    <label className="form-field">
+                      <span>选择知识库文件</span>
+                      <label className={`upload-picker ${knowledgeBaseForm.file ? "upload-picker-ready" : ""}`}>
+                        <input
+                          accept=".txt,.md,.csv,.xlsx"
+                          className="upload-picker-input"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] ?? null;
+                            setKnowledgeBaseForm((current) => ({
+                              ...current,
+                              file,
+                              fileName: file?.name ?? "",
+                              title: current.title || (file?.name ? file.name.replace(/\.[^.]+$/, "") : ""),
+                            }));
+                          }}
+                          type="file"
+                        />
+                        <div className="upload-picker-main">
+                          <div className="upload-picker-meta">
+                            <strong>{knowledgeBaseForm.fileName || "点击选择要导入的知识库文件"}</strong>
+                            <span>
+                              {knowledgeBaseForm.file
+                                ? `文件大小 ${formatFileSize(knowledgeBaseForm.file.size)}，上传后会自动切分为可检索片段`
+                                : "支持 TXT、Markdown、CSV、Excel，上传后可通过开放接口和 MCP 工具检索"}
+                            </span>
+                          </div>
+                          <span className="upload-picker-action">{knowledgeBaseForm.file ? "重新选择" : "选择文件"}</span>
+                        </div>
+                      </label>
+                    </label>
+                    <div className="upload-hint-list">
+                      <span className="tag">支持 TXT</span>
+                      <span className="tag">支持 Markdown</span>
+                      <span className="tag">支持 CSV / Excel</span>
+                      <span className="tag">自动切片检索</span>
+                    </div>
+                    <label className="form-field">
+                      <span>知识库标题</span>
+                      <input
+                        value={knowledgeBaseForm.title}
+                        onChange={(event) => {
+                          setKnowledgeBaseForm((current) => ({ ...current, title: event.target.value }));
+                        }}
+                        placeholder="例如：英语语法答疑库"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>归属到哪个科目</span>
+                      <select
+                        value={knowledgeBaseForm.subjectKey}
+                        onChange={(event) => {
+                          setKnowledgeBaseForm((current) => ({ ...current, subjectKey: event.target.value }));
+                        }}
+                      >
+                        {subjects.map((subject) => (
+                          <option key={subject.key} value={subject.key}>
+                            {subject.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button className="primary-button" disabled={busyAction === "knowledge-base-import"} type="submit">
+                      {busyAction === "knowledge-base-import" ? "上传处理中..." : "上传到知识库"}
+                    </button>
+                  </form>
+                </article>
+
+                <article className="content-card">
                   <h2>新增学习科目</h2>
                   <form className="setup-form" onSubmit={handleSaveSubject}>
                     <label className="form-field">
@@ -2543,6 +2675,59 @@ function startEditLearner(item: AdminLearnerUser) {
                   </form>
                 </article>
               </div>
+
+              <section className="content-card">
+                <div className="section-toolbar">
+                  <h2>知识库文档</h2>
+                  <div className="toolbar-controls">
+                    <input
+                      className="toolbar-search"
+                      onChange={(event) => {
+                        setKnowledgeBaseQuery(event.target.value);
+                        setKnowledgeBasePage(1);
+                      }}
+                      placeholder="搜索标题或文件名"
+                      value={knowledgeBaseQuery}
+                    />
+                  </div>
+                </div>
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>标题</th>
+                        <th>文件名</th>
+                        <th>类型</th>
+                        <th>片段数</th>
+                        <th>字数</th>
+                        <th>更新时间</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(knowledgeBaseDocuments?.items ?? []).map((item) => (
+                        <tr key={item.id}>
+                          <td>{item.title}</td>
+                          <td>{item.source_file_name}</td>
+                          <td>{item.source_type}</td>
+                          <td>{formatCount(item.chunk_count)}</td>
+                          <td>{formatCount(item.character_count)}</td>
+                          <td>{formatDateTime(item.updated_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {(knowledgeBaseDocuments?.items ?? []).length === 0 ? (
+                  <div className="feedback-banner">当前还没有知识库文档，先上传一份文本或表格文件试试。</div>
+                ) : null}
+                <PagerControls
+                  disabled={dataLoading}
+                  onChange={setKnowledgeBasePage}
+                  page={knowledgeBasePage}
+                  pageSize={knowledgeBaseDocuments?.page_size ?? adminPageSize}
+                  total={knowledgeBaseDocuments?.total ?? 0}
+                />
+              </section>
 
               <article className="content-card">
                 <div className="section-toolbar">
@@ -4812,6 +4997,7 @@ function PagerControls(props: {
   total: number;
   pageSize: number;
   onChange: (page: number) => void;
+  disabled?: boolean;
 }) {
   const totalPages = Math.max(1, Math.ceil(props.total / Math.max(props.pageSize, 1)));
 
@@ -4819,7 +5005,7 @@ function PagerControls(props: {
     <div className="pager">
       <button
         className="secondary-button small-button"
-        disabled={props.page <= 1}
+        disabled={props.disabled || props.page <= 1}
         onClick={() => props.onChange(Math.max(1, props.page - 1))}
         type="button"
       >
@@ -4830,7 +5016,7 @@ function PagerControls(props: {
       </span>
       <button
         className="secondary-button small-button"
-        disabled={props.page >= totalPages}
+        disabled={props.disabled || props.page >= totalPages}
         onClick={() => props.onChange(Math.min(totalPages, props.page + 1))}
         type="button"
       >

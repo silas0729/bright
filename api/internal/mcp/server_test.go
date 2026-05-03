@@ -13,6 +13,7 @@ func TestCanonicalToolName(t *testing.T) {
 		{input: "brights_search_words", want: "search_words"},
 		{input: "list_plans", want: "list_membership_plans"},
 		{input: "brights_list_membership_plans", want: "list_membership_plans"},
+		{input: "brights_search_knowledge_base", want: "search_knowledge_base"},
 	}
 
 	for _, tc := range tests {

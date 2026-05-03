@@ -45,6 +45,7 @@ export default function MCPConsole(props: MCPConsoleProps) {
   const [editingEndpointID, setEditingEndpointID] = useState<number | null>(null);
   const [endpointForm, setEndpointForm] = useState<EndpointFormState>(emptyEndpointForm);
   const [savingEndpoint, setSavingEndpoint] = useState(false);
+  const [endpointActionBusyID, setEndpointActionBusyID] = useState<number | null>(null);
   const [endpointBusyMessage, setEndpointBusyMessage] = useState("");
   const [copiedMessage, setCopiedMessage] = useState("");
 
@@ -328,6 +329,45 @@ export default function MCPConsole(props: MCPConsoleProps) {
     }
   }
 
+  async function toggleEndpointEnabled(endpoint: MCPEndpoint) {
+    if (!props.token.trim()) {
+      setEndpointBusyMessage("请先登录学员账号，再变更远程接入点状态。");
+      return;
+    }
+
+    setEndpointActionBusyID(endpoint.id);
+    setEndpointBusyMessage("");
+
+    try {
+      const payload: SaveMCPEndpointInput = {
+        name: endpoint.name,
+        url: endpoint.url,
+        description: endpoint.description,
+        enabled: !endpoint.enabled,
+        token_query_param: endpoint.token_query_param || "token",
+        subject_query_param: endpoint.subject_query_param || "subject",
+      };
+
+      const saved = await api.updateLearnerMCPEndpoint(props.token, endpoint.id, payload);
+      setEndpoints((current) => current.map((item) => (item.id === saved.id ? saved : item)));
+      setToolPreviewMap((current) => {
+        const next = { ...current };
+        delete next[saved.id];
+        return next;
+      });
+      setToolPreviewVersionMap((current) => {
+        const next = { ...current };
+        delete next[saved.id];
+        return next;
+      });
+      setEndpointBusyMessage(saved.enabled ? `已启动接入点“${saved.name}”。` : `已停用接入点“${saved.name}”。`);
+    } catch (error) {
+      setEndpointBusyMessage(parseErrorMessage(error));
+    } finally {
+      setEndpointActionBusyID(null);
+    }
+  }
+
   async function deleteEndpoint(endpoint: MCPEndpoint) {
     if (!props.token.trim()) {
       setEndpointBusyMessage("请先登录学员账号，再删除远程接入点。");
@@ -392,7 +432,7 @@ export default function MCPConsole(props: MCPConsoleProps) {
 
   return (
     <>
-      <section className="content-card profile-card mcp-hub-card" id="mcp">
+      <section className="content-card profile-card mcp-hub-card">
         <div className="section-header">
           <div>
             <p className="section-eyebrow">MCP Remote</p>
@@ -558,9 +598,7 @@ export default function MCPConsole(props: MCPConsoleProps) {
                     <tr>
                       <th scope="col">接入点</th>
                       <th scope="col">远程地址</th>
-                      <th scope="col">状态</th>
-                      <th scope="col">工具</th>
-                      <th scope="col">最近连接</th>
+                      <th scope="col">状态与工具</th>
                       <th scope="col">操作</th>
                     </tr>
                   </thead>
@@ -568,6 +606,7 @@ export default function MCPConsole(props: MCPConsoleProps) {
                     {endpoints.map((endpoint) => {
                       const endpointTools = toolPreviewMap[endpoint.id] ?? globalTools;
                       const isSelected = endpoint.id === selectedEndpoint?.id;
+                      const isActionBusy = endpointActionBusyID === endpoint.id;
 
                       return (
                         <tr
@@ -598,16 +637,21 @@ export default function MCPConsole(props: MCPConsoleProps) {
                               <code className="mcp-url-text" title={endpoint.url}>
                                 {endpoint.url}
                               </code>
-                              <button
-                                className="secondary-button small-button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  void copyText(endpoint.url, "远程地址已复制。");
-                                }}
-                                type="button"
-                              >
-                                复制
-                              </button>
+                              <div className="mcp-url-meta">
+                                <span className="mcp-table-muted">
+                                  参数：{endpoint.token_query_param || "token"} / {endpoint.subject_query_param || "subject"}
+                                </span>
+                                <button
+                                  className="secondary-button small-button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void copyText(endpoint.url, "远程地址已复制。");
+                                  }}
+                                  type="button"
+                                >
+                                  复制
+                                </button>
+                              </div>
                             </div>
                           </td>
                           <td>
@@ -615,6 +659,8 @@ export default function MCPConsole(props: MCPConsoleProps) {
                               <span className={`pill ${statusPillClass(endpoint.connection_status, endpoint.enabled)}`}>
                                 {statusLabel(endpoint.connection_status, endpoint.enabled)}
                               </span>
+                              <span className="mcp-table-muted">工具 {endpointTools.length} 个</span>
+                              <span className="mcp-table-muted">最近连接：{formatDateTime(endpoint.connected_at)}</span>
                               {endpoint.last_error ? (
                                 <span className="mcp-table-error">{endpoint.last_error}</span>
                               ) : (
@@ -623,27 +669,21 @@ export default function MCPConsole(props: MCPConsoleProps) {
                             </div>
                           </td>
                           <td>
-                            <div className="mcp-cell-stack">
-                              <strong>{endpointTools.length}</strong>
-                              <span className="mcp-table-muted">统一暴露工具</span>
-                            </div>
-                          </td>
-                          <td>{formatDateTime(endpoint.connected_at)}</td>
-                          <td>
                             <div className="mcp-action-group">
                               <button
                                 className="secondary-button small-button"
-                                disabled={toolPreviewLoadingID === endpoint.id}
+                                disabled={isActionBusy}
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  selectEndpoint(endpoint);
+                                  void toggleEndpointEnabled(endpoint);
                                 }}
                                 type="button"
                               >
-                                {toolPreviewLoadingID === endpoint.id ? "加载中..." : "查看"}
+                                {isActionBusy ? "处理中..." : endpoint.enabled ? "停用" : "启动"}
                               </button>
                               <button
                                 className="secondary-button small-button"
+                                disabled={isActionBusy}
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   openEditModal(endpoint);
@@ -654,6 +694,7 @@ export default function MCPConsole(props: MCPConsoleProps) {
                               </button>
                               <button
                                 className="secondary-button small-button"
+                                disabled={isActionBusy}
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   void deleteEndpoint(endpoint);

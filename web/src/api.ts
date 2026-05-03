@@ -233,6 +233,50 @@ export interface ImportResult {
   replace: boolean;
 }
 
+export interface KnowledgeBaseDocument {
+  id: number;
+  subject_key: string;
+  title: string;
+  source_file_name: string;
+  source_type: string;
+  status: string;
+  chunk_count: number;
+  character_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeBaseChunk {
+  id: number;
+  document_id: number;
+  subject_key: string;
+  title: string;
+  chunk_index: number;
+  content: string;
+  character_count: number;
+  created_at: string;
+}
+
+export interface ImportKnowledgeBaseResult {
+  document: KnowledgeBaseDocument;
+  chunk_count: number;
+  character_count: number;
+}
+
+export interface PagedKnowledgeBaseDocuments {
+  items: KnowledgeBaseDocument[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface PagedKnowledgeBaseChunks {
+  items: KnowledgeBaseChunk[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 export interface WechatPayConfig {
   id: number;
   auth_mode: string;
@@ -981,6 +1025,53 @@ export const api = {
       },
       body: formData,
     });
+  },
+  adminImportKnowledgeBase(
+    token: string,
+    payload: { file: File; subject_key: string; title: string },
+  ) {
+    const formData = new FormData();
+    formData.set("file", payload.file);
+    formData.set("subject_key", payload.subject_key);
+    formData.set("title", payload.title);
+    return request<ImportKnowledgeBaseResult>("/api/v1/admin/knowledge-base/import", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+  },
+  adminKnowledgeBaseDocuments(
+    token: string,
+    params: { page: number; pageSize: number; query: string; subjectKey: string },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.subjectKey) {
+      search.set("subject", params.subjectKey);
+    }
+    return request<PagedKnowledgeBaseDocuments>(`/api/v1/admin/knowledge-base/documents?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  searchKnowledgeBase(params: { query: string; page: number; pageSize: number; subjectKey?: string }) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.subjectKey) {
+      search.set("subject", params.subjectKey);
+    }
+    return request<PagedKnowledgeBaseChunks>(`/api/v1/knowledge-base/search?${search.toString()}`);
   },
   adminCreateSubject(token: string, payload: CreateSubjectInput) {
     return request<Subject>("/api/v1/admin/subjects", {

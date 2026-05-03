@@ -66,6 +66,7 @@ func (s *Server) Routes() http.Handler {
 	v1.GET("/categories", s.handleCategories)
 	v1.GET("/grades", s.handleGrades)
 	v1.GET("/words", s.handleWords)
+	v1.GET("/knowledge-base/search", s.handleSearchKnowledgeBase)
 	v1.GET("/plans", s.handlePlans)
 	v1.GET("/site/settings", s.handleSiteSettings)
 	v1.GET("/auth/captcha", s.handleLearnerCaptcha)
@@ -110,6 +111,7 @@ func (s *Server) Routes() http.Handler {
 	adminProtected.GET("/site/settings", s.permissionRequired("site.read"), s.handleAdminSiteSettings)
 	adminProtected.PUT("/site/settings", s.permissionRequired("site.write"), s.handleAdminSaveSiteSettings)
 	adminProtected.GET("/words", s.permissionRequired("catalog.read"), s.handleAdminWords)
+	adminProtected.GET("/knowledge-base/documents", s.permissionRequired("catalog.read"), s.handleAdminKnowledgeBaseDocuments)
 	adminProtected.GET("/categories", s.permissionRequired("catalog.read"), s.handleAdminCategories)
 	adminProtected.GET("/grades", s.permissionRequired("grade.read"), s.handleAdminGrades)
 	adminProtected.GET("/plans", s.permissionRequired("plan.read"), s.handleAdminPlans)
@@ -123,6 +125,7 @@ func (s *Server) Routes() http.Handler {
 	admin := v1.Group("/admin")
 	admin.Use(s.authRequired())
 	admin.POST("/import/local", s.permissionRequired("catalog.write"), s.handleImportLocal)
+	admin.POST("/knowledge-base/import", s.permissionRequired("catalog.write"), s.handleAdminImportKnowledgeBase)
 	admin.POST("/subjects", s.permissionRequired("subject.write"), s.handleCreateSubject)
 	admin.PUT("/subjects/:id", s.permissionRequired("subject.write"), s.handleUpdateSubject)
 	admin.POST("/categories", s.permissionRequired("catalog.write"), s.handleCreateCategory)
@@ -717,6 +720,16 @@ func defaultIfBlank(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func wordFilterFromRequest(c *gin.Context) domain.WordFilter {
