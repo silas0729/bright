@@ -3585,6 +3585,7 @@ export default function PublicSite() {
                 </select>
               </div>
 
+              <div className="helper-text">匹配结果 {formatCount(marketResult?.total ?? 0)}，当前页 {formatCount(marketTools.length)}。</div>
               <div className="tag-list">
                 <span className="tag">工具总数 {formatCount(marketTools.length)}</span>
                 <span className="tag">当前可见 {formatCount(filteredMarketTools.length)}</span>
