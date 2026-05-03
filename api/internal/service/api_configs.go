@@ -26,6 +26,7 @@ var apiTemplatePattern = regexp.MustCompile(`\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}`)
 type apiParameterDefinition struct {
 	Name        string
 	Type        string
+	In          string
 	Description string
 	Required    bool
 }
@@ -755,6 +756,7 @@ func parseAPIParameterDefinitions(raw string) ([]apiParameterDefinition, error) 
 				result = append(result, apiParameterDefinition{
 					Name:        name,
 					Type:        "string",
+					In:          "url",
 					Description: fmt.Sprintf("Parameter: %s", name),
 					Required:    true,
 				})
@@ -766,12 +768,17 @@ func parseAPIParameterDefinitions(raw string) ([]apiParameterDefinition, error) 
 				description := strings.TrimSpace(fmt.Sprintf("%v", typed["description"]))
 				required, _ := typed["required"].(bool)
 				paramType := strings.TrimSpace(fmt.Sprintf("%v", typed["type"]))
+				paramIn := strings.TrimSpace(fmt.Sprintf("%v", typed["in"]))
+				if paramIn == "" {
+					paramIn = strings.TrimSpace(fmt.Sprintf("%v", typed["location"]))
+				}
 				if description == "" {
 					description = fmt.Sprintf("Parameter: %s", name)
 				}
 				result = append(result, apiParameterDefinition{
 					Name:        name,
 					Type:        paramType,
+					In:          paramIn,
 					Description: description,
 					Required:    required,
 				})
@@ -803,18 +810,24 @@ func parseAPIParameterDefinitions(raw string) ([]apiParameterDefinition, error) 
 			result = append(result, apiParameterDefinition{
 				Name:        name,
 				Type:        "string",
+				In:          "url",
 				Description: strings.TrimSpace(typed),
 			})
 		case map[string]interface{}:
 			description := strings.TrimSpace(fmt.Sprintf("%v", typed["description"]))
 			required, _ := typed["required"].(bool)
 			paramType := strings.TrimSpace(fmt.Sprintf("%v", typed["type"]))
+			paramIn := strings.TrimSpace(fmt.Sprintf("%v", typed["in"]))
+			if paramIn == "" {
+				paramIn = strings.TrimSpace(fmt.Sprintf("%v", typed["location"]))
+			}
 			if description == "" {
 				description = fmt.Sprintf("Parameter: %s", name)
 			}
 			result = append(result, apiParameterDefinition{
 				Name:        name,
 				Type:        paramType,
+				In:          paramIn,
 				Description: description,
 				Required:    required,
 			})
@@ -822,6 +835,7 @@ func parseAPIParameterDefinitions(raw string) ([]apiParameterDefinition, error) 
 			result = append(result, apiParameterDefinition{
 				Name:        name,
 				Type:        "string",
+				In:          "url",
 				Description: fmt.Sprintf("Parameter: %s", name),
 			})
 		}
@@ -868,8 +882,15 @@ func validateAPIConfigInput(name, toolName, rawURL, method, headers, body, param
 	if err := validateJSONField("body", body); err != nil {
 		return storage.APIConfig{}, err
 	}
-	if _, err := parseAPIParameterDefinitions(parameters); err != nil {
+	definitions, err := parseAPIParameterDefinitions(parameters)
+	if err != nil {
 		return storage.APIConfig{}, err
+	}
+	for _, definition := range definitions {
+		location := strings.ToLower(strings.TrimSpace(definition.In))
+		if location == "header" && !isValidHTTPHeaderFieldName(strings.TrimSpace(definition.Name)) {
+			return storage.APIConfig{}, fmt.Errorf("header parameter name %q is invalid", definition.Name)
+		}
 	}
 	return validated, nil
 }
@@ -882,6 +903,13 @@ func validateJSONObjectField(label, raw string) error {
 	var object map[string]interface{}
 	if err := json.Unmarshal([]byte(raw), &object); err != nil {
 		return fmt.Errorf("%s must be a valid JSON object", label)
+	}
+	if strings.EqualFold(label, "headers") {
+		for key := range object {
+			if !isValidHTTPHeaderFieldName(strings.TrimSpace(key)) {
+				return fmt.Errorf("headers contains an invalid header name: %s", key)
+			}
+		}
 	}
 	return nil
 }
@@ -1021,18 +1049,21 @@ func appendAPIConfigQueryArgs(
 			if value == nil {
 				continue
 			}
-			if _, exists := queryValues[key]; exists {
+			if apiConfigQueryHasConcreteValue(queryValues, key) {
 				continue
 			}
 			queryValues.Set(key, fmt.Sprintf("%v", renderTemplateValue(value, templateValues)))
 		}
 	} else {
 		for _, definition := range parameterDefs {
+			if location := strings.ToLower(strings.TrimSpace(definition.In)); location != "" && location != "url" && location != "query" {
+				continue
+			}
 			value, exists := args[definition.Name]
 			if !exists || value == nil {
 				continue
 			}
-			if _, exists := queryValues[definition.Name]; exists {
+			if apiConfigQueryHasConcreteValue(queryValues, definition.Name) {
 				continue
 			}
 			queryValues.Set(definition.Name, fmt.Sprintf("%v", renderTemplateValue(value, templateValues)))
@@ -1041,6 +1072,39 @@ func appendAPIConfigQueryArgs(
 
 	parsed.RawQuery = queryValues.Encode()
 	return parsed.String(), nil
+}
+
+func apiConfigQueryHasConcreteValue(values url.Values, key string) bool {
+	existing, exists := values[key]
+	if !exists {
+		return false
+	}
+	for _, value := range existing {
+		if strings.TrimSpace(value) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func isValidHTTPHeaderFieldName(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	const allowed = "!#$%&'*+-.^_`|~"
+	for i := 0; i < len(value); i++ {
+		char := value[i]
+		switch {
+		case char >= 'a' && char <= 'z':
+		case char >= 'A' && char <= 'Z':
+		case char >= '0' && char <= '9':
+		case strings.ContainsRune(allowed, rune(char)):
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func buildAPIConfigTemplateValues(execCtx domain.APIConfigExecutionContext, args map[string]interface{}) map[string]interface{} {
@@ -1103,4 +1167,3 @@ func renderTemplateStringAny(value string, values map[string]interface{}) interf
 		return ""
 	})
 }
-

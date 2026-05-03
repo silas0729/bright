@@ -97,22 +97,22 @@ type Grade struct {
 }
 
 type Word struct {
-	ID          uint64 `gorm:"primaryKey"`
-	LegacyID    int64  `gorm:"index"`
-	SubjectID   uint   `gorm:"not null;index;index:idx_words_subject_category,priority:1"`
-	CategoryID  *uint  `gorm:"index;index:idx_words_subject_category,priority:2"`
-	GradeID     *uint  `gorm:"index"`
-	Term        string `gorm:"size:180;not null;index"`
-	Translation string `gorm:"size:255;index"`
-	SourceLabel string `gorm:"size:255;index"`
-	Phonetics   string `gorm:"type:text"`
-	Explanation string `gorm:"type:text"`
+	ID                uint64 `gorm:"primaryKey"`
+	LegacyID          int64  `gorm:"index"`
+	SubjectID         uint   `gorm:"not null;index;index:idx_words_subject_category,priority:1"`
+	CategoryID        *uint  `gorm:"index;index:idx_words_subject_category,priority:2"`
+	GradeID           *uint  `gorm:"index"`
+	Term              string `gorm:"size:180;not null;index"`
+	Translation       string `gorm:"size:255;index"`
+	SourceLabel       string `gorm:"size:255;index"`
+	Phonetics         string `gorm:"type:text"`
+	Explanation       string `gorm:"type:text"`
 	DefaultLevel      string `gorm:"size:32;not null;default:beginner;index"`
 	DefaultDifficulty string `gorm:"size:32;not null;default:medium;index"`
-	IsVIP       bool   `gorm:"column:is_v_ip;not null;default:false;index"`
-	Status      string `gorm:"size:32;not null;default:published;index"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	IsVIP             bool   `gorm:"column:is_v_ip;not null;default:false;index"`
+	Status            string `gorm:"size:32;not null;default:published;index"`
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 
 	Subject  Subject   `gorm:"foreignKey:SubjectID"`
 	Category *Category `gorm:"foreignKey:CategoryID"`

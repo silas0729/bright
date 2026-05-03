@@ -3000,6 +3000,10 @@ textarea {
   table-layout: auto;
 }
 
+.api-config-modal {
+  width: min(1080px, 100%);
+}
+
 .api-config-table th:last-child,
 .api-config-table td:last-child {
   width: 228px;
@@ -3022,6 +3026,93 @@ textarea {
 .api-config-test-helper h3 {
   margin: 0;
   font-size: 1.05rem;
+}
+
+.api-parameter-builder,
+.api-config-advanced {
+  display: grid;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid #d8e2ed;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.api-parameter-builder-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.api-parameter-builder-header h3 {
+  margin: 0 0 4px;
+  font-size: 1.02rem;
+}
+
+.api-parameter-list {
+  display: grid;
+  gap: 12px;
+}
+
+.api-parameter-card {
+  padding: 14px;
+  border: 1px solid #e4ebf3;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.api-parameter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) 136px 136px minmax(0, 1.25fr) auto auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.api-parameter-row input,
+.api-parameter-row select {
+  width: 100%;
+}
+
+.api-parameter-required {
+  min-width: 64px;
+  align-items: center;
+  color: var(--text);
+}
+
+.api-parameter-delete {
+  color: var(--danger-text);
+  border-color: var(--danger-line);
+  background: #fff8f7;
+}
+
+.api-parameter-delete:hover {
+  color: #7a2e27;
+  background: #fff2ef;
+}
+
+.api-config-advanced summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--text);
+  list-style: none;
+}
+
+.api-config-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.api-config-advanced summary::after {
+  content: "展开";
+  margin-left: 10px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.api-config-advanced[open] summary::after {
+  content: "收起";
 }
 
 .api-test-modal {
@@ -3161,6 +3252,10 @@ textarea {
   .form-grid-two,
   .detail-grid,
   .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .api-parameter-row {
     grid-template-columns: 1fr;
   }
 
@@ -3324,6 +3419,11 @@ textarea {
 
   .import-tab-button {
     padding: 12px 14px;
+  }
+
+  .api-parameter-builder,
+  .api-config-advanced {
+    padding: 16px;
   }
 
   .mcp-url-meta {

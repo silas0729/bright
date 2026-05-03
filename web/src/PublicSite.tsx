@@ -42,6 +42,7 @@ const publicClassificationPageSize = 8;
 const profilePageSize = 5;
 const publicUIStateStorageKey = "brights_public_ui_state";
 const publicSessionStorageKey = "brights_public_session";
+const inviteCodeSessionStorageKey = "brights_invite_code";
 
 type AuthMode = "login" | "register";
 type PublicView = "home" | "profile" | "mcp" | "market";
@@ -126,6 +127,7 @@ export default function PublicSite() {
   const [authError, setAuthError] = useState("");
   const [authNotice, setAuthNotice] = useState("");
   const [authCaptchaLoading, setAuthCaptchaLoading] = useState(false);
+  const [inviteCodeLocked, setInviteCodeLocked] = useState(false);
 
   const [siteSettings, setSiteSettings] = useState<SiteSetting>(fallbackSiteSettings);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -209,6 +211,8 @@ export default function PublicSite() {
   const currentMembership = currentUser?.membership ?? null;
   const hasActiveMembership = currentMembership?.status === "active";
   const membershipExpiryText = formatMembershipExpiry(currentMembership);
+  const currentInviteCode = (inviteSummary?.invite_code || currentUser?.invite_code || "").trim();
+  const inviteRegistrationLink = buildInviteRegistrationLink(currentInviteCode);
   const membershipBadgeText = currentMembership
     ? hasActiveMembership
       ? "\u4f1a\u5458\u5df2\u5f00\u901a"
@@ -299,6 +303,25 @@ export default function PublicSite() {
     return () => {
       window.removeEventListener("hashchange", handleHashChange);
     };
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      return;
+    }
+
+    const inviteCode = resolveInitialInviteCode();
+    if (!inviteCode) {
+      return;
+    }
+
+    setInviteCodeLocked(true);
+    setAuthMode("register");
+    setAuthForm((current) => ({ ...current, inviteCode }));
+
+    if (resolvePublicView(getCurrentHash()) !== "profile") {
+      window.location.hash = "#profile";
+    }
   }, []);
 
   useEffect(() => {
@@ -1111,6 +1134,9 @@ export default function PublicSite() {
         });
         persistLearnerSession(nextSession);
         setCheckoutCustomerRef(nextSession.user.username);
+        window.sessionStorage.removeItem(inviteCodeSessionStorageKey);
+        clearInviteQueryParam();
+        setInviteCodeLocked(false);
         setAuthNotice("注册成功，已经自动登录。");
       } else {
         const nextSession = await api.learnerLogin(
@@ -1165,15 +1191,27 @@ export default function PublicSite() {
   }
 
   async function handleCopyInviteCode() {
-    const code = inviteSummary?.invite_code?.trim() ?? "";
-    if (!code) {
+    if (!currentInviteCode || !window.navigator.clipboard) {
       return;
     }
+    const code = currentInviteCode;
     try {
-      await navigator.clipboard.writeText(code);
+      await window.navigator.clipboard.writeText(currentInviteCode);
       setProfileNotice(`邀请码 ${code} 已复制。`);
     } catch {
       setProfileError("复制邀请码失败，请手动复制。");
+    }
+  }
+
+  async function handleCopyInviteLink() {
+    if (!inviteRegistrationLink || !window.navigator.clipboard) {
+      return;
+    }
+    try {
+      await window.navigator.clipboard.writeText(inviteRegistrationLink);
+      setProfileNotice("注册链接已复制。");
+    } catch {
+      setProfileError("复制注册链接失败，请手动复制。");
     }
   }
 
@@ -2164,6 +2202,7 @@ export default function PublicSite() {
                             <label className="form-field">
                               <span>邀请码</span>
                               <input
+                                readOnly={inviteCodeLocked}
                                 value={authForm.inviteCode}
                                 onChange={(event) => {
                                   setAuthForm((current) => ({ ...current, inviteCode: event.target.value }));
@@ -2171,6 +2210,13 @@ export default function PublicSite() {
                                 placeholder="有邀请码可填写，没有可留空"
                               />
                             </label>
+                          ) : null}
+                          {authMode === "register" ? (
+                            <p className="helper-text">
+                              {inviteCodeLocked
+                                ? "通过邀请链接进入，邀请码已自动带入并锁定。注册成功后会自动建立邀请关系。"
+                                : "有邀请码可以填写；如果从邀请链接进入，这里会自动带入。"}
+                            </p>
                           ) : null}
                           <label className="form-field">
                             <span>登录密码</span>
@@ -2402,6 +2448,28 @@ export default function PublicSite() {
                     ) : null}
                   </div>
                   {currentUser ? (
+                    <div className="profile-panel-stack">
+                      <label className="form-field">
+                        <span>注册链接</span>
+                        <input readOnly value={inviteRegistrationLink} />
+                        <small className="helper-text">把这个注册链接分享给好友，打开后会自动带入邀请码并进入注册流程。</small>
+                      </label>
+                      <div className="button-row">
+                        <button className="secondary-button small-button" onClick={() => void handleCopyInviteCode()} type="button">
+                          复制邀请码
+                        </button>
+                        <button className="secondary-button small-button" onClick={() => void handleCopyInviteLink()} type="button">
+                          复制注册链接
+                        </button>
+                        {inviteRegistrationLink ? (
+                          <a className="secondary-button small-button" href={inviteRegistrationLink} rel="noreferrer" target="_blank">
+                            打开注册链接
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                  {currentUser ? (
                     <>
                       <div className="profile-overview">
                         <div>
@@ -2423,7 +2491,7 @@ export default function PublicSite() {
                       </div>
                       <label className="form-field">
                         <span>邀请码</span>
-                        <input readOnly value={inviteSummary?.invite_code || currentUser.invite_code || ""} />
+                        <input readOnly value={currentInviteCode} />
                         <small className="helper-text">邀请码由系统自动生成，前台普通用户不可修改。</small>
                       </label>
                       <div className="table-wrap">
@@ -4301,6 +4369,45 @@ function resolveProfileWorkspaceTab(hash: string): ProfileWorkspaceTab {
     default:
       return "overview";
   }
+}
+
+function resolveInitialInviteCode() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const search = new URLSearchParams(window.location.search);
+  const inviteCode = (search.get("invite_code") || search.get("invite") || search.get("code") || "").trim();
+  if (inviteCode) {
+    window.sessionStorage.setItem(inviteCodeSessionStorageKey, inviteCode);
+    return inviteCode;
+  }
+
+  return window.sessionStorage.getItem(inviteCodeSessionStorageKey)?.trim() || "";
+}
+
+function clearInviteQueryParam() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  url.searchParams.delete("invite_code");
+  url.searchParams.delete("invite");
+  url.searchParams.delete("code");
+  window.history.replaceState({}, "", url.toString());
+}
+
+function buildInviteRegistrationLink(inviteCode: string) {
+  const code = inviteCode.trim();
+  if (!code || typeof window === "undefined") {
+    return "";
+  }
+
+  const url = new URL(window.location.origin + window.location.pathname);
+  url.searchParams.set("invite", code);
+  url.hash = "profile";
+  return url.toString();
 }
 
 function canUseBrowserSpeech() {

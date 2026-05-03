@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -258,6 +260,72 @@ func TestImportKnowledgeBaseFromFileAndSearch(t *testing.T) {
 	}
 	if searchResult.Items[0].DocumentID != result.Document.ID {
 		t.Fatalf("expected search result to belong to document %d, got %d", result.Document.ID, searchResult.Items[0].DocumentID)
+	}
+}
+
+func TestAppendAPIConfigQueryArgsFillsExistingEmptyQueryValue(t *testing.T) {
+	resolved, err := appendAPIConfigQueryArgs(
+		"https://api.pearapi.ai/api/drvinglicense/?keyword=",
+		storage.APIConfig{
+			Parameters: `[{"name":"keyword","type":"string","required":true,"in":"url"}]`,
+		},
+		domain.APIConfigExecutionContext{},
+		map[string]interface{}{
+			"keyword": "高速爆胎后为什么要紧握转向盘",
+		},
+	)
+	if err != nil {
+		t.Fatalf("append query args: %v", err)
+	}
+
+	parsed, err := url.Parse(resolved)
+	if err != nil {
+		t.Fatalf("parse resolved url: %v", err)
+	}
+	if got := parsed.Query().Get("keyword"); got != "高速爆胎后为什么要紧握转向盘" {
+		t.Fatalf("expected keyword query to be populated, got %q", got)
+	}
+}
+
+func TestAppendAPIConfigQueryArgsKeepsExistingNonEmptyQueryValue(t *testing.T) {
+	resolved, err := appendAPIConfigQueryArgs(
+		"https://api.pearapi.ai/api/drvinglicense/?keyword=existing",
+		storage.APIConfig{
+			Parameters: `[{"name":"keyword","type":"string","required":true,"in":"url"}]`,
+		},
+		domain.APIConfigExecutionContext{},
+		map[string]interface{}{
+			"keyword": "replacement",
+		},
+	)
+	if err != nil {
+		t.Fatalf("append query args: %v", err)
+	}
+
+	parsed, err := url.Parse(resolved)
+	if err != nil {
+		t.Fatalf("parse resolved url: %v", err)
+	}
+	if got := parsed.Query().Get("keyword"); got != "existing" {
+		t.Fatalf("expected existing keyword query to be preserved, got %q", got)
+	}
+}
+
+func TestValidateAPIConfigInputRejectsInvalidHeaderFieldName(t *testing.T) {
+	_, err := validateAPIConfigInput(
+		"驾驶题查询",
+		"driving_question_lookup",
+		"https://api.pearapi.ai/api/drvinglicense/",
+		"GET",
+		`{"keyword=":"{{keyword}}"}`,
+		"",
+		`[{"name":"keyword","type":"string","required":true,"in":"url"}]`,
+	)
+	if err == nil {
+		t.Fatal("expected invalid header field name to be rejected")
+	}
+	if !strings.Contains(err.Error(), "invalid header name") {
+		t.Fatalf("expected invalid header name error, got %v", err)
 	}
 }
 
