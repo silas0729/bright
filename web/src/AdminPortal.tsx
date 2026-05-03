@@ -3359,6 +3359,7 @@ function startEditLearner(item: AdminLearnerUser) {
     { key: "api-tools", label: "API 工具", helper: "动态接口与测试", hidden: !canViewMCPTools, count: apiConfigs?.total ?? 0 },
     { key: "tool-access", label: "工具权限", helper: "开关与会员门槛", hidden: !canViewMCPTools, count: mcpToolConfigs?.total ?? 0 },
     { key: "invite-stats", label: "邀请统计", helper: "邀请与付费转化", hidden: !canViewInviteStats, count: inviteStats?.total ?? 0 },
+    { key: "invite-withdraws", label: "返佣提现", helper: "审核与打款处理", hidden: !canViewInviteStats, count: inviteWithdraws?.total ?? 0 },
   ];
 
   const visiblePaymentTabItems = paymentTabItems.filter((item) => !item.hidden);
@@ -4685,6 +4686,25 @@ function startEditLearner(item: AdminLearnerUser) {
                         }}
                       />
                     </label>
+                    <label className="form-field">
+                      <span>邀请返佣比例（%）</span>
+                      <input
+                        disabled={!canManageSiteSettings}
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        type="number"
+                        value={siteForm.invite_commission_rate ?? 0}
+                        onChange={(event) => {
+                          const nextValue = Number(event.target.value);
+                          setSiteForm((current) => ({
+                            ...current,
+                            invite_commission_rate: Number.isFinite(nextValue) && nextValue >= 0 ? nextValue : 0,
+                          }));
+                        }}
+                      />
+                      <small className="helper-text">填写 10 表示邀请好友充值后返佣 10%，前台提现金额会按这里的比例自动累计。</small>
+                    </label>
                     {canManageSiteSettings ? (
                       <button className="primary-button" disabled={busyAction === "site-settings"} type="submit">
                         {busyAction === "site-settings" ? "保存中..." : "保存前台展示"}
@@ -5492,6 +5512,170 @@ function startEditLearner(item: AdminLearnerUser) {
                     pageSize={inviteStats?.page_size ?? adminPageSize}
                     total={inviteStats?.total ?? 0}
                   />
+                </article>
+              ) : null}
+
+              {canViewInviteStats && currentMCPTab === "invite-withdraws" ? (
+                <article className="content-card">
+                  <div className="section-toolbar">
+                    <div>
+                      <h2>返佣提现审核</h2>
+                      <p className="helper-text">查看用户提现申请、对应佣金明细，并在后台完成审核和打款记录。</p>
+                    </div>
+                    <div className="toolbar-controls">
+                      <select
+                        value={inviteWithdrawStatusFilter}
+                        onChange={(event) => {
+                          setInviteWithdrawStatusFilter(event.target.value);
+                          setInviteWithdrawPage(1);
+                        }}
+                      >
+                        <option value="">全部状态</option>
+                        <option value="pending">待审核</option>
+                        <option value="approved">已审核</option>
+                        <option value="paid">已打款</option>
+                        <option value="rejected">已驳回</option>
+                        <option value="cancelled">已取消</option>
+                      </select>
+                      <input
+                        className="toolbar-search"
+                        value={inviteWithdrawQuery}
+                        onChange={(event) => {
+                          setInviteWithdrawQuery(event.target.value);
+                          setInviteWithdrawPage(1);
+                        }}
+                        placeholder="搜索账号、收款名、账号或备注"
+                      />
+                    </div>
+                  </div>
+                  <DataTable
+                    columns={["申请单", "学员", "金额", "方式", "状态", "申请时间", "处理人", "操作"]}
+                    rows={(inviteWithdraws?.items ?? []).map((item) => {
+                      const approveBusy = busyAction === `invite-withdraw-approve-${item.id}`;
+                      const rejectBusy = busyAction === `invite-withdraw-reject-${item.id}`;
+                      const payBusy = busyAction === `invite-withdraw-pay-${item.id}`;
+                      return [
+                        `#${item.id}`,
+                        <div className="mcp-cell-stack">
+                          <strong>{item.learner_display_name || item.learner_username}</strong>
+                          <span className="mcp-table-muted">{item.learner_username}</span>
+                        </div>,
+                        formatPrice(item.amount_cents),
+                        invitePaymentTypeLabel(item.payment_type),
+                        <span className={`pill ${inviteWithdrawStatusClass(item.status)}`}>{inviteWithdrawStatusLabel(item.status)}</span>,
+                        formatDateTime(item.created_at),
+                        item.processed_by_name || "-",
+                        <div className="button-row">
+                          <button
+                            className="secondary-button small-button"
+                            onClick={() => {
+                              void handleLoadInviteWithdrawDetail(item.id);
+                            }}
+                            type="button"
+                          >
+                            查看明细
+                          </button>
+                          {canManageInviteStats && item.status === "pending" ? (
+                            <>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={approveBusy}
+                                onClick={() => {
+                                  void handleProcessInviteWithdraw(item, "approve");
+                                }}
+                                type="button"
+                              >
+                                {approveBusy ? "处理中..." : "审核通过"}
+                              </button>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={rejectBusy}
+                                onClick={() => {
+                                  void handleProcessInviteWithdraw(item, "reject");
+                                }}
+                                type="button"
+                              >
+                                {rejectBusy ? "处理中..." : "驳回"}
+                              </button>
+                            </>
+                          ) : null}
+                          {canManageInviteStats && item.status === "approved" ? (
+                            <>
+                              <button
+                                className="primary-button small-button"
+                                disabled={payBusy}
+                                onClick={() => {
+                                  void handleProcessInviteWithdraw(item, "pay");
+                                }}
+                                type="button"
+                              >
+                                {payBusy ? "处理中..." : "确认打款"}
+                              </button>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={rejectBusy}
+                                onClick={() => {
+                                  void handleProcessInviteWithdraw(item, "reject");
+                                }}
+                                type="button"
+                              >
+                                {rejectBusy ? "处理中..." : "驳回"}
+                              </button>
+                            </>
+                          ) : null}
+                        </div>,
+                      ];
+                    })}
+                    emptyText="当前还没有返佣提现申请。"
+                  />
+                  <PagerControls
+                    disabled={dataLoading}
+                    onChange={setInviteWithdrawPage}
+                    page={inviteWithdraws?.page ?? inviteWithdrawPage}
+                    pageSize={inviteWithdraws?.page_size ?? adminPageSize}
+                    total={inviteWithdraws?.total ?? 0}
+                  />
+                  <div className="content-card" style={{ marginTop: 16 }}>
+                    <div className="section-header">
+                      <div>
+                        <p className="section-eyebrow">申请详情</p>
+                        <h2>收款信息与佣金来源</h2>
+                      </div>
+                    </div>
+                    {inviteWithdrawDetailLoading ? (
+                      <div className="feedback-banner">正在加载这笔提现申请的详情...</div>
+                    ) : inviteWithdrawDetail ? (
+                      <>
+                        <ul className="detail-list">
+                          <li>申请单号：#{inviteWithdrawDetail.withdraw.id}</li>
+                          <li>提现状态：{inviteWithdrawStatusLabel(inviteWithdrawDetail.withdraw.status)}</li>
+                          <li>申请用户：{inviteWithdrawDetail.withdraw.learner_display_name || inviteWithdrawDetail.withdraw.learner_username}</li>
+                          <li>提现金额：{formatPrice(inviteWithdrawDetail.withdraw.amount_cents)}</li>
+                          <li>提现方式：{invitePaymentTypeLabel(inviteWithdrawDetail.withdraw.payment_type)}</li>
+                          <li>收款人：{inviteWithdrawDetail.withdraw.account_name || "-"}</li>
+                          <li>收款账号：{inviteWithdrawDetail.withdraw.account_no || "-"}</li>
+                          <li>收款码：{inviteWithdrawDetail.withdraw.account_qr_code ? <a href={inviteWithdrawDetail.withdraw.account_qr_code} rel="noreferrer" target="_blank">查看二维码</a> : "-"}</li>
+                          <li>管理员备注：{inviteWithdrawDetail.withdraw.admin_note || "-"}</li>
+                          <li>处理人：{inviteWithdrawDetail.withdraw.processed_by_name || "-"}</li>
+                          <li>处理时间：{inviteWithdrawDetail.withdraw.processed_at ? formatDateTime(inviteWithdrawDetail.withdraw.processed_at) : "-"}</li>
+                        </ul>
+                        <DataTable
+                          columns={["好友", "订单号", "充值金额", "佣金金额", "支付时间", "状态"]}
+                          rows={inviteWithdrawDetail.commissions.map((commission) => [
+                            commission.invited_display_name || commission.invited_username || "-",
+                            commission.payment_order_no,
+                            formatPrice(commission.order_amount_cents),
+                            formatPrice(commission.commission_cents),
+                            commission.order_paid_at ? formatDateTime(commission.order_paid_at) : "-",
+                            <span className={`pill ${inviteCommissionStatusClass(commission)}`}>{inviteCommissionStatusLabel(commission)}</span>,
+                          ])}
+                          emptyText="这笔提现申请暂时没有关联的佣金记录。"
+                        />
+                      </>
+                    ) : (
+                      <div className="feedback-banner">点击上方“查看明细”后，这里会展示对应的收款信息和佣金来源。</div>
+                    )}
+                  </div>
                 </article>
               ) : null}
               </div>
@@ -7554,6 +7738,72 @@ function subscriptionStatusLabel(status?: string) {
   }
 }
 
+function inviteCommissionStatusLabel(item: { status?: string; withdraw_request_id?: number }) {
+  if (item.status === "paid") {
+    return "已打款";
+  }
+  if (item.status === "cancelled") {
+    return "已取消";
+  }
+  if (item.withdraw_request_id) {
+    return "提现处理中";
+  }
+  return "待提现";
+}
+
+function inviteCommissionStatusClass(item: { status?: string; withdraw_request_id?: number }) {
+  if (item.status === "paid") {
+    return "pill-success";
+  }
+  if (item.status === "cancelled") {
+    return "pill-danger";
+  }
+  if (item.withdraw_request_id) {
+    return "pill-warning";
+  }
+  return "pill-muted";
+}
+
+function inviteWithdrawStatusLabel(status?: string) {
+  switch (status) {
+    case "approved":
+      return "已审核";
+    case "paid":
+      return "已打款";
+    case "rejected":
+      return "已驳回";
+    case "cancelled":
+      return "已取消";
+    default:
+      return "待审核";
+  }
+}
+
+function inviteWithdrawStatusClass(status?: string) {
+  switch (status) {
+    case "approved":
+      return "pill-warning";
+    case "paid":
+      return "pill-success";
+    case "rejected":
+    case "cancelled":
+      return "pill-danger";
+    default:
+      return "pill-muted";
+  }
+}
+
+function invitePaymentTypeLabel(value?: string) {
+  switch ((value ?? "").trim().toLowerCase()) {
+    case "wechat":
+      return "微信";
+    case "alipay":
+      return "支付宝";
+    default:
+      return value || "-";
+  }
+}
+
 function looksLikeAuthError(message: string) {
   return /(authorization|token|expired|claims|unauthorized)/i.test(message);
 }
@@ -7632,6 +7882,8 @@ function permissionLabel(permission: string) {
       return "管理 MCP 接入";
     case "invite.read":
       return "查看邀请统计";
+    case "invite.write":
+      return "处理邀请返佣";
     default:
       return permission;
   }

@@ -353,6 +353,7 @@ export default function PublicSite() {
     fileName: "",
     title: "",
   });
+  const [knowledgeBaseUploadModalOpen, setKnowledgeBaseUploadModalOpen] = useState(false);
   const [apiConfigs, setAPIConfigs] = useState<PagedAPIConfigs | null>(null);
   const [apiConfigPage, setAPIConfigPage] = useState(1);
   const [apiConfigQuery, setAPIConfigQuery] = useState("");
@@ -1385,11 +1386,8 @@ export default function PublicSite() {
       setCurrentUser(null);
       setAuthNotice("你已退出登录。");
       setCheckoutCustomerRef("");
-      setKnowledgeBaseForm({
-        file: null,
-        fileName: "",
-        title: "",
-      });
+      setKnowledgeBaseUploadModalOpen(false);
+      resetKnowledgeBaseForm();
       void refreshAuthCaptcha(authMode);
     }
   }
@@ -1545,11 +1543,7 @@ export default function PublicSite() {
         subject_key: subjectKey,
         title: knowledgeBaseForm.title.trim(),
       });
-      setKnowledgeBaseForm({
-        file: null,
-        fileName: "",
-        title: "",
-      });
+      closeKnowledgeBaseUploadModal();
       setKnowledgeBasePage(1);
       setProfileReloadKey((current) => current + 1);
       setProfileNotice(`知识库文档《${result.document.title || result.document.source_file_name}》已上传。`);
@@ -1625,6 +1619,23 @@ export default function PublicSite() {
     setKnowledgeBaseDocumentPreview(null);
     setKnowledgeBaseDocumentChunks([]);
     setKnowledgeBaseDocumentPreviewLoading(false);
+  }
+
+  function resetKnowledgeBaseForm() {
+    setKnowledgeBaseForm({
+      file: null,
+      fileName: "",
+      title: "",
+    });
+  }
+
+  function openKnowledgeBaseUploadModal() {
+    setKnowledgeBaseUploadModalOpen(true);
+  }
+
+  function closeKnowledgeBaseUploadModal() {
+    setKnowledgeBaseUploadModalOpen(false);
+    resetKnowledgeBaseForm();
   }
 
   async function handleSaveLearningProgress(wordID: number, level: string, difficulty: string) {
@@ -3475,90 +3486,29 @@ export default function PublicSite() {
                   </div>
                   {currentUser ? (
                     <>
-                      {false ? (
-                        <div className="profile-grid">
-                        <form className="setup-form" onSubmit={handleSubmitKnowledgeBase}>
-                          <label className="form-field">
-                            <span>选择知识库文件</span>
-                            <label className={`upload-picker ${knowledgeBaseForm.file ? "upload-picker-ready" : ""}`}>
-                              <input
-                                accept=".txt,.md,.csv,.xlsx,.docx"
-                                className="upload-picker-input"
-                                onChange={(event) => {
-                                  const file = event.target.files?.[0] ?? null;
-                                  setKnowledgeBaseForm((current) => ({
-                                    ...current,
-                                    file,
-                                    fileName: file?.name ?? "",
-                                    title: current.title || (file?.name ? file.name.replace(/\.[^.]+$/, "") : ""),
-                                  }));
-                                }}
-                                type="file"
-                              />
-                              <div className="upload-picker-main">
-                                <div className="upload-picker-meta">
-                                  <strong>{knowledgeBaseForm.fileName || "点击选择要上传的知识库文件"}</strong>
-                                  <span>
-                                    {knowledgeBaseForm.file
-                                      ? `文件大小 ${formatFileSize(knowledgeBaseForm.file?.size ?? 0)}，上传后仅当前账号和对应 MCP 检索可见`
-                                      : "支持 TXT、Markdown、CSV、Excel、Word(.docx)，上传后会自动切片用于检索"}
-                                  </span>
-                                </div>
-                                <span className="upload-picker-action">{knowledgeBaseForm.file ? "重新选择" : "选择文件"}</span>
-                              </div>
-                            </label>
-                          </label>
-                          <div className="upload-hint-list">
-                            <span className="tag">私有知识库</span>
-                            <span className="tag">支持 TXT / Markdown / Word</span>
-                            <span className="tag">支持 CSV / Excel</span>
-                            <span className="tag">支持 MCP 检索</span>
-                          </div>
-                          <label className="form-field">
-                            <span>文档标题</span>
-                            <input
-                              value={knowledgeBaseForm.title}
-                              onChange={(event) => {
-                                setKnowledgeBaseForm((current) => ({ ...current, title: event.target.value }));
-                              }}
-                              placeholder="例如：我的产品知识库"
-                            />
-                          </label>
-                          <div className="feedback-banner">
-                            当前将上传到 <strong>{selectedSubjectLabel}</strong> 学科下，管理员也能在后台区分公共知识库和你的私有知识库。
-                          </div>
-                          <button className="primary-button" disabled={profileBusyAction === "knowledge-base-upload"} type="submit">
-                            {profileBusyAction === "knowledge-base-upload" ? "上传处理中..." : "上传到我的知识库"}
-                          </button>
-                        </form>
-
-                        <div className="profile-card-body">
-                          <div className="feedback-banner feedback-success">
-                            你的个人知识库上传后，会自动参与开放接口与 MCP 工具的检索，但不会暴露给其他普通用户。
-                          </div>
-                          <ul className="detail-list">
-                            <li>支持上传管理员公共知识库之外的个人资料，适合整理自己的文档、表格和说明。</li>
-                            <li>停用后不会参与检索；删除后文档和切片都会一起移除。</li>
-                            <li>知识库检索结果会返回命中片段和文档来源，方便定位答案来自哪份文档。</li>
-                          </ul>
-                        </div>
-                        </div>
-                      ) : null}
-
                       <div className="section-toolbar">
                         <div>
                           <h2>我的知识库文档</h2>
                           <p className="helper-text">这里只展示当前账号上传的私有知识库文档。</p>
                         </div>
-                        <input
-                          className="toolbar-search"
-                          onChange={(event) => {
-                            setKnowledgeBaseQuery(event.target.value);
-                            setKnowledgeBasePage(1);
-                          }}
-                          placeholder="搜索标题或文件名"
-                          value={knowledgeBaseQuery}
-                        />
+                        <div className="toolbar-controls">
+                          <button className="primary-button" onClick={openKnowledgeBaseUploadModal} type="button">
+                            上传文件
+                          </button>
+                          <input
+                            className="toolbar-search"
+                            onChange={(event) => {
+                              setKnowledgeBaseQuery(event.target.value);
+                              setKnowledgeBasePage(1);
+                            }}
+                            placeholder="搜索标题或文件名"
+                            value={knowledgeBaseQuery}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="feedback-banner">
+                        上传后的文档会自动切片，并可被当前账号可用的 MCP 工具直接检索调用；支持 TXT、Markdown、CSV、Excel、Word(.docx)。
                       </div>
 
                       <div className="table-wrap">
@@ -3626,7 +3576,14 @@ export default function PublicSite() {
                         </table>
                       </div>
                       {(knowledgeBaseDocuments?.items ?? []).length === 0 ? (
-                        <div className="feedback-banner">当前还没有上传个人知识库文件，先上传一份文本、表格或 Word 文件试试。</div>
+                        <div className="feedback-banner">
+                          <div className="button-row">
+                            <span>当前还没有上传个人知识库文件，先上传一份文本、表格或 Word 文件试试。</span>
+                            <button className="secondary-button small-button" onClick={openKnowledgeBaseUploadModal} type="button">
+                              立即上传
+                            </button>
+                          </div>
+                        </div>
                       ) : null}
                       <PagerControls
                         onChange={setKnowledgeBasePage}
@@ -4722,6 +4679,101 @@ export default function PublicSite() {
           </main>
         </div>
       )}
+
+      {knowledgeBaseUploadModalOpen ? (
+        <div className="admin-edit-modal-backdrop" onClick={closeKnowledgeBaseUploadModal} role="presentation">
+          <section
+            aria-labelledby="knowledge-base-upload-modal-title"
+            aria-modal="true"
+            className="admin-edit-modal"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+            role="dialog"
+          >
+            <div className="admin-edit-modal-header">
+              <div>
+                <p className="section-eyebrow">知识库上传</p>
+                <h2 id="knowledge-base-upload-modal-title">上传我的知识库文件</h2>
+                <p className="helper-text">上传后会自动切片，可直接给当前账号可用的 MCP 工具检索调用。</p>
+              </div>
+              <button className="secondary-button small-button" onClick={closeKnowledgeBaseUploadModal} type="button">
+                关闭
+              </button>
+            </div>
+
+            <form className="setup-form admin-edit-modal-form" onSubmit={handleSubmitKnowledgeBase}>
+              <label className="form-field">
+                <span>选择知识库文件</span>
+                <label className={`upload-picker ${knowledgeBaseForm.file ? "upload-picker-ready" : ""}`}>
+                  <input
+                    accept=".txt,.md,.csv,.xlsx,.docx"
+                    className="upload-picker-input"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      setKnowledgeBaseForm((current) => ({
+                        ...current,
+                        file,
+                        fileName: file?.name ?? "",
+                        title: current.title || (file?.name ? file.name.replace(/\.[^.]+$/, "") : ""),
+                      }));
+                    }}
+                    type="file"
+                  />
+                  <div className="upload-picker-main">
+                    <div className="upload-picker-meta">
+                      <strong>{knowledgeBaseForm.fileName || "点击选择要上传的知识库文件"}</strong>
+                      <span>
+                        {knowledgeBaseForm.file
+                          ? `文件大小 ${formatFileSize(knowledgeBaseForm.file?.size ?? 0)}，上传后仅当前账号和对应 MCP 检索可见`
+                          : "支持 TXT、Markdown、CSV、Excel、Word(.docx)，上传后会自动切片用于检索"}
+                      </span>
+                    </div>
+                    <span className="upload-picker-action">{knowledgeBaseForm.file ? "重新选择" : "选择文件"}</span>
+                  </div>
+                </label>
+              </label>
+
+              <div className="upload-hint-list">
+                <span className="tag">私有知识库</span>
+                <span className="tag">支持 TXT / Markdown / Word</span>
+                <span className="tag">支持 CSV / Excel</span>
+                <span className="tag">支持 MCP 检索</span>
+              </div>
+
+              <label className="form-field">
+                <span>文档标题</span>
+                <input
+                  value={knowledgeBaseForm.title}
+                  onChange={(event) => {
+                    setKnowledgeBaseForm((current) => ({ ...current, title: event.target.value }));
+                  }}
+                  placeholder="例如：我的产品知识库"
+                />
+              </label>
+
+              <div className="feedback-banner">
+                当前将上传到 <strong>{selectedSubjectLabel}</strong> 学科下，管理员也能在后台区分公共知识库和你的私有知识库。
+              </div>
+
+              <ul className="detail-list">
+                <li>适合上传自己的说明文档、表格资料、流程文档和问答素材。</li>
+                <li>停用后不会参与检索；删除后文档和切片都会一起移除。</li>
+                <li>检索结果会返回命中片段和文档来源，方便定位答案来自哪份文档。</li>
+              </ul>
+
+              <div className="button-row">
+                <button className="primary-button" disabled={profileBusyAction === "knowledge-base-upload"} type="submit">
+                  {profileBusyAction === "knowledge-base-upload" ? "上传处理中..." : "上传到我的知识库"}
+                </button>
+                <button className="secondary-button" onClick={closeKnowledgeBaseUploadModal} type="button">
+                  取消
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
 
       {knowledgeBaseDocumentPreview ? (
         <div
