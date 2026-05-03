@@ -511,7 +511,7 @@ export default function PublicSite() {
 
   useEffect(() => {
     setMarketPage(1);
-  }, [deferredMarketQuery, marketCategory, subjectKey]);
+  }, [deferredMarketQuery, marketCategory]);
 
   useEffect(() => {
     if (activeView !== "market") {
@@ -527,7 +527,6 @@ export default function PublicSite() {
         pageSize: marketPageSize,
         query: deferredMarketQuery,
         category: marketCategory || undefined,
-        subjectKey,
         token: learnerAccessToken || undefined,
       })
       .then((result) => {
@@ -550,7 +549,7 @@ export default function PublicSite() {
     return () => {
       active = false;
     };
-  }, [activeView, deferredMarketQuery, learnerAccessToken, marketCategory, marketPage, profileReloadKey, subjectKey]);
+  }, [activeView, deferredMarketQuery, learnerAccessToken, marketCategory, marketPage, profileReloadKey]);
 
   useEffect(() => {
     if (!session?.access_token) {
@@ -3528,9 +3527,9 @@ export default function PublicSite() {
               <div className="section-header profile-hero-header">
                 <div>
                   <p className="section-eyebrow">MCP 工具市场</p>
-                  <h1>把当前项目里的 MCP 能力单独展示出来</h1>
+                  <h1>把能直接使用的 AI 工具整理给你</h1>
                   <p className="helper-text">
-                    这里集中查看内置工具、知识库工具、学习工具、米家工具和你自己的 API 工具，同时会标出是否需要登录、是否需要会员、当前能否直接使用。
+                    这里汇总了站内可调用的 MCP 工具。你可以按名称、用途和分类快速查找，也能一眼看出哪些工具需要登录、哪些需要会员、哪些现在就能直接使用。
                   </p>
                 </div>
                 <div className="button-row">
@@ -3538,35 +3537,19 @@ export default function PublicSite() {
                     返回个人中心
                   </a>
                   <a className="primary-button" href="#mcp">
-                    去连接中心
+                    管理我的连接
                   </a>
                 </div>
               </div>
 
               <div className="mcp-page-toolbar">
-                <label className="form-field mcp-page-subject-field">
-                  <span>当前工具学科</span>
-                  <select
-                    value={subjectKey}
-                    onChange={(event) => {
-                      setSubjectKey(event.target.value);
-                      setMarketPage(1);
-                    }}
-                  >
-                    {subjects.map((subject) => (
-                      <option key={subject.key} value={subject.key}>
-                        {subject.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
                 <input
                   className="toolbar-search"
                   onChange={(event) => {
                     setMarketQuery(event.target.value);
                     setMarketPage(1);
                   }}
-                  placeholder="搜索工具名称、描述或分类"
+                  placeholder="搜索工具名称、用途或分类"
                   value={marketQuery}
                 />
                 <select
@@ -3585,11 +3568,11 @@ export default function PublicSite() {
                 </select>
               </div>
 
-              <div className="helper-text">匹配结果 {formatCount(marketResult?.total ?? 0)}，当前页 {formatCount(marketTools.length)}。</div>
+              <div className="helper-text">按名称、用途或分类筛选，看看哪些工具现在就能直接使用。</div>
               <div className="tag-list">
-                <span className="tag">工具总数 {formatCount(marketTools.length)}</span>
-                <span className="tag">当前可见 {formatCount(filteredMarketTools.length)}</span>
-                <span className="tag">{currentUser ? `当前账号：${learnerName}` : "未登录访客"}</span>
+                <span className="tag">匹配结果 {formatCount(marketResult?.total ?? 0)}</span>
+                <span className="tag">本页显示 {formatCount(filteredMarketTools.length)}</span>
+                <span className="tag">{currentUser ? `当前账号：${learnerName}` : "游客浏览"}</span>
               </div>
             </section>
 
@@ -3617,12 +3600,12 @@ export default function PublicSite() {
                   </div>
                   <div className="helper-text">
                     {tool.canUse
-                      ? "当前条件下可以直接被 MCP 调用。"
+                      ? "你现在就可以直接使用这个工具。"
                       : tool.requiresMembership
-                        ? "管理员已配置为会员工具，未满足会员条件时不能调用。"
+                        ? "这是会员工具，开通会员后才可以使用。"
                         : tool.requiresAuth
-                          ? "需要先登录学习账号后才能调用。"
-                          : "当前工具暂不可用。"}
+                          ? "登录后才可以使用这个工具。"
+                          : "这个工具暂时不可用。"}
                   </div>
                 </article>
               ))}

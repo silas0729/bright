@@ -44,39 +44,39 @@ const learningLevelOptions = [
   { value: "beginner", label: "初级" },
   { value: "intermediate", label: "中级" },
   { value: "advanced", label: "高级" },
-  { value: "mastered", label: "已掌握" },
+  { value: "mastered", label: "已掌�? },
 ] as const;
 const learningDifficultyOptions = [
-  { value: "easy", label: "简单" },
+  { value: "easy", label: "简�? },
   { value: "medium", label: "中等" },
   { value: "hard", label: "困难" },
 ] as const;
 
 const rolePermissionGroups = [
   {
-    title: "最高权限",
+    title: "最高权�?,
     helper: "谨慎授权，一般只给负责人",
     options: [
       {
         code: "*",
         label: "全部后台能力",
-        description: "可查看并处理所有后台页面和操作，通常只给站点负责人。",
+        description: "可查看并处理所有后台页面和操作，通常只给站点负责人�?,
       },
     ],
   },
   {
-    title: "团队与角色",
-    helper: "管理后台成员和岗位模板",
+    title: "团队与角�?,
+    helper: "管理后台成员和岗位模�?,
     options: [
       {
         code: "admin.read",
         label: "查看团队账号",
-        description: "可以查看后台账号、岗位模板和团队权限列表。",
+        description: "可以查看后台账号、岗位模板和团队权限列表�?,
       },
       {
         code: "admin.write",
         label: "管理团队账号",
-        description: "可以新增、调整后台账号和岗位权限模板。",
+        description: "可以新增、调整后台账号和岗位权限模板�?,
       },
     ],
   },
@@ -87,99 +87,99 @@ const rolePermissionGroups = [
       {
         code: "catalog.read",
         label: "查看内容整理",
-        description: "可以查看词库内容、内容分组和学习阶段等数据。",
+        description: "可以查看词库内容、内容分组和学习阶段等数据�?,
       },
       {
         code: "catalog.write",
         label: "管理内容整理",
-        description: "可以新增、编辑词条，并批量调整内容分组和会员权限。",
+        description: "可以新增、编辑词条，并批量调整内容分组和会员权限�?,
       },
       {
         code: "subject.read",
         label: "查看学习科目",
-        description: "可以查看科目配置和导入归属信息。",
+        description: "可以查看科目配置和导入归属信息�?,
       },
       {
         code: "subject.write",
         label: "管理学习科目",
-        description: "可以新增、修改科目和对应的展示配置。",
+        description: "可以新增、修改科目和对应的展示配置�?,
       },
       {
         code: "grade.read",
         label: "查看学习阶段",
-        description: "可以查看学习阶段配置和内容归属。",
+        description: "可以查看学习阶段配置和内容归属�?,
       },
       {
         code: "grade.write",
         label: "管理学习阶段",
-        description: "可以新增、修改学习阶段和相关配置。",
+        description: "可以新增、修改学习阶段和相关配置�?,
       },
     ],
   },
   {
-    title: "站点与收费",
+    title: "站点与收�?,
     helper: "管理前台展示、方案与支付",
     options: [
       {
         code: "site.read",
         label: "查看站点展示",
-        description: "可以查看前台文案、SEO 和品牌展示配置。",
+        description: "可以查看前台文案、SEO 和品牌展示配置�?,
       },
       {
         code: "site.write",
         label: "管理站点展示",
-        description: "可以修改首页文案、SEO、图标和品牌展示内容。",
+        description: "可以修改首页文案、SEO、图标和品牌展示内容�?,
       },
       {
         code: "plan.read",
         label: "查看收费方案",
-        description: "可以查看会员方案、价格和支付渠道配置。",
+        description: "可以查看会员方案、价格和支付渠道配置�?,
       },
       {
         code: "plan.write",
         label: "管理收费方案",
-        description: "可以新增、编辑和删除会员方案。",
+        description: "可以新增、编辑和删除会员方案�?,
       },
       {
         code: "payment.read",
         label: "查看支付订单",
-        description: "可以查看订单、支付状态和收款配置。",
+        description: "可以查看订单、支付状态和收款配置�?,
       },
       {
         code: "payment.write",
-        label: "处理支付与会员",
-        description: "可以处理订单、修改会员状态并维护收款配置。",
+        label: "处理支付与会�?,
+        description: "可以处理订单、修改会员状态并维护收款配置�?,
       },
     ],
   },
   {
-    title: "学员与接入",
-    helper: "管理学员账号和外部服务接入",
+    title: "学员与接�?,
+    helper: "管理学员账号和外部服务接�?,
     options: [
       {
         code: "learner.read",
         label: "查看学员账号",
-        description: "可以查看学员资料、会员状态和使用记录。",
+        description: "可以查看学员资料、会员状态和使用记录�?,
       },
       {
         code: "learner.write",
         label: "管理学员账号",
-        description: "可以调整学员资料、账号状态和相关服务信息。",
+        description: "可以调整学员资料、账号状态和相关服务信息�?,
       },
       {
         code: "mcp.read",
         label: "查看 MCP 接入",
-        description: "可以查看 MCP、WSS 和工具接入配置。",
+        description: "可以查看 MCP、WSS 和工具接入配置�?,
       },
       {
         code: "mcp.write",
         label: "管理 MCP 接入",
-        description: "可以修改 MCP、WSS 和工具接入配置。",
+        description: "可以修改 MCP、WSS 和工具接入配置�?,
       },
       {
         code: "invite.read",
-        label: "查看邀请统计",
-        description: "可以查看邀请效果、来源和相关统计数据。",
+        label: "查看邀请统�?,
+        description: "可以查看邀请效果、来源和相关统计数据�?,
       },
     ],
   },
@@ -230,19 +230,19 @@ type ConfirmDialogState = {
 };
 
 const defaultSiteForm: SiteSetting = {
-  site_name: "Brights 英语单词学习站",
+  site_name: "Brights 英语单词学习�?,
   site_icon: "",
-  site_tagline: "先学真正会用到的词，再把词汇量慢慢做厚。",
+  site_tagline: "先学真正会用到的词，再把词汇量慢慢做厚�?,
   hero_title: "高频英语单词，从真实场景开始学",
   hero_description:
-    "围绕校园、日常、旅行、职场等高频场景整理常用英语单词，先学真正会遇到、会使用、会反复出现的词，再逐步扩展到更多学科和更系统的学习内容。",
-  seo_headline: "高频英语单词｜场景词汇｜会员制学习",
-  seo_title: "Brights 英语单词学习站 | 高频英语单词、场景词汇、会员制学习平台",
+    "围绕校园、日常、旅行、职场等高频场景整理常用英语单词，先学真正会遇到、会使用、会反复出现的词，再逐步扩展到更多学科和更系统的学习内容�?,
+  seo_headline: "高频英语单词｜场景词汇｜会员制学�?,
+  seo_title: "Brights 英语单词学习�?| 高频英语单词、场景词汇、会员制学习平台",
   seo_description:
-    "Brights 专注高频英语单词学习，围绕校园、日常、旅行、职场等真实场景整理常用英语词汇，提供中文释义、分类学习、会员内容与多学科扩展能力。",
+    "Brights 专注高频英语单词学习，围绕校园、日常、旅行、职场等真实场景整理常用英语词汇，提供中文释义、分类学习、会员内容与多学科扩展能力�?,
   seo_keywords:
     "英语单词学习,高频英语单词,场景英语词汇,英语学习网站,英语会员学习,英语词汇记忆",
-  footer_text: "Brights 适合以英语高频词汇为主线持续学习，也支持后续扩展更多学科内容。",
+  footer_text: "Brights 适合以英语高频词汇为主线持续学习，也支持后续扩展更多学科内容�?,
   contact_email: "support@brights.local",
 };
 
@@ -273,8 +273,8 @@ const apiParameterTypeOptions: Array<{ value: APIParameterValueType; label: stri
 
 const apiParameterLocationOptions: Array<{ value: APIParameterLocation; label: string }> = [
   { value: "url", label: "URL 参数" },
-  { value: "body", label: "请求体" },
-  { value: "header", label: "请求头" },
+  { value: "body", label: "请求�? },
+  { value: "header", label: "请求�? },
 ];
 
 export default function AdminPortal() {
@@ -587,7 +587,7 @@ export default function AdminPortal() {
   const noticeDialog = authError
     ? {
         tone: "error" as NoticeDialogTone,
-        title: "登录状态需要处理",
+        title: "登录状态需要处�?,
         message: authError,
       }
     : dataError
@@ -599,7 +599,7 @@ export default function AdminPortal() {
       : notice
         ? {
             tone: "success" as NoticeDialogTone,
-            title: "操作已完成",
+            title: "操作已完�?,
             message: notice,
           }
         : null;
@@ -830,7 +830,7 @@ export default function AdminPortal() {
     for (const key of extractTemplateKeysFromText(item.url)) {
       upsertRow(key, {
         location: rowMap.get(key)?.location ?? "url",
-        description: rowMap.get(key)?.description || `URL 参数：${key}`,
+        description: rowMap.get(key)?.description || `URL 参数�?{key}`,
       });
     }
 
@@ -915,7 +915,7 @@ export default function AdminPortal() {
       const trimmedValue = rawValue.trim();
       if (!trimmedValue) {
         if (row.required) {
-          throw new Error(`请填写“${row.name}”测试值。`);
+          throw new Error(`请填写�?{row.name}”测试值。`);
         }
         return;
       }
@@ -923,21 +923,21 @@ export default function AdminPortal() {
         case "number": {
           const numeric = Number(trimmedValue);
           if (!Number.isFinite(numeric)) {
-            throw new Error(`参数“${row.name}”必须填写数字。`);
+            throw new Error(`参数�?{row.name}”必须填写数字。`);
           }
           payload[row.name] = numeric;
           return;
         }
         case "boolean":
           if (trimmedValue !== "true" && trimmedValue !== "false") {
-            throw new Error(`参数“${row.name}”只能选择 true 或 false。`);
+            throw new Error(`参数�?{row.name}”只能选择 true �?false。`);
           }
           payload[row.name] = trimmedValue === "true";
           return;
         case "object": {
           const parsed = safeParseJSONValue(rawValue);
           if (parsed === null && trimmedValue !== "null") {
-            throw new Error(`参数“${row.name}”必须是有效 JSON。`);
+            throw new Error(`参数�?{row.name}”必须是有效 JSON。`);
           }
           payload[row.name] = parsed;
           return;
@@ -1234,7 +1234,7 @@ export default function AdminPortal() {
         }
         if (looksLikeAuthError(err.message)) {
           clearSession();
-          setAuthError("登录已失效，请重新登录。");
+          setAuthError("登录已失效，请重新登录�?);
           return;
         }
         setDataError(err.message);
@@ -1472,7 +1472,7 @@ export default function AdminPortal() {
   async function handleSetupBootstrap(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (setupForm.password !== setupForm.confirmPassword) {
-      setAuthError("两次输入的密码不一致。");
+      setAuthError("两次输入的密码不一致�?);
       return;
     }
 
@@ -1488,7 +1488,7 @@ export default function AdminPortal() {
       persistSession(nextSession);
       setSetupStatus({ initialized: true, admin_count: 1 });
       setSetupForm((current) => ({ ...current, password: "", confirmPassword: "" }));
-      setNotice("超级管理员已创建，后台已自动登录。");
+      setNotice("超级管理员已创建，后台已自动登录�?);
     } catch (err) {
       setAuthError((err as Error).message);
     } finally {
@@ -1499,7 +1499,7 @@ export default function AdminPortal() {
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!loginCaptcha?.captcha_id || !loginCaptchaAnswer.trim()) {
-      setAuthError("请先填写图形验证码。");
+      setAuthError("请先填写图形验证码�?);
       return;
     }
 
@@ -1518,7 +1518,7 @@ export default function AdminPortal() {
       setSetupStatus({ initialized: true, admin_count: Math.max(setupStatus?.admin_count ?? 0, 1) });
       setLoginForm((current) => ({ ...current, password: "" }));
       setLoginCaptchaAnswer("");
-      setNotice("后台登录成功。");
+      setNotice("后台登录成功�?);
     } catch (err) {
       setAuthError((err as Error).message);
       await refreshLoginCaptcha();
@@ -1568,7 +1568,7 @@ export default function AdminPortal() {
       setLoginCaptcha(null);
       setLoginCaptchaAnswer("");
       setBusyAction("");
-      setNotice("已退出登录。");
+      setNotice("已退出登录�?);
       try {
         await loadSetupStatus();
       } catch {
@@ -1583,7 +1583,7 @@ export default function AdminPortal() {
       return;
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setAuthError("两次输入的新密码不一致。");
+      setAuthError("两次输入的新密码不一致�?);
       return;
     }
 
@@ -1597,7 +1597,7 @@ export default function AdminPortal() {
         newPassword: "",
         confirmPassword: "",
       });
-      setNotice("登录密码已更新。");
+      setNotice("登录密码已更新�?);
     } catch (err) {
       setAuthError((err as Error).message);
     } finally {
@@ -1611,7 +1611,7 @@ export default function AdminPortal() {
       return;
     }
     if (!importForm.file) {
-      setDataError("请先选择要导入的文件。");
+      setDataError("请先选择要导入的文件�?);
       return;
     }
 
@@ -1626,7 +1626,7 @@ export default function AdminPortal() {
       });
       setReloadKey((current) => current + 1);
       setNotice(
-        `导入完成：文件 ${result.path} 共处理 ${result.imported_count} 条学习内容，自动匹配或创建 ${result.created_categories} 个内容分组。`,
+        `导入完成：文�?${result.path} 共处�?${result.imported_count} 条学习内容，自动匹配或创�?${result.created_categories} 个内容分组。`,
       );
     } catch (err) {
       setDataError((err as Error).message);
@@ -1641,7 +1641,7 @@ export default function AdminPortal() {
       return;
     }
     if (!knowledgeBaseForm.file) {
-      setDataError("请先选择要导入的知识库文件。");
+      setDataError("请先选择要导入的知识库文件�?);
       return;
     }
 
@@ -1662,7 +1662,7 @@ export default function AdminPortal() {
       }));
       setReloadKey((current) => current + 1);
       setNotice(
-        `知识库导入完成：${result.document.source_file_name}，生成 ${result.chunk_count} 个片段，共 ${result.character_count} 字。`,
+        `知识库导入完成：${result.document.source_file_name}，生�?${result.chunk_count} 个片段，�?${result.character_count} 字。`,
       );
     } catch (err) {
       setDataError((err as Error).message);
@@ -1682,7 +1682,7 @@ export default function AdminPortal() {
     try {
       await api.adminUpdateKnowledgeBaseDocumentStatus(token, id, status);
       setReloadKey((current) => current + 1);
-      setNotice(status === "active" ? "知识库文档已启用。" : "知识库文档已停用。");
+      setNotice(status === "active" ? "知识库文档已启用�? : "知识库文档已停用�?);
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -1698,8 +1698,8 @@ export default function AdminPortal() {
     if (!confirmed) {
       setConfirmDialog({
         tone: "warning",
-        title: "删除知识库文档",
-        message: `确定删除“${title || "未命名文档"}”吗？删除后它的检索片段也会一起移除。`,
+        title: "删除知识库文�?,
+        message: `确定删除�?{title || "未命名文�?}”吗？删除后它的检索片段也会一起移除。`,
         confirmLabel: "确认删除",
         onConfirm: () => {
           void handleDeleteKnowledgeBaseDocument(id, title, true);
@@ -1714,7 +1714,7 @@ export default function AdminPortal() {
     try {
       await api.adminDeleteKnowledgeBaseDocument(token, id);
       setReloadKey((current) => current + 1);
-      setNotice("知识库文档已删除。");
+      setNotice("知识库文档已删除�?);
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -1753,7 +1753,7 @@ export default function AdminPortal() {
     try {
       await api.adminUpdateMCPToolConfig(token, toolName, payload);
       setReloadKey((current) => current + 1);
-      setNotice("MCP 工具配置已更新。");
+      setNotice("MCP 工具配置已更新�?);
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -1874,13 +1874,13 @@ export default function AdminPortal() {
     const seen = new Set<string>();
     for (const row of rows) {
       if (seen.has(row.name)) {
-        throw new Error(`接口参数“${row.name}”重复，请调整后再保存。`);
+        throw new Error(`接口参数�?{row.name}”重复，请调整后再保存。`);
       }
       if (/[=?&]/.test(row.name)) {
-        throw new Error(`参数名“${row.name}”只填写字段名即可，例如 keyword，不要带 =、?、&。`);
+        throw new Error(`参数名�?{row.name}”只填写字段名即可，例如 keyword，不要带 =�?�?。`);
       }
       if (row.location === "header" && !isValidHTTPHeaderFieldName(row.name)) {
-        throw new Error(`请求头参数名“${row.name}”无效，请只填写标准请求头名称。`);
+        throw new Error(`请求头参数名�?{row.name}”无效，请只填写标准请求头名称。`);
       }
       seen.add(row.name);
     }
@@ -1892,14 +1892,14 @@ export default function AdminPortal() {
       try {
         parsedHeaders = JSON.parse(advancedHeaders) as unknown;
       } catch {
-        throw new Error("高级请求头必须是有效的 JSON 对象。");
+        throw new Error("高级请求头必须是有效�?JSON 对象�?);
       }
       if (!isPlainJSONObject(parsedHeaders)) {
-        throw new Error("高级请求头必须是有效的 JSON 对象。");
+        throw new Error("高级请求头必须是有效�?JSON 对象�?);
       }
       for (const key of Object.keys(parsedHeaders)) {
         if (!isValidHTTPHeaderFieldName(key)) {
-          throw new Error(`高级请求头里的字段名“${key}”无效，请不要带 =。`);
+          throw new Error(`高级请求头里的字段名�?{key}”无效，请不要带 =。`);
         }
       }
       Object.assign(headerObject, parsedHeaders);
@@ -1912,12 +1912,12 @@ export default function AdminPortal() {
       try {
         bodyValue = JSON.parse(bodyAdvanced) as unknown;
       } catch {
-        throw new Error("高级请求体必须是有效的 JSON。");
+        throw new Error("高级请求体必须是有效�?JSON�?);
       }
     }
     if (bodyRows.length > 0) {
       if (bodyValue !== null && !isPlainJSONObject(bodyValue)) {
-        throw new Error("当你使用请求体参数时，高级请求体需要填写为 JSON 对象。");
+        throw new Error("当你使用请求体参数时，高级请求体需要填写为 JSON 对象�?);
       }
       const bodyObject: Record<string, unknown> = isPlainJSONObject(bodyValue) ? { ...bodyValue } : {};
       bodyRows.forEach((row) => {
@@ -1939,7 +1939,7 @@ export default function AdminPortal() {
       rows.map((row) => ({
         name: row.name,
         type: row.type,
-        description: row.description || `参数：${row.name}`,
+        description: row.description || `参数�?{row.name}`,
         example: row.exampleValue || undefined,
         required: row.required,
         in: row.location,
@@ -1977,10 +1977,10 @@ export default function AdminPortal() {
       const payload = buildAPIConfigPayloadFromEditor();
       if (apiConfigEditor.id > 0) {
         await api.adminUpdateAPIConfig(token, apiConfigEditor.id, payload);
-        setNotice("API 工具配置已更新。");
+        setNotice("API 工具配置已更新�?);
       } else {
         await api.adminCreateAPIConfig(token, payload);
-        setNotice("API 工具配置已创建。");
+        setNotice("API 工具配置已创建�?);
       }
       setAPIConfigModalOpen(false);
       resetAPIConfigEditor();
@@ -1997,7 +1997,7 @@ export default function AdminPortal() {
     if (!token || !canManageMCPTools) {
       return;
     }
-    const confirmed = window.confirm(`确认删除 API 配置“${item.name || item.resolved_tool_name}”吗？`);
+    const confirmed = window.confirm(`确认删除 API 配置�?{item.name || item.resolved_tool_name}”吗？`);
     if (!confirmed) {
       return;
     }
@@ -2011,7 +2011,7 @@ export default function AdminPortal() {
         resetAPIConfigEditor();
       }
       setReloadKey((current) => current + 1);
-      setNotice("API 工具配置已删除。");
+      setNotice("API 工具配置已删除�?);
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -2037,7 +2037,7 @@ export default function AdminPortal() {
     try {
       const result = await api.adminTestAPIConfig(token, item.id, { arguments: argumentsPayload });
       setAPIConfigTestResult(result);
-      setNotice("API 工具测试已完成。");
+      setNotice("API 工具测试已完成�?);
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -2091,7 +2091,7 @@ export default function AdminPortal() {
         setContentEditModal(null);
       }
       setReloadKey((current) => current + 1);
-      setNotice(subjectForm.id > 0 ? "学习科目已更新。" : "学习科目已创建。");
+      setNotice(subjectForm.id > 0 ? "学习科目已更新�? : "学习科目已创建�?);
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -2130,7 +2130,7 @@ export default function AdminPortal() {
         setContentEditModal(null);
       }
       setReloadKey((current) => current + 1);
-      setNotice(categoryForm.id > 0 ? "内容分组已更新。" : "内容分组已创建。");
+      setNotice(categoryForm.id > 0 ? "内容分组已更新�? : "内容分组已创建�?);
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -2168,7 +2168,7 @@ export default function AdminPortal() {
         setContentEditModal(null);
       }
       setReloadKey((current) => current + 1);
-      setNotice(gradeForm.id > 0 ? "学习阶段已更新。" : "学习阶段已创建。");
+      setNotice(gradeForm.id > 0 ? "学习阶段已更新�? : "学习阶段已创建�?);
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -2212,7 +2212,7 @@ export default function AdminPortal() {
         setContentEditModal(null);
       }
       setReloadKey((current) => current + 1);
-      setNotice(wordEditor.id > 0 ? "单词内容已更新。" : "单词内容已新增。");
+      setNotice(wordEditor.id > 0 ? "单词内容已更新�? : "单词内容已新增�?);
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -2232,11 +2232,11 @@ export default function AdminPortal() {
     }
 
     if (!options.confirmed) {
-      const targetLabel = options.isVIP ? "会员专享内容" : "普通内容";
+      const targetLabel = options.isVIP ? "会员专享内容" : "普通内�?;
       setConfirmDialog({
         tone: options.isVIP ? "warning" : "info",
-        title: "批量调整内容开放范围",
-        message: `确定将“${options.label}”下的全部内容批量调整为${targetLabel}吗？`,
+        title: "批量调整内容开放范�?,
+        message: `确定将�?{options.label}”下的全部内容批量调整为${targetLabel}吗？`,
         confirmLabel: "确认调整",
         onConfirm: () => {
           void handleBatchUpdateWordVIP({ ...options, confirmed: true });
@@ -2245,7 +2245,7 @@ export default function AdminPortal() {
       return;
     }
 
-    const targetLabel = options.isVIP ? "会员专享内容" : "普通内容";
+    const targetLabel = options.isVIP ? "会员专享内容" : "普通内�?;
     setBusyAction("word-batch-vip");
     setDataError("");
     setNotice("");
@@ -2257,7 +2257,7 @@ export default function AdminPortal() {
         is_vip: options.isVIP,
       });
       setReloadKey((current) => current + 1);
-      setNotice(`已将「${options.label}」中的 ${formatCount(result.updated_count)} 条内容调整为${targetLabel}。`);
+      setNotice(`已将�?{options.label}」中�?${formatCount(result.updated_count)} 条内容调整为${targetLabel}。`);
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -2282,7 +2282,7 @@ export default function AdminPortal() {
       normalizedName.endsWith(".webp");
 
     if (!isAllowedImage) {
-      setDataError("站点图标只支持 ico、png、svg、jpg、jpeg、webp 图片。");
+      setDataError("站点图标只支�?ico、png、svg、jpg、jpeg、webp 图片�?);
       return;
     }
 
@@ -2291,7 +2291,7 @@ export default function AdminPortal() {
       const dataUrl = await readFileAsDataUrl(file);
       setSiteForm((current) => ({ ...current, site_icon: dataUrl }));
     } catch {
-      setDataError("站点图标读取失败，请换一个文件再试。");
+      setDataError("站点图标读取失败，请换一个文件再试�?);
     }
   }
 
@@ -2312,7 +2312,7 @@ export default function AdminPortal() {
       const saved = await api.adminSaveSiteSettings(token, siteForm);
       setSiteSettings(saved);
       setSiteForm(saved);
-      setNotice("前台展示文案和搜索优化设置已保存。");
+      setNotice("前台展示文案和搜索优化设置已保存�?);
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -2327,7 +2327,7 @@ export default function AdminPortal() {
     }
     const priceCents = yuanToCents(planEditor.priceYuan);
     if (priceCents <= 0) {
-      setDataError("会员方案售价必须大于 0 元。");
+      setDataError("会员方案售价必须大于 0 元�?);
       return;
     }
 
@@ -2356,10 +2356,10 @@ export default function AdminPortal() {
           payment_channels: payload.payment_channels,
           features: payload.features,
         });
-        setNotice("会员方案已更新。");
+        setNotice("会员方案已更新�?);
       } else {
         await api.adminCreatePlan(token, payload);
-        setNotice("会员方案已创建。");
+        setNotice("会员方案已创建�?);
       }
 
       resetPlanEditor();
@@ -2383,7 +2383,7 @@ export default function AdminPortal() {
       setConfirmDialog({
         tone: "warning",
         title: "删除会员方案",
-        message: "确定删除这个会员方案吗？如果已经关联订单或会员记录，系统会阻止删除。",
+        message: "确定删除这个会员方案吗？如果已经关联订单或会员记录，系统会阻止删除�?,
         confirmLabel: "确认删除",
         onConfirm: () => {
           void handleDeletePlan(id, true);
@@ -2401,7 +2401,7 @@ export default function AdminPortal() {
         resetPlanEditor();
       }
       setReloadKey((current) => current + 1);
-      setNotice("会员方案已删除。");
+      setNotice("会员方案已删除�?);
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -2480,7 +2480,7 @@ async function startEditSubscription(item: SubscriptionStatus) {
         setPanelEditModal(null);
       }
       setReloadKey((current) => current + 1);
-      setNotice("会员服务状态已更新。");
+      setNotice("会员服务状态已更新�?);
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -2519,7 +2519,7 @@ async function startEditSubscription(item: SubscriptionStatus) {
       });
       setWechatPayConfig(config);
       setWechatPayConfigExists(true);
-      setNotice("微信收款配置已保存。");
+      setNotice("微信收款配置已保存�?);
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -2545,7 +2545,7 @@ async function startEditSubscription(item: SubscriptionStatus) {
         setPanelEditModal(null);
       }
       setReloadKey((current) => current + 1);
-      setNotice("学员资料已更新。");
+      setNotice("学员资料已更新�?);
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -2570,7 +2570,7 @@ async function startEditSubscription(item: SubscriptionStatus) {
           status: adminEditor.status,
           is_super: adminEditor.isSuper,
         });
-        setNotice("后台账号已更新。");
+        setNotice("后台账号已更新�?);
       } else {
         await api.adminCreateUser(token, {
           username: adminEditor.username,
@@ -2580,7 +2580,7 @@ async function startEditSubscription(item: SubscriptionStatus) {
           status: adminEditor.status,
           is_super: adminEditor.isSuper,
         });
-        setNotice("后台账号已创建。");
+        setNotice("后台账号已创建�?);
       }
       resetAdminEditor();
       if (panelEditModal === "admin") {
@@ -2614,7 +2614,7 @@ async function startEditSubscription(item: SubscriptionStatus) {
           permissions,
           sort,
         });
-        setNotice("岗位权限模板已更新。");
+        setNotice("岗位权限模板已更新�?);
       } else {
         await api.adminCreateRole(token, {
           key: roleEditor.key,
@@ -2623,7 +2623,7 @@ async function startEditSubscription(item: SubscriptionStatus) {
           permissions,
           sort,
         });
-        setNotice("岗位权限模板已创建。");
+        setNotice("岗位权限模板已创建�?);
       }
       resetRoleEditor();
       if (panelEditModal === "role") {
@@ -2854,8 +2854,7 @@ function startEditPlan(plan: Plan) {
               </div>
               <div className="button-row notice-dialog-actions">
                 <button className="secondary-button" onClick={closeConfirmDialog} type="button">
-                  先取消
-                </button>
+                  先取�?                </button>
                 <button className="primary-button" onClick={handleConfirmDialog} type="button">
                   {confirmDialog.confirmLabel}
                 </button>
@@ -2902,7 +2901,7 @@ function startEditLearner(item: AdminLearnerUser) {
 
   function startEditRole(role: AdminRole) {
     if (role.system) {
-      setDataError("系统内置岗位模板只能查看，不能直接在这里修改。");
+      setDataError("系统内置岗位模板只能查看，不能直接在这里修改�?);
       return;
     }
     setRoleEditor({
@@ -3068,8 +3067,8 @@ function startEditLearner(item: AdminLearnerUser) {
       <div className="admin-auth-shell">
         <section className="auth-card">
           <p className="section-eyebrow">Brights 管理后台</p>
-          <h1>正在确认后台访问状态</h1>
-          <p>正在恢复上一次登录，或读取首次开通所需的信息。</p>
+          <h1>正在确认后台访问状�?/h1>
+          <p>正在恢复上一次登录，或读取首次开通所需的信息�?/p>
         </section>
       </div>
     );
@@ -3082,11 +3081,11 @@ function startEditLearner(item: AdminLearnerUser) {
         <div className="admin-auth-shell">
           <section className="auth-card">
             <p className="section-eyebrow">Brights 管理后台</p>
-            <h1>{needsSetup ? "首次开通后台管理" : "后台登录"}</h1>
+            <h1>{needsSetup ? "首次开通后台管�? : "后台登录"}</h1>
             <p>
               {needsSetup
-                ? "当前还没有后台账号，请先由运营负责人设置第一个超级管理员。首次开通后，后续账号都可以在后台继续新增和管理。"
-                : "使用后台账号登录后，即可统一维护学习内容、站点展示、收费方案、会员服务和学员账号。"}
+                ? "当前还没有后台账号，请先由运营负责人设置第一个超级管理员。首次开通后，后续账号都可以在后台继续新增和管理�?
+                : "使用后台账号登录后，即可统一维护学习内容、站点展示、收费方案、会员服务和学员账号�?}
             </p>
 
             {needsSetup ? (
@@ -3102,13 +3101,13 @@ function startEditLearner(item: AdminLearnerUser) {
                 />
               </label>
               <label className="form-field">
-                <span>负责人姓名</span>
+                <span>负责人姓�?/span>
                 <input
                   value={setupForm.displayName}
                   onChange={(event) => {
                     setSetupForm((current) => ({ ...current, displayName: event.target.value }));
                   }}
-                  placeholder="站点运营负责人"
+                  placeholder="站点运营负责�?
                 />
               </label>
               <label className="form-field">
@@ -3119,7 +3118,7 @@ function startEditLearner(item: AdminLearnerUser) {
                   onChange={(event) => {
                     setSetupForm((current) => ({ ...current, password: event.target.value }));
                   }}
-                  placeholder="至少 8 位"
+                  placeholder="至少 8 �?
                 />
               </label>
               <label className="form-field">
@@ -3130,11 +3129,11 @@ function startEditLearner(item: AdminLearnerUser) {
                   onChange={(event) => {
                     setSetupForm((current) => ({ ...current, confirmPassword: event.target.value }));
                   }}
-                  placeholder="请再输入一次密码"
+                  placeholder="请再输入一次密�?
                 />
               </label>
               <button className="primary-button" disabled={busyAction === "setup"} type="submit">
-                {busyAction === "setup" ? "开通中..." : "创建超级管理员"}
+                {busyAction === "setup" ? "开通中..." : "创建超级管理�?}
               </button>
             </form>
           ) : (
@@ -3157,12 +3156,12 @@ function startEditLearner(item: AdminLearnerUser) {
                   onChange={(event) => {
                     setLoginForm((current) => ({ ...current, password: event.target.value }));
                   }}
-                  placeholder="请输入后台登录密码"
+                  placeholder="请输入后台登录密�?
                 />
               </label>
               <div className="form-grid-two">
                 <label className="form-field">
-                  <span>图形验证码</span>
+                  <span>图形验证�?/span>
                   <input
                     value={loginCaptchaAnswer}
                     onChange={(event) => {
@@ -3172,9 +3171,9 @@ function startEditLearner(item: AdminLearnerUser) {
                   />
                 </label>
                 <div className="form-field">
-                  <span>验证码图片</span>
+                  <span>验证码图�?/span>
                   <div className="button-row">
-                    <img alt="图形验证码" className="captcha-image" src={loginCaptcha?.image_data || ""} />
+                    <img alt="图形验证�? className="captcha-image" src={loginCaptcha?.image_data || ""} />
                     <button
                       className="secondary-button small-button"
                       disabled={loginCaptchaLoading}
@@ -3183,13 +3182,13 @@ function startEditLearner(item: AdminLearnerUser) {
                       }}
                       type="button"
                     >
-                      {loginCaptchaLoading ? "刷新中..." : "换一张"}
+                      {loginCaptchaLoading ? "刷新�?.." : "换一�?}
                     </button>
                   </div>
                 </div>
               </div>
               <button className="primary-button" disabled={busyAction === "login"} type="submit">
-                {busyAction === "login" ? "登录中..." : "进入运营后台"}
+                {busyAction === "login" ? "登录�?.." : "进入运营后台"}
               </button>
               </form>
             )}
@@ -3208,15 +3207,15 @@ function startEditLearner(item: AdminLearnerUser) {
     { key: "payments", label: "收费方案", hidden: !canViewPayments && !canViewPlans },
     { key: "memberships", label: "会员服务", hidden: !canViewPayments },
     { key: "learners", label: "学员账号", hidden: !canViewLearners },
-    { key: "admins", label: "团队与权限" },
+    { key: "admins", label: "团队与权�? },
     { key: "mcp", label: "MCP 工具", hidden: !canViewMCPTools && !canViewInviteStats },
   ];
 
   const importTabItems: Array<WorkspaceTabItem<ImportWorkspaceTab>> = [
     { key: "catalog-upload", label: "词库导入", helper: "CSV / Excel" },
-    { key: "knowledge-base-upload", label: "知识库导入", helper: "TXT / Markdown / 表格" },
-    { key: "knowledge-base-docs", label: "知识库文档", helper: "已上传文档", count: knowledgeBaseDocuments?.total ?? 0 },
-    { key: "subjects", label: "科目管理", helper: "已开通科目", count: subjects.length },
+    { key: "knowledge-base-upload", label: "知识库导�?, helper: "TXT / Markdown / 表格" },
+    { key: "knowledge-base-docs", label: "知识库文�?, helper: "已上传文�?, count: knowledgeBaseDocuments?.total ?? 0 },
+    { key: "subjects", label: "科目管理", helper: "已开通科�?, count: subjects.length },
     { key: "categories", label: "分组管理", helper: "当前分组", count: categories?.total ?? 0 },
     { key: "grades", label: "阶段管理", helper: "学习阶段", count: grades?.total ?? 0 },
   ];
@@ -3224,27 +3223,27 @@ function startEditLearner(item: AdminLearnerUser) {
   const catalogTabItems: Array<WorkspaceTabItem<CatalogWorkspaceTab>> = [
     { key: "word-create", label: "新增词条", helper: "手动录入内容" },
     { key: "words", label: "词库内容", helper: "筛选与批量整理", count: words?.total ?? 0 },
-    { key: "categories", label: "内容分组", helper: "分类与批量处理", count: categories?.total ?? 0 },
-    { key: "grades", label: "学习阶段", helper: "阶段筛选管理", count: grades?.total ?? 0 },
+    { key: "categories", label: "内容分组", helper: "分类与批量处�?, count: categories?.total ?? 0 },
+    { key: "grades", label: "学习阶段", helper: "阶段筛选管�?, count: grades?.total ?? 0 },
   ];
 
   const paymentTabItems: Array<{ key: PaymentWorkspaceTab; label: string; helper: string; count?: number; hidden?: boolean }> = [
-    { key: "plan-setup", label: "方案操作", helper: canManagePlans ? "新增与调整入口" : "查看说明" },
+    { key: "plan-setup", label: "方案操作", helper: canManagePlans ? "新增与调整入�? : "查看说明" },
     { key: "wechat-pay", label: "微信收款", helper: "支付参数配置", hidden: !canViewPayments },
-    { key: "plans", label: "方案列表", helper: "价格与渠道管理", count: plans.length },
-    { key: "orders", label: "支付订单", helper: "订单跟进与详情", count: paymentOrders?.total ?? 0, hidden: !canViewPayments },
+    { key: "plans", label: "方案列表", helper: "价格与渠道管�?, count: plans.length },
+    { key: "orders", label: "支付订单", helper: "订单跟进与详�?, count: paymentOrders?.total ?? 0, hidden: !canViewPayments },
   ];
 
   const adminTabItems: Array<WorkspaceTabItem<AdminWorkspaceTab>> = [
     { key: "security", label: "我的安全", helper: "修改当前登录密码" },
-    { key: "admins", label: "后台账号", helper: canManageAdmins ? "账号与岗位分配" : "查看团队账号", count: adminUsers?.total ?? 0 },
-    { key: "roles", label: "岗位模板", helper: canManageAdmins ? "职责与权限模板" : "查看权限模板", count: roles.length },
+    { key: "admins", label: "后台账号", helper: canManageAdmins ? "账号与岗位分�? : "查看团队账号", count: adminUsers?.total ?? 0 },
+    { key: "roles", label: "岗位模板", helper: canManageAdmins ? "职责与权限模�? : "查看权限模板", count: roles.length },
   ];
 
   const mcpTabItems: Array<(WorkspaceTabItem<MCPWorkspaceTab> & { hidden?: boolean })> = [
     { key: "api-tools", label: "API 工具", helper: "动态接口与测试", hidden: !canViewMCPTools, count: apiConfigs?.total ?? 0 },
     { key: "tool-access", label: "工具权限", helper: "开关与会员门槛", hidden: !canViewMCPTools, count: mcpToolConfigs?.total ?? 0 },
-    { key: "invite-stats", label: "邀请统计", helper: "邀请与付费转化", hidden: !canViewInviteStats, count: inviteStats?.total ?? 0 },
+    { key: "invite-stats", label: "邀请统�?, helper: "邀请与付费转化", hidden: !canViewInviteStats, count: inviteStats?.total ?? 0 },
   ];
 
   const visiblePaymentTabItems = paymentTabItems.filter((item) => !item.hidden);
@@ -3281,11 +3280,10 @@ function startEditLearner(item: AdminLearnerUser) {
         </div>
         <div className="button-row">
           <button className="secondary-button" disabled={busyAction === "refresh"} onClick={handleRefreshSession} type="button">
-            {busyAction === "refresh" ? "处理中..." : "延长登录有效期"}
+            {busyAction === "refresh" ? "处理�?.." : "延长登录有效�?}
           </button>
           <button className="secondary-button" disabled={busyAction === "logout"} onClick={handleLogout} type="button">
-            退出登录
-          </button>
+            退出登�?          </button>
         </div>
       </header>
 
@@ -3310,7 +3308,7 @@ function startEditLearner(item: AdminLearnerUser) {
           </div>
 
           <div className="admin-sidebar-section">
-            <h3>正在管理的科目</h3>
+            <h3>正在管理的科�?/h3>
             <select
               value={subjectFilter}
               onChange={(event) => {
@@ -3331,7 +3329,7 @@ function startEditLearner(item: AdminLearnerUser) {
 
           <div className="admin-sidebar-section">
             <h3>本页提醒</h3>
-            <p>上传 CSV 后，系统会根据文件中的分类字段自动适配内容分组。后续新增其他学科时，也可以继续沿用同一套运营流程。</p>
+            <p>上传 CSV 后，系统会根据文件中的分类字段自动适配内容分组。后续新增其他学科时，也可以继续沿用同一套运营流程�?/p>
           </div>
         </aside>
 
@@ -3348,9 +3346,9 @@ function startEditLearner(item: AdminLearnerUser) {
               </div>
 
               <div className="summary-grid">
-                <SummaryCard label="已开通科目" value={String(stats?.subject_count ?? subjects.length)} help="可继续扩展更多学习方向" />
-                <SummaryCard label="内容总量" value={formatCount(stats?.word_count ?? 0)} help="当前已经上架的学习内容" />
-                <SummaryCard label="收款订单" value={formatCount(paymentOrders?.total ?? 0)} help="已记录的付款与下单信息" />
+                <SummaryCard label="已开通科�? value={String(stats?.subject_count ?? subjects.length)} help="可继续扩展更多学习方�? />
+                <SummaryCard label="内容总量" value={formatCount(stats?.word_count ?? 0)} help="当前已经上架的学习内�? />
+                <SummaryCard label="收款订单" value={formatCount(paymentOrders?.total ?? 0)} help="已记录的付款与下单信�? />
                 <SummaryCard label="学员人数" value={formatCount(learners?.total ?? 0)} help="已注册的学习账号总数" />
               </div>
 
@@ -3358,17 +3356,17 @@ function startEditLearner(item: AdminLearnerUser) {
                 <article className="content-card">
                   <h2>当前后台可以处理</h2>
                   <ul className="detail-list">
-                    <li>首次运行时由运营负责人自行创建超级管理员，不需要提前把账号密码写死在配置文件里。</li>
-                    <li>导入 CSV 后自动匹配内容分组，适合持续补充英语高频词和后续其他学科资料。</li>
-                    <li>后台可以统一维护首页展示、搜索优化、会员方案、微信收款、订单和会员状态。</li>
+                    <li>首次运行时由运营负责人自行创建超级管理员，不需要提前把账号密码写死在配置文件里�?/li>
+                    <li>导入 CSV 后自动匹配内容分组，适合持续补充英语高频词和后续其他学科资料�?/li>
+                    <li>后台可以统一维护首页展示、搜索优化、会员方案、微信收款、订单和会员状态�?/li>
                   </ul>
                 </article>
                 <article className="content-card">
                   <h2>推荐操作顺序</h2>
                   <ol className="detail-list ordered-list">
-                    <li>先上传英语词库 CSV，确认内容分组是否符合你的教学结构。</li>
-                    <li>再到站点展示页完善站名、首页文案和默认搜索优化内容。</li>
-                    <li>最后去收费方案页创建会员方案，并完整测试一次下单到会员生效的流程。</li>
+                    <li>先上传英语词�?CSV，确认内容分组是否符合你的教学结构�?/li>
+                    <li>再到站点展示页完善站名、首页文案和默认搜索优化内容�?/li>
+                    <li>最后去收费方案页创建会员方案，并完整测试一次下单到会员生效的流程�?/li>
                   </ol>
                 </article>
               </div>
@@ -3397,7 +3395,7 @@ function startEditLearner(item: AdminLearnerUser) {
                     <div className="section-toolbar">
                       <div>
                         <h2>上传学习内容文件</h2>
-                        <p className="helper-text">导入词库时会自动识别分类并归入当前科目，适合批量上架学习内容。</p>
+                        <p className="helper-text">导入词库时会自动识别分类并归入当前科目，适合批量上架学习内容�?/p>
                       </div>
                     </div>
                     <form className="setup-form" onSubmit={handleImportLocal}>
@@ -3436,7 +3434,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         <span className="tag">自动识别内容分组</span>
                       </div>
                       <label className="form-field">
-                        <span>导入到哪个科目</span>
+                        <span>导入到哪个科�?/span>
                         <select
                           value={importForm.subjectKey}
                           onChange={(event) => {
@@ -3458,10 +3456,10 @@ function startEditLearner(item: AdminLearnerUser) {
                           }}
                           type="checkbox"
                         />
-                        <span>导入前先清空当前科目下的旧内容</span>
+                        <span>导入前先清空当前科目下的旧内�?/span>
                       </label>
                       <button className="primary-button" disabled={busyAction === "import"} type="submit">
-                        {busyAction === "import" ? "导入中..." : "开始导入"}
+                        {busyAction === "import" ? "导入�?.." : "开始导�?}
                       </button>
                     </form>
                   </article>
@@ -3471,13 +3469,13 @@ function startEditLearner(item: AdminLearnerUser) {
                   <article className="content-card import-panel-card">
                     <div className="section-toolbar">
                       <div>
-                        <h2>上传知识库文件</h2>
-                        <p className="helper-text">上传后会自动切片，便于后台搜索、开放接口和 MCP 工具统一检索。</p>
+                        <h2>上传知识库文�?/h2>
+                        <p className="helper-text">上传后会自动切片，便于后台搜索、开放接口和 MCP 工具统一检索�?/p>
                       </div>
                     </div>
                     <form className="setup-form" onSubmit={handleImportKnowledgeBase}>
                       <label className="form-field">
-                        <span>选择知识库文件</span>
+                        <span>选择知识库文�?/span>
                         <label className={`upload-picker ${knowledgeBaseForm.file ? "upload-picker-ready" : ""}`}>
                           <input
                             accept=".txt,.md,.csv,.xlsx"
@@ -3495,11 +3493,11 @@ function startEditLearner(item: AdminLearnerUser) {
                           />
                           <div className="upload-picker-main">
                             <div className="upload-picker-meta">
-                              <strong>{knowledgeBaseForm.fileName || "点击选择要导入的知识库文件"}</strong>
+                              <strong>{knowledgeBaseForm.fileName || "点击选择要导入的知识库文�?}</strong>
                               <span>
                                 {knowledgeBaseForm.file
                                   ? `文件大小 ${formatFileSize(knowledgeBaseForm.file.size)}，上传后会自动切分为可检索片段`
-                                  : "支持 TXT、Markdown、CSV、Excel，上传后可通过开放接口和 MCP 工具检索"}
+                                  : "支持 TXT、Markdown、CSV、Excel，上传后可通过开放接口和 MCP 工具检�?}
                               </span>
                             </div>
                             <span className="upload-picker-action">{knowledgeBaseForm.file ? "重新选择" : "选择文件"}</span>
@@ -3510,10 +3508,10 @@ function startEditLearner(item: AdminLearnerUser) {
                         <span className="tag">支持 TXT</span>
                         <span className="tag">支持 Markdown</span>
                         <span className="tag">支持 CSV / Excel</span>
-                        <span className="tag">自动切片检索</span>
+                        <span className="tag">自动切片检�?/span>
                       </div>
                       <label className="form-field">
-                        <span>知识库标题</span>
+                        <span>知识库标�?/span>
                         <input
                           value={knowledgeBaseForm.title}
                           onChange={(event) => {
@@ -3523,7 +3521,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         />
                       </label>
                       <label className="form-field">
-                        <span>归属到哪个科目</span>
+                        <span>归属到哪个科�?/span>
                         <select
                           value={knowledgeBaseForm.subjectKey}
                           onChange={(event) => {
@@ -3538,7 +3536,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         </select>
                       </label>
                       <button className="primary-button" disabled={busyAction === "knowledge-base-import"} type="submit">
-                        {busyAction === "knowledge-base-import" ? "上传处理中..." : "上传到知识库"}
+                        {busyAction === "knowledge-base-import" ? "上传处理�?.." : "上传到知识库"}
                       </button>
                     </form>
                   </article>
@@ -3549,8 +3547,8 @@ function startEditLearner(item: AdminLearnerUser) {
                     <div className="table-section import-panel-table">
                       <div className="section-toolbar">
                         <div>
-                          <h2>知识库文档</h2>
-                          <p className="helper-text">这里集中查看所有已上传知识库文档，不用在导入表单和列表之间反复滚动。</p>
+                          <h2>知识库文�?/h2>
+                          <p className="helper-text">这里集中查看所有已上传知识库文档，不用在导入表单和列表之间反复滚动�?/p>
                         </div>
                         <input
                           className="toolbar-search"
@@ -3563,7 +3561,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         />
                       </div>
                       <DataTable
-                        columns={["标题", "文件名", "类型", "片段数", "字数", "更新时间"]}
+                        columns={["标题", "文件�?, "类型", "片段�?, "字数", "更新时间"]}
                         rows={(knowledgeBaseDocuments?.items ?? []).map((item) => [
                           item.title,
                           item.source_file_name,
@@ -3572,7 +3570,7 @@ function startEditLearner(item: AdminLearnerUser) {
                           formatCount(item.character_count),
                           formatDateTime(item.updated_at),
                         ])}
-                        emptyText="当前还没有知识库文档，先上传一份文本或表格文件试试。"
+                        emptyText="当前还没有知识库文档，先上传一份文本或表格文件试试�?
                       />
                       {(knowledgeBaseDocuments?.items ?? []).length > 0 ? (
                         <div className="table-wrap">
@@ -3580,7 +3578,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             <thead>
                               <tr>
                                 <th>归属</th>
-                                <th>状态</th>
+                                <th>状�?/th>
                                 <th>操作</th>
                               </tr>
                             </thead>
@@ -3594,11 +3592,11 @@ function startEditLearner(item: AdminLearnerUser) {
                                     <td>
                                       {item.visibility === "private"
                                         ? `学员私有${item.owner_username ? ` · ${item.owner_username}` : ""}`
-                                        : "公共知识库"}
+                                        : "公共知识�?}
                                     </td>
                                     <td>
                                       <span className={item.status === "active" ? "pill pill-success" : "pill pill-muted"}>
-                                        {item.status === "active" ? "启用中" : "已停用"}
+                                        {item.status === "active" ? "启用�? : "已停�?}
                                       </span>
                                     </td>
                                     <td>
@@ -3611,7 +3609,7 @@ function startEditLearner(item: AdminLearnerUser) {
                                           }}
                                           type="button"
                                         >
-                                          {viewActionBusy ? "加载中..." : "查看内容"}
+                                          {viewActionBusy ? "加载�?.." : "查看内容"}
                                         </button>
                                         <button
                                           className="secondary-button small-button"
@@ -3624,7 +3622,7 @@ function startEditLearner(item: AdminLearnerUser) {
                                           }}
                                           type="button"
                                         >
-                                          {statusActionBusy ? "处理中..." : item.status === "active" ? "停用" : "启用"}
+                                          {statusActionBusy ? "处理�?.." : item.status === "active" ? "停用" : "启用"}
                                         </button>
                                         <button
                                           className="secondary-button small-button"
@@ -3634,7 +3632,7 @@ function startEditLearner(item: AdminLearnerUser) {
                                           }}
                                           type="button"
                                         >
-                                          {deleteActionBusy ? "删除中..." : "删除"}
+                                          {deleteActionBusy ? "删除�?.." : "删除"}
                                         </button>
                                       </div>
                                     </td>
@@ -3662,7 +3660,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       <div className="section-toolbar">
                         <div>
                           <h2>新增学习科目</h2>
-                          <p className="helper-text">用于管理前台学科入口和导入归属科目。</p>
+                          <p className="helper-text">用于管理前台学科入口和导入归属科目�?/p>
                         </div>
                       </div>
                       <form className="setup-form" onSubmit={handleSaveSubject}>
@@ -3698,7 +3696,7 @@ function startEditLearner(item: AdminLearnerUser) {
                           />
                         </label>
                         <label className="form-field">
-                          <span>科目简介</span>
+                          <span>科目简�?/span>
                           <textarea
                             rows={3}
                             value={subjectForm.description}
@@ -3719,7 +3717,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         </label>
                         <div className="button-row">
                           <button className="primary-button" disabled={busyAction === "subject"} type="submit">
-                            {busyAction === "subject" ? "保存中..." : "新增科目"}
+                            {busyAction === "subject" ? "保存�?.." : "新增科目"}
                           </button>
                           <button className="secondary-button" onClick={resetSubjectEditor} type="button">
                             清空表单
@@ -3730,7 +3728,7 @@ function startEditLearner(item: AdminLearnerUser) {
 
                     <div className="table-section import-panel-table">
                       <div className="section-toolbar">
-                        <h2>已开通科目</h2>
+                        <h2>已开通科�?/h2>
                       </div>
                       <DataTable
                         columns={["科目名称", "科目编码", "显示顺序", "首页优先", "科目说明", "操作"]}
@@ -3738,13 +3736,13 @@ function startEditLearner(item: AdminLearnerUser) {
                           subject.name,
                           subject.key,
                           subject.sort,
-                          subject.featured ? "是" : "否",
+                          subject.featured ? "�? : "�?,
                           subject.description || "-",
                           <button className="secondary-button small-button" onClick={() => startEditSubject(subject)} type="button">
                             编辑
                           </button>,
                         ])}
-                        emptyText="当前还没有开通任何学习科目。"
+                        emptyText="当前还没有开通任何学习科目�?
                       />
                     </div>
                   </div>
@@ -3756,7 +3754,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       <div className="section-toolbar">
                         <div>
                           <h2>新增内容分组</h2>
-                          <p className="helper-text">内容分组会影响词库展示和批量导入后的分类归属。</p>
+                          <p className="helper-text">内容分组会影响词库展示和批量导入后的分类归属�?/p>
                         </div>
                       </div>
                       <form className="setup-form" onSubmit={handleSaveCategory}>
@@ -3818,7 +3816,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             />
                           </label>
                           <label className="form-field">
-                            <span>当前状态</span>
+                            <span>当前状�?/span>
                             <select
                               value={categoryForm.enabled ? "enabled" : "disabled"}
                               onChange={(event) => {
@@ -3845,7 +3843,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         </label>
                         <div className="button-row">
                           <button className="primary-button" disabled={busyAction === "category"} type="submit">
-                            {busyAction === "category" ? "保存中..." : "新增分组"}
+                            {busyAction === "category" ? "保存�?.." : "新增分组"}
                           </button>
                           <button className="secondary-button" onClick={resetCategoryEditor} type="button">
                             清空表单
@@ -3868,7 +3866,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         />
                       </div>
                       <DataTable
-                        columns={["名称", "分组编码", "所属科目", "分组类型", "状态", "操作"]}
+                        columns={["名称", "分组编码", "所属科�?, "分组类型", "状�?, "操作"]}
                         rows={(categories?.items ?? []).map((item) => [
                           item.name,
                           item.key,
@@ -3884,7 +3882,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             </button>
                           </div>,
                         ])}
-                        emptyText="当前还没有符合条件的内容分组。"
+                        emptyText="当前还没有符合条件的内容分组�?
                       />
                       <PagerControls
                         page={categories?.page ?? 1}
@@ -3902,7 +3900,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       <div className="section-toolbar">
                         <div>
                           <h2>新增学习阶段</h2>
-                          <p className="helper-text">学习阶段用于组织词库的适用范围和后台筛选维度。</p>
+                          <p className="helper-text">学习阶段用于组织词库的适用范围和后台筛选维度�?/p>
                         </div>
                       </div>
                       <form className="setup-form" onSubmit={handleSaveGrade}>
@@ -3949,7 +3947,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             />
                           </label>
                           <label className="form-field">
-                            <span>当前状态</span>
+                            <span>当前状�?/span>
                             <select
                               value={gradeForm.enabled ? "enabled" : "disabled"}
                               onChange={(event) => {
@@ -3976,7 +3974,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         </label>
                         <div className="button-row">
                           <button className="primary-button" disabled={busyAction === "grade"} type="submit">
-                            {busyAction === "grade" ? "保存中..." : "新增阶段"}
+                            {busyAction === "grade" ? "保存�?.." : "新增阶段"}
                           </button>
                           <button className="secondary-button" onClick={resetGradeEditor} type="button">
                             清空表单
@@ -4004,12 +4002,12 @@ function startEditLearner(item: AdminLearnerUser) {
                           item.name,
                           item.key,
                           item.stage || "-",
-                          item.enabled ? "是" : "否",
+                          item.enabled ? "�? : "�?,
                           <button className="secondary-button small-button" onClick={() => startEditGrade(item)} type="button">
                             编辑
                           </button>,
                         ])}
-                        emptyText="当前还没有符合条件的学习阶段。"
+                        emptyText="当前还没有符合条件的学习阶段�?
                       />
                       <PagerControls
                         page={grades?.page ?? 1}
@@ -4047,13 +4045,13 @@ function startEditLearner(item: AdminLearnerUser) {
                       <div className="section-toolbar">
                         <div>
                           <h2>手动新增单词内容</h2>
-                          <p className="helper-text">适合运营补录、修正导入结果，或者直接新增少量词条。</p>
+                          <p className="helper-text">适合运营补录、修正导入结果，或者直接新增少量词条�?/p>
                         </div>
                       </div>
                       <form className="setup-form" onSubmit={handleSaveWord}>
                         <div className="form-grid-two">
                           <label className="form-field">
-                            <span>所属科目</span>
+                            <span>所属科�?/span>
                             <select
                               value={wordEditor.subjectKey}
                               onChange={(event) => {
@@ -4075,7 +4073,7 @@ function startEditLearner(item: AdminLearnerUser) {
                               onChange={(event) => {
                                 setWordEditor((current) => ({ ...current, legacyId: event.target.value }));
                               }}
-                              placeholder="可留空"
+                              placeholder="可留�?
                             />
                           </label>
                         </div>
@@ -4097,7 +4095,7 @@ function startEditLearner(item: AdminLearnerUser) {
                               onChange={(event) => {
                                 setWordEditor((current) => ({ ...current, translation: event.target.value }));
                               }}
-                              placeholder="登机牌"
+                              placeholder="登机�?
                             />
                           </label>
                         </div>
@@ -4117,7 +4115,7 @@ function startEditLearner(item: AdminLearnerUser) {
                                 <option key={category.id} value={category.name} />
                               ))}
                             </datalist>
-                            <p className="helper-text">可以直接选择已有分类，也可以输入新的分类名称，保存后会自动归类。</p>
+                            <p className="helper-text">可以直接选择已有分类，也可以输入新的分类名称，保存后会自动归类�?/p>
                           </label>
                           <label className="form-field">
                             <span>学习阶段</span>
@@ -4166,7 +4164,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             onChange={(event) => {
                               setWordEditor((current) => ({ ...current, explanation: event.target.value }));
                             }}
-                            placeholder="这里可以记录例句、适用场景或运营备注。"
+                            placeholder="这里可以记录例句、适用场景或运营备注�?
                           />
                         </label>
                         <div className="form-grid-two">
@@ -4184,7 +4182,7 @@ function startEditLearner(item: AdminLearnerUser) {
                                 </option>
                               ))}
                             </select>
-                            <p className="helper-text">学员第一次加入学习时，会默认带入这个掌握等级。</p>
+                            <p className="helper-text">学员第一次加入学习时，会默认带入这个掌握等级�?/p>
                           </label>
                           <label className="form-field">
                             <span>默认学习难度</span>
@@ -4200,7 +4198,7 @@ function startEditLearner(item: AdminLearnerUser) {
                                 </option>
                               ))}
                             </select>
-                            <p className="helper-text">学员第一次复习这个单词时，会默认使用这里的难度。</p>
+                            <p className="helper-text">学员第一次复习这个单词时，会默认使用这里的难度�?/p>
                           </label>
                         </div>
                         <label className="checkbox-field">
@@ -4215,7 +4213,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         </label>
                         <div className="button-row">
                           <button className="primary-button" disabled={busyAction === "word"} type="submit">
-                            {busyAction === "word" ? "保存中..." : "新增单词"}
+                            {busyAction === "word" ? "保存�?.." : "新增单词"}
                           </button>
                           <button className="secondary-button" onClick={resetWordEditor} type="button">
                             清空表单
@@ -4232,7 +4230,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       <div className="section-toolbar">
                         <div>
                           <h2>词库内容列表</h2>
-                          <p className="helper-text">默认聚焦表格管理，便于筛选、检索和批量调整内容权限。</p>
+                          <p className="helper-text">默认聚焦表格管理，便于筛选、检索和批量调整内容权限�?/p>
                         </div>
                         <div className="toolbar-controls">
                           <select
@@ -4243,7 +4241,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             }}
                           >
                             <option value="">全部分类</option>
-                            <option value={unclassifiedCategoryValue}>未分类</option>
+                            <option value={unclassifiedCategoryValue}>未分�?/option>
                             {wordFilterCategories.map((category) => (
                               <option key={category.id} value={category.name}>
                                 {category.name}
@@ -4265,10 +4263,8 @@ function startEditLearner(item: AdminLearnerUser) {
                         <div className="feedback-banner">
                           <div className="button-row">
                             <span>
-                              当前正在查看分类「
-                              {wordClassificationFilter === unclassifiedCategoryValue ? "未分类" : wordClassificationFilter}
-                              」的内容。
-                            </span>
+                              当前正在查看分类�?                              {wordClassificationFilter === unclassifiedCategoryValue ? "未分�? : wordClassificationFilter}
+                              」的内容�?                            </span>
                             <button
                               className="secondary-button small-button"
                               disabled={busyAction === "word-batch-vip"}
@@ -4279,7 +4275,7 @@ function startEditLearner(item: AdminLearnerUser) {
                                       ? undefined
                                       : wordFilterCategories.find((item) => item.name === wordClassificationFilter)?.id,
                                   classification: wordClassificationFilter,
-                                  label: wordClassificationFilter === unclassifiedCategoryValue ? "未分类" : wordClassificationFilter,
+                                  label: wordClassificationFilter === unclassifiedCategoryValue ? "未分�? : wordClassificationFilter,
                                   isVIP: true,
                                 })
                               }
@@ -4297,14 +4293,13 @@ function startEditLearner(item: AdminLearnerUser) {
                                       ? undefined
                                       : wordFilterCategories.find((item) => item.name === wordClassificationFilter)?.id,
                                   classification: wordClassificationFilter,
-                                  label: wordClassificationFilter === unclassifiedCategoryValue ? "未分类" : wordClassificationFilter,
+                                  label: wordClassificationFilter === unclassifiedCategoryValue ? "未分�? : wordClassificationFilter,
                                   isVIP: false,
                                 })
                               }
                               type="button"
                             >
-                              整个分类设为普通内容
-                            </button>
+                              整个分类设为普通内�?                            </button>
                           </div>
                         </div>
                       ) : null}
@@ -4313,15 +4308,15 @@ function startEditLearner(item: AdminLearnerUser) {
                         rows={(words?.items ?? []).map((item) => [
                           item.term,
                           item.translation || "-",
-                          item.category_id ? item.classification : "未分类",
-                          item.is_vip ? "会员专享" : "普通内容",
+                          item.category_id ? item.classification : "未分�?,
+                          item.is_vip ? "会员专享" : "普通内�?,
                           item.source || "-",
                           item.phonetics || "-",
                           <button className="secondary-button small-button" onClick={() => startEditWord(item)} type="button">
                             编辑
                           </button>,
                         ])}
-                        emptyText="当前还没有符合条件的词库内容。"
+                        emptyText="当前还没有符合条件的词库内容�?
                       />
                       <PagerControls
                         page={words?.page ?? 1}
@@ -4339,7 +4334,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       <div className="section-toolbar">
                         <div>
                           <h2>内容分组列表</h2>
-                          <p className="helper-text">这里集中做分组筛选、编辑和按分组查看词库内容。</p>
+                          <p className="helper-text">这里集中做分组筛选、编辑和按分组查看词库内容�?/p>
                         </div>
                         <input
                           className="toolbar-search"
@@ -4352,7 +4347,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         />
                       </div>
                       <DataTable
-                        columns={["名称", "分组编码", "所属科目", "分组类型", "状态", "操作"]}
+                        columns={["名称", "分组编码", "所属科�?, "分组类型", "状�?, "操作"]}
                         rows={(categories?.items ?? []).map((item) => [
                           item.name,
                           item.key,
@@ -4394,11 +4389,10 @@ function startEditLearner(item: AdminLearnerUser) {
                               }
                               type="button"
                             >
-                              设为普通
-                            </button>
+                              设为普�?                            </button>
                           </div>,
                         ])}
-                        emptyText="当前还没有符合条件的内容分组。"
+                        emptyText="当前还没有符合条件的内容分组�?
                       />
                       <PagerControls
                         page={categories?.page ?? 1}
@@ -4416,7 +4410,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       <div className="section-toolbar">
                         <div>
                           <h2>学习阶段列表</h2>
-                          <p className="helper-text">集中维护阶段维度，便于词库筛选和内容标注。</p>
+                          <p className="helper-text">集中维护阶段维度，便于词库筛选和内容标注�?/p>
                         </div>
                         <input
                           className="toolbar-search"
@@ -4434,12 +4428,12 @@ function startEditLearner(item: AdminLearnerUser) {
                           item.name,
                           item.key,
                           item.stage || "-",
-                          item.enabled ? "是" : "否",
+                          item.enabled ? "�? : "�?,
                           <button className="secondary-button small-button" onClick={() => startEditGrade(item)} type="button">
                             编辑
                           </button>,
                         ])}
-                        emptyText="当前还没有符合条件的学习阶段。"
+                        emptyText="当前还没有符合条件的学习阶段�?
                       />
                       <PagerControls
                         page={grades?.page ?? 1}
@@ -4483,8 +4477,8 @@ function startEditLearner(item: AdminLearnerUser) {
                           />
                           <div className="upload-picker-main">
                             <div className="upload-picker-meta">
-                              <strong>{siteForm.site_icon ? "已上传网站图标" : "上传网站图标"}</strong>
-                              <span>建议使用正方形 ico、png 或 svg，小图标会同时用于浏览器标签页和站点品牌标识。</span>
+                              <strong>{siteForm.site_icon ? "已上传网站图�? : "上传网站图标"}</strong>
+                              <span>建议使用正方�?ico、png �?svg，小图标会同时用于浏览器标签页和站点品牌标识�?/span>
                             </div>
                             <span className="upload-picker-action">{siteForm.site_icon ? "重新上传" : "选择图标"}</span>
                           </div>
@@ -4499,7 +4493,7 @@ function startEditLearner(item: AdminLearnerUser) {
                           </div>
                           <div className="site-icon-preview-meta">
                             <strong>{siteForm.site_icon ? "当前图标预览" : "暂未上传图标"}</strong>
-                            <span>{siteForm.site_icon ? "保存后会同步到前台页面和浏览器标签页。" : "上传后可以让站点在浏览器标签页里更容易识别。"}</span>
+                            <span>{siteForm.site_icon ? "保存后会同步到前台页面和浏览器标签页�? : "上传后可以让站点在浏览器标签页里更容易识别�?}</span>
                           </div>
                           {canManageSiteSettings && siteForm.site_icon ? (
                             <button className="secondary-button small-button" onClick={handleClearSiteIcon} type="button">
@@ -4520,7 +4514,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       />
                     </label>
                     <label className="form-field">
-                      <span>站点副标题</span>
+                      <span>站点副标�?/span>
                       <input
                         disabled={!canManageSiteSettings}
                         value={siteForm.site_tagline}
@@ -4530,7 +4524,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       />
                     </label>
                     <label className="form-field">
-                      <span>首页主标题</span>
+                      <span>首页主标�?/span>
                       <input
                         disabled={!canManageSiteSettings}
                         value={siteForm.hero_title}
@@ -4573,10 +4567,10 @@ function startEditLearner(item: AdminLearnerUser) {
                     </label>
                     {canManageSiteSettings ? (
                       <button className="primary-button" disabled={busyAction === "site-settings"} type="submit">
-                        {busyAction === "site-settings" ? "保存中..." : "保存前台展示"}
+                        {busyAction === "site-settings" ? "保存�?.." : "保存前台展示"}
                       </button>
                     ) : (
-                      <p className="helper-text">当前账号只能查看前台展示信息，暂时不能修改。</p>
+                      <p className="helper-text">当前账号只能查看前台展示信息，暂时不能修改�?/p>
                     )}
                   </form>
                 </article>
@@ -4616,7 +4610,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       />
                     </label>
                     <label className="form-field">
-                      <span>SEO 关键词</span>
+                      <span>SEO 关键�?/span>
                       <textarea
                         disabled={!canManageSiteSettings}
                         rows={4}
@@ -4627,11 +4621,10 @@ function startEditLearner(item: AdminLearnerUser) {
                       />
                     </label>
                     <div className="feedback-banner">
-                      默认 SEO 已按“高频英语单词 + 场景词汇 + 会员学习 + 多学科扩展”方向预设，后续可根据你的实际内容继续优化。
-                    </div>
+                      默认 SEO 已按“高频英语单�?+ 场景词汇 + 会员学习 + 多学科扩展”方向预设，后续可根据你的实际内容继续优化�?                    </div>
                     {canManageSiteSettings ? (
                       <button className="primary-button" disabled={busyAction === "site-settings"} type="submit">
-                        {busyAction === "site-settings" ? "保存中..." : "保存搜索优化设置"}
+                        {busyAction === "site-settings" ? "保存�?.." : "保存搜索优化设置"}
                       </button>
                     ) : null}
                   </form>
@@ -4664,7 +4657,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         <div className="section-toolbar">
                           <div>
                             <h2>会员方案设置</h2>
-                            <p className="helper-text">新增和修改会员方案都通过弹窗处理，方便你边看列表边调整，不会打断当前分页和筛选位置。</p>
+                            <p className="helper-text">新增和修改会员方案都通过弹窗处理，方便你边看列表边调整，不会打断当前分页和筛选位置�?/p>
                           </div>
                           <button className="primary-button" onClick={openCreatePlanModal} type="button">
                             新增会员方案
@@ -4674,7 +4667,7 @@ function startEditLearner(item: AdminLearnerUser) {
                     ) : (
                       <article className="content-card import-panel-card">
                         <h2>方案查看说明</h2>
-                        <p className="helper-text">当前岗位可以查看会员方案和订单信息，但暂时不能直接修改收费方案。</p>
+                        <p className="helper-text">当前岗位可以查看会员方案和订单信息，但暂时不能直接修改收费方案�?/p>
                       </article>
                     )}
                   </div>
@@ -4686,20 +4679,20 @@ function startEditLearner(item: AdminLearnerUser) {
                       <div className="section-toolbar">
                         <div>
                           <h2>微信收款配置</h2>
-                          <p className="helper-text">把前台支付需要的微信参数集中放在这里维护，保存后前台会直接使用。</p>
+                          <p className="helper-text">把前台支付需要的微信参数集中放在这里维护，保存后前台会直接使用�?/p>
                         </div>
                       </div>
                       <form className="setup-form" onSubmit={handleSaveWechatPayConfig}>
                         {wechatPayConfigExists && wechatPayConfig ? (
                           <div className={`feedback-banner ${wechatPayConfig.ready_for_checkout ? "feedback-success" : "feedback-error"}`}>
                             当前收款配置
-                            {wechatPayConfig.ready_for_checkout ? "已经可以用于前台收款。" : "还未达到可收款状态。"}
+                            {wechatPayConfig.ready_for_checkout ? "已经可以用于前台收款�? : "还未达到可收款状态�?}
                             {!wechatPayConfig.ready_for_checkout && wechatPayConfig.validation_error
-                              ? ` 还需补充：${wechatPayConfig.validation_error}。`
+                              ? ` 还需补充�?{wechatPayConfig.validation_error}。`
                               : ""}
                           </div>
                         ) : (
-                          <div className="feedback-banner">还没有保存微信收款配置，保存后前台才能发起支付。</div>
+                          <div className="feedback-banner">还没有保存微信收款配置，保存后前台才能发起支付�?/div>
                         )}
                         <div className="form-grid-two">
                           <label className="form-field">
@@ -4716,7 +4709,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             </select>
                           </label>
                           <label className="form-field">
-                            <span>商户号</span>
+                            <span>商户�?/span>
                             <input
                               disabled={!canManagePayments}
                               value={wechatPayForm.mchId}
@@ -4736,7 +4729,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             />
                           </label>
                           <label className="form-field">
-                            <span>商户证书序列号</span>
+                            <span>商户证书序列�?/span>
                             <input
                               disabled={!canManagePayments}
                               value={wechatPayForm.merchantSerialNo}
@@ -4767,7 +4760,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             />
                           </label>
                           <label className="form-field">
-                            <span>二维码有效时长（分钟）</span>
+                            <span>二维码有效时长（分钟�?/span>
                             <input
                               disabled={!canManagePayments}
                               inputMode="numeric"
@@ -4828,15 +4821,14 @@ function startEditLearner(item: AdminLearnerUser) {
                             </>
                           ) : null}
                           <div className="feedback-banner form-grid-span-two">
-                            当前页面会直接回显并保存密钥内容。如需清空某一项，把输入框删空后再保存即可。
-                          </div>
+                            当前页面会直接回显并保存密钥内容。如需清空某一项，把输入框删空后再保存即可�?                          </div>
                         </div>
                         {canManagePayments ? (
                           <button className="primary-button" disabled={busyAction === "wechatpay"} type="submit">
-                            {busyAction === "wechatpay" ? "保存中..." : "保存收款配置"}
+                            {busyAction === "wechatpay" ? "保存�?.." : "保存收款配置"}
                           </button>
                         ) : (
-                          <p className="helper-text">当前账号只能查看收款配置，暂时不能修改。</p>
+                          <p className="helper-text">当前账号只能查看收款配置，暂时不能修改�?/p>
                         )}
                       </form>
                     </article>
@@ -4849,7 +4841,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       <div className="section-toolbar">
                         <div>
                           <h2>会员方案列表</h2>
-                          <p className="helper-text">集中查看方案价格、收费方式、推荐状态和可用收款渠道。</p>
+                          <p className="helper-text">集中查看方案价格、收费方式、推荐状态和可用收款渠道�?/p>
                         </div>
                         {canManagePlans ? (
                           <button className="primary-button" onClick={openCreatePlanModal} type="button">
@@ -4864,9 +4856,9 @@ function startEditLearner(item: AdminLearnerUser) {
                             ? [
                                 item.key,
                                 item.name,
-                                item.billing_mode === "monthly" ? "按月会员" : "一次性买断",
+                                item.billing_mode === "monthly" ? "按月会员" : "一次性买�?,
                                 formatPrice(item.price_cents),
-                                item.recommended ? "是" : "否",
+                                item.recommended ? "�? : "�?,
                                 formatPaymentChannelLabels(item.payment_channels),
                                 <div className="button-row" key={`plan-actions-${item.key}`}>
                                   <button className="secondary-button small-button" onClick={() => startEditPlan(item)} type="button">
@@ -4885,13 +4877,13 @@ function startEditLearner(item: AdminLearnerUser) {
                             : [
                                 item.key,
                                 item.name,
-                                item.billing_mode === "monthly" ? "按月会员" : "一次性买断",
+                                item.billing_mode === "monthly" ? "按月会员" : "一次性买�?,
                                 formatPrice(item.price_cents),
-                                item.recommended ? "是" : "否",
+                                item.recommended ? "�? : "�?,
                                 formatPaymentChannelLabels(item.payment_channels),
                               ],
                         )}
-                        emptyText="当前还没有会员方案，请先新增一个方案。"
+                        emptyText="当前还没有会员方案，请先新增一个方案�?
                       />
                     </div>
                   </div>
@@ -4903,7 +4895,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       <div className="section-toolbar">
                         <div>
                           <h2>收款订单</h2>
-                          <p className="helper-text">按状态筛选订单，并直接查看支付详情与会员权益联动结果。</p>
+                          <p className="helper-text">按状态筛选订单，并直接查看支付详情与会员权益联动结果�?/p>
                         </div>
                         <div className="toolbar-controls">
                           <select
@@ -4913,11 +4905,11 @@ function startEditLearner(item: AdminLearnerUser) {
                               setPaymentPage(1);
                             }}
                           >
-                            <option value="">全部状态</option>
-                            <option value="pending">待支付</option>
+                            <option value="">全部状�?/option>
+                            <option value="pending">待支�?/option>
                             <option value="success">支付成功</option>
                             <option value="failed">支付失败</option>
-                            <option value="closed">已关闭</option>
+                            <option value="closed">已关�?/option>
                           </select>
                           <input
                             className="toolbar-search"
@@ -4926,12 +4918,12 @@ function startEditLearner(item: AdminLearnerUser) {
                               setPaymentQuery(event.target.value);
                               setPaymentPage(1);
                             }}
-                            placeholder="搜索订单号、学员账号、会员方案"
+                            placeholder="搜索订单号、学员账号、会员方�?
                           />
                         </div>
                       </div>
                       <DataTable
-                        columns={["订单号", "学员账号", "会员方案", "金额", "状态", "支付时间", "创建时间", "操作"]}
+                        columns={["订单�?, "学员账号", "会员方案", "金额", "状�?, "支付时间", "创建时间", "操作"]}
                         rows={(paymentOrders?.items ?? []).map((item) => [
                           item.order_no,
                           item.customer_ref,
@@ -4949,7 +4941,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             查看订单
                           </button>,
                         ])}
-                        emptyText="没有符合条件的收款订单。"
+                        emptyText="没有符合条件的收款订单�?
                       />
                       <PagerControls
                         page={paymentOrders?.page ?? 1}
@@ -4969,11 +4961,11 @@ function startEditLearner(item: AdminLearnerUser) {
                         </div>
                         <div className="detail-grid">
                           <div>
-                            <dt>订单号</dt>
+                            <dt>订单�?/dt>
                             <dd>{selectedOrderDetail.order.order_no}</dd>
                           </div>
                           <div>
-                            <dt>状态</dt>
+                            <dt>状�?/dt>
                             <dd>
                               <span className={`pill ${paymentStatusClass(selectedOrderDetail.order.status)}`}>
                                 {paymentStatusLabel(selectedOrderDetail.order.status)}
@@ -4989,7 +4981,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             <dd>{formatPlanLabel(selectedOrderDetail.order.plan_key)}</dd>
                           </div>
                           <div>
-                            <dt>所属科目</dt>
+                            <dt>所属科�?/dt>
                             <dd>{formatSubjectLabel(selectedOrderDetail.order.subject_key)}</dd>
                           </div>
                           <div>
@@ -5001,7 +4993,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             <dd>{formatPaymentProviderLabel(selectedOrderDetail.order.provider)}</dd>
                           </div>
                           <div>
-                            <dt>渠道流水号</dt>
+                            <dt>渠道流水�?/dt>
                             <dd>{selectedOrderDetail.order.provider_trade_no || "-"}</dd>
                           </div>
                           <div>
@@ -5032,11 +5024,11 @@ function startEditLearner(item: AdminLearnerUser) {
                             已关联会员权益：学员账号 {selectedOrderDetail.subscription.customer_ref}，状态{" "}
                             {subscriptionStatusLabel(selectedOrderDetail.subscription.status)}
                             {selectedOrderDetail.subscription.current_period_end
-                              ? `，有效期至 ${formatDateTime(selectedOrderDetail.subscription.current_period_end)}`
+                              ? `，有效期�?${formatDateTime(selectedOrderDetail.subscription.current_period_end)}`
                               : "，当前为长期有效"}
                           </div>
                         ) : (
-                          <div className="feedback-banner">当前订单还没有关联到会员权益记录。</div>
+                          <div className="feedback-banner">当前订单还没有关联到会员权益记录�?/div>
                         )}
                       </article>
                     ) : null}
@@ -5051,25 +5043,24 @@ function startEditLearner(item: AdminLearnerUser) {
               <div className="section-header">
                 <div>
                   <p className="section-eyebrow">会员服务</p>
-                  <h1>会员状态、有效期与人工处理</h1>
+                  <h1>会员状态、有效期与人工处�?/h1>
                 </div>
               </div>
 
               <div className="admin-card-grid">
                 <article className="content-card">
-                  <h2>调整会员状态</h2>
+                  <h2>调整会员状�?/h2>
                   <p className="helper-text">
-                    从下方会员记录列表点击“调整”后，会以弹窗方式修改方案、状态和有效期，方便对照当前记录处理。
-                  </p>
+                    从下方会员记录列表点击“调整”后，会以弹窗方式修改方案、状态和有效期，方便对照当前记录处理�?                  </p>
                 </article>
 
                 <article className="content-card">
                   <h2>处理说明</h2>
                   <ul className="detail-list">
-                    <li>按月会员建议维护“当前服务周期开始”和“当前服务周期结束”。</li>
-                    <li>一次性买断方案通常不需要填写“当前服务周期结束”。</li>
-                    <li>把状态改为“已过期”时，如果没有填写结束时间，系统会自动补上当前时间。</li>
-                    <li>把状态改为“已取消”时，如果没有填写终止时间，系统会自动补上当前时间。</li>
+                    <li>按月会员建议维护“当前服务周期开始”和“当前服务周期结束”�?/li>
+                    <li>一次性买断方案通常不需要填写“当前服务周期结束”�?/li>
+                    <li>把状态改为“已过期”时，如果没有填写结束时间，系统会自动补上当前时间�?/li>
+                    <li>把状态改为“已取消”时，如果没有填写终止时间，系统会自动补上当前时间�?/li>
                   </ul>
                 </article>
               </div>
@@ -5085,11 +5076,11 @@ function startEditLearner(item: AdminLearnerUser) {
                         setSubscriptionPage(1);
                       }}
                     >
-                      <option value="">全部状态</option>
-                      <option value="active">生效中</option>
-                      <option value="expired">已过期</option>
-                      <option value="pending">待生效</option>
-                      <option value="cancelled">已取消</option>
+                      <option value="">全部状�?/option>
+                      <option value="active">生效�?/option>
+                      <option value="expired">已过�?/option>
+                      <option value="pending">待生�?/option>
+                      <option value="cancelled">已取�?/option>
                     </select>
                     <input
                       className="toolbar-search"
@@ -5098,7 +5089,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         setSubscriptionQuery(event.target.value);
                         setSubscriptionPage(1);
                       }}
-                      placeholder="搜索学员账号或会员方案"
+                      placeholder="搜索学员账号或会员方�?
                     />
                   </div>
                 </div>
@@ -5109,10 +5100,10 @@ function startEditLearner(item: AdminLearnerUser) {
                         <th>学员账号</th>
                         <th>会员方案</th>
                         <th>科目</th>
-                        <th>状态</th>
+                        <th>状�?/th>
                         <th>到期时间</th>
                         <th>自动续费</th>
-                        <th>开通时间</th>
+                        <th>开通时�?/th>
                         <th>操作</th>
                       </tr>
                     </thead>
@@ -5126,7 +5117,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             <span className={`pill ${subscriptionStatusClass(item.status)}`}>{subscriptionStatusLabel(item.status)}</span>
                           </td>
                           <td>{item.current_period_end ? formatDateTime(item.current_period_end) : "长期有效"}</td>
-                          <td>{item.auto_renew ? "是" : "否"}</td>
+                          <td>{item.auto_renew ? "�? : "�?}</td>
                           <td>{item.started_at ? formatDateTime(item.started_at) : "-"}</td>
                           <td>
                             <button className="secondary-button small-button" onClick={() => startEditSubscription(item)} type="button">
@@ -5137,7 +5128,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       ))}
                     </tbody>
                   </table>
-                  {(subscriptions?.items ?? []).length === 0 ? <div className="feedback-banner">没有符合条件的会员记录。</div> : null}
+                  {(subscriptions?.items ?? []).length === 0 ? <div className="feedback-banner">没有符合条件的会员记录�?/div> : null}
                 </div>
                 <PagerControls
                   page={subscriptions?.page ?? 1}
@@ -5153,8 +5144,8 @@ function startEditLearner(item: AdminLearnerUser) {
             <section className="admin-section">
               <div className="section-header">
                 <div>
-                  <p className="section-eyebrow">MCP 宸ュ叿</p>
-                  <h1>MCP 工具权限、会员门槛与邀请统计</h1>
+                  <p className="section-eyebrow">MCP 宸ュ�?/p>
+                  <h1>MCP 工具权限、会员门槛与邀请统�?/h1>
                 </div>
               </div>
 
@@ -5171,7 +5162,7 @@ function startEditLearner(item: AdminLearnerUser) {
                   <div className="section-toolbar">
                     <div>
                       <h2>API 接口工具管理</h2>
-                      <p className="helper-text">这里维护后台和用户可见的动态 API 工具，新增和编辑都通过弹窗处理，保存后会自动同步进 MCP 工具列表。</p>
+                      <p className="helper-text">这里维护后台和用户可见的动�?API 工具，新增和编辑都通过弹窗处理，保存后会自动同步进 MCP 工具列表�?/p>
                     </div>
                     <div className="toolbar-controls">
                       {canManageMCPTools ? (
@@ -5186,12 +5177,12 @@ function startEditLearner(item: AdminLearnerUser) {
                           setAPIConfigQuery(event.target.value);
                           setAPIConfigPage(1);
                         }}
-                        placeholder="搜索名称、工具名或分类"
+                        placeholder="搜索名称、工具名或分�?
                       />
                     </div>
                   </div>
                   <DataTable
-                    columns={["名称", "工具名", "方法", "分类", "归属", "状态", "公开", "操作"]}
+                    columns={["名称", "工具�?, "方法", "分类", "归属", "状�?, "公开", "操作"]}
                     tableClassName="data-table api-config-table"
                     wrapClassName="table-wrap api-config-table-wrap"
                     rows={(apiConfigs?.items ?? []).map((item) => [
@@ -5201,7 +5192,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       item.category || "-",
                       item.owner_name || item.owner_type || "-",
                       <span className={item.is_active ? "pill pill-success" : "pill pill-muted"}>
-                        {item.is_active ? "启用中" : "已停用"}
+                        {item.is_active ? "启用�? : "已停�?}
                       </span>,
                       item.is_public ? "公开" : "私有",
                       <div className="button-row api-config-actions">
@@ -5216,7 +5207,7 @@ function startEditLearner(item: AdminLearnerUser) {
                           }}
                           type="button"
                         >
-                          {busyAction === `admin-api-config-test-${item.id}` ? "测试中..." : "测试"}
+                          {busyAction === `admin-api-config-test-${item.id}` ? "测试�?.." : "测试"}
                         </button>
                         <button
                           className="secondary-button small-button"
@@ -5226,11 +5217,11 @@ function startEditLearner(item: AdminLearnerUser) {
                           }}
                           type="button"
                         >
-                          {busyAction === `admin-api-config-delete-${item.id}` ? "删除中..." : "删除"}
+                          {busyAction === `admin-api-config-delete-${item.id}` ? "删除�?.." : "删除"}
                         </button>
                       </div>,
                     ])}
-                    emptyText="当前还没有 API 配置。"
+                    emptyText="当前还没�?API 配置�?
                   />
                   <PagerControls
                     disabled={dataLoading}
@@ -5247,7 +5238,7 @@ function startEditLearner(item: AdminLearnerUser) {
                   <div className="section-toolbar">
                     <div>
                       <h2>MCP 工具配置</h2>
-                      <p className="helper-text">管理员可以决定哪些工具开放、哪些工具需要会员才能调用。</p>
+                      <p className="helper-text">管理员可以决定哪些工具开放、哪些工具需要会员才能调用�?/p>
                     </div>
                     <input
                       className="toolbar-search"
@@ -5260,7 +5251,7 @@ function startEditLearner(item: AdminLearnerUser) {
                     />
                   </div>
                   <DataTable
-                    columns={canManageMCPTools ? ["工具", "分类", "来源", "说明", "开关", "会员"] : ["工具", "分类", "来源", "说明", "开关", "会员"]}
+                    columns={canManageMCPTools ? ["工具", "分类", "来源", "说明", "开�?, "会员"] : ["工具", "分类", "来源", "说明", "开�?, "会员"]}
                     rows={(mcpToolConfigs?.items ?? []).map((item) => [
                       <div className="mcp-cell-stack">
                         <strong>{item.title || item.tool_name}</strong>
@@ -5278,10 +5269,10 @@ function startEditLearner(item: AdminLearnerUser) {
                           }}
                           type="button"
                         >
-                          {busyAction === `mcp-tool-${item.tool_name}` ? "处理中..." : item.is_enabled ? "已启用" : "已停用"}
+                          {busyAction === `mcp-tool-${item.tool_name}` ? "处理�?.." : item.is_enabled ? "已启�? : "已停�?}
                         </button>
                       ) : (
-                        <span className={item.is_enabled ? "pill pill-success" : "pill pill-muted"}>{item.is_enabled ? "启用中" : "已停用"}</span>
+                        <span className={item.is_enabled ? "pill pill-success" : "pill pill-muted"}>{item.is_enabled ? "启用�? : "已停�?}</span>
                       ),
                       canManageMCPTools ? (
                         <button
@@ -5294,15 +5285,15 @@ function startEditLearner(item: AdminLearnerUser) {
                           }}
                           type="button"
                         >
-                          {busyAction === `mcp-tool-${item.tool_name}` ? "处理中..." : item.requires_membership ? "需要会员" : "公开可用"}
+                          {busyAction === `mcp-tool-${item.tool_name}` ? "处理�?.." : item.requires_membership ? "需要会�? : "公开可用"}
                         </button>
                       ) : (
                         <span className={item.requires_membership ? "pill pill-warning" : "pill pill-muted"}>
-                          {item.requires_membership ? "需要会员" : "公开可用"}
+                          {item.requires_membership ? "需要会�? : "公开可用"}
                         </span>
                       ),
                     ])}
-                    emptyText="当前还没有可管理的 MCP 工具。"
+                    emptyText="当前还没有可管理�?MCP 工具�?
                   />
                   <PagerControls
                     disabled={dataLoading}
@@ -5318,8 +5309,8 @@ function startEditLearner(item: AdminLearnerUser) {
                 <article className="content-card">
                   <div className="section-toolbar">
                     <div>
-                      <h2>邀请统计</h2>
-                      <p className="helper-text">查看哪些学员带来了更多邀请与充值转化。</p>
+                      <h2>邀请统�?/h2>
+                      <p className="helper-text">查看哪些学员带来了更多邀请与充值转化�?/p>
                     </div>
                     <input
                       className="toolbar-search"
@@ -5332,7 +5323,7 @@ function startEditLearner(item: AdminLearnerUser) {
                     />
                   </div>
                   <DataTable
-                    columns={["邀请人", "邀请码", "邀请人数", "付费人数", "累计充值", "最近邀请", "最近付费"]}
+                    columns={["邀请人", "邀请码", "邀请人�?, "付费人数", "累计充�?, "最近邀�?, "最近付�?]}
                     rows={(inviteStats?.items ?? []).map((item) => [
                       <div className="mcp-cell-stack">
                         <strong>{item.inviter_display_name || item.inviter_username}</strong>
@@ -5345,7 +5336,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       item.last_invite_at ? formatDateTime(item.last_invite_at) : "-",
                       item.last_paid_at ? formatDateTime(item.last_paid_at) : "-",
                     ])}
-                    emptyText="当前还没有邀请统计数据。"
+                    emptyText="当前还没有邀请统计数据�?
                   />
                   <PagerControls
                     disabled={dataLoading}
@@ -5365,22 +5356,22 @@ function startEditLearner(item: AdminLearnerUser) {
               <div className="section-header">
                 <div>
                   <p className="section-eyebrow">学员账号</p>
-                  <h1>学员账号、购买情况与服务状态</h1>
+                  <h1>学员账号、购买情况与服务状�?/h1>
                 </div>
               </div>
 
               <div className="admin-card-grid">
                 <article className="content-card">
                   <h2>调整学员资料</h2>
-                  <p className="helper-text">从下方学员列表中选择一个账号后，会弹出资料调整窗口，修改昵称或账号状态更直观。</p>
+                  <p className="helper-text">从下方学员列表中选择一个账号后，会弹出资料调整窗口，修改昵称或账号状态更直观�?/p>
                 </article>
 
                 <article className="content-card">
                   <h2>服务说明</h2>
                   <ul className="detail-list">
-                    <li>可以查看学员的注册时间、购买次数、当前会员状态和正在使用的方案。</li>
-                    <li>分页查询由前后端协同处理，刷新页面后会停留在当前分页和筛选条件。</li>
-                    <li>后续继续扩展更多学科时，学员依旧可以共用同一个学习账号体系。</li>
+                    <li>可以查看学员的注册时间、购买次数、当前会员状态和正在使用的方案�?/li>
+                    <li>分页查询由前后端协同处理，刷新页面后会停留在当前分页和筛选条件�?/li>
+                    <li>后续继续扩展更多学科时，学员依旧可以共用同一个学习账号体系�?/li>
                   </ul>
                 </article>
               </div>
@@ -5396,7 +5387,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         setLearnerPage(1);
                       }}
                     >
-                      <option value="">全部状态</option>
+                      <option value="">全部状�?/option>
                       <option value="active">启用</option>
                       <option value="disabled">停用</option>
                     </select>
@@ -5407,7 +5398,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         setLearnerQuery(event.target.value);
                         setLearnerPage(1);
                       }}
-                      placeholder="搜索学员账号或昵称"
+                      placeholder="搜索学员账号或昵�?
                     />
                   </div>
                 </div>
@@ -5417,11 +5408,11 @@ function startEditLearner(item: AdminLearnerUser) {
                       <tr>
                         <th>学员账号</th>
                         <th>昵称</th>
-                        <th>账号状态</th>
+                        <th>账号状�?/th>
                         <th>注册时间</th>
                         <th>购买次数</th>
                         <th>是否开通过会员</th>
-                        <th>会员状态</th>
+                        <th>会员状�?/th>
                         <th>当前方案</th>
                         <th>到期时间</th>
                         {canManageLearners ? <th>操作</th> : null}
@@ -5435,7 +5426,7 @@ function startEditLearner(item: AdminLearnerUser) {
                           <td>{item.status === "active" ? "启用" : "停用"}</td>
                           <td>{formatDateTime(item.created_at)}</td>
                           <td>{formatCount(item.purchase_count)}</td>
-                          <td>{item.has_membership ? "是" : "否"}</td>
+                          <td>{item.has_membership ? "�? : "�?}</td>
                           <td>{item.membership_status ? subscriptionStatusLabel(item.membership_status) : "-"}</td>
                           <td>{item.current_plan_key ? formatPlanLabel(item.current_plan_key) : "-"}</td>
                           <td>{item.current_period_end ? formatDateTime(item.current_period_end) : "-"}</td>
@@ -5450,7 +5441,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       ))}
                     </tbody>
                   </table>
-                  {(learners?.items ?? []).length === 0 ? <div className="feedback-banner">当前没有符合条件的学员。</div> : null}
+                  {(learners?.items ?? []).length === 0 ? <div className="feedback-banner">当前没有符合条件的学员�?/div> : null}
                 </div>
                 <PagerControls
                   page={learners?.page ?? 1}
@@ -5466,14 +5457,14 @@ function startEditLearner(item: AdminLearnerUser) {
             <section className="admin-section">
               <div className="section-header">
                 <div>
-                  <p className="section-eyebrow">团队与权限</p>
+                  <p className="section-eyebrow">团队与权�?/p>
                   <h1>后台账号、岗位职责与操作范围</h1>
                 </div>
               </div>
 
               <div className="import-workbench">
                 <AdminSectionTabs
-                  ariaLabel="团队与权限内部导航"
+                  ariaLabel="团队与权限内部导�?
                   currentKey={activeAdminTab}
                   items={adminTabItems}
                   onChange={setActiveAdminTab}
@@ -5485,12 +5476,12 @@ function startEditLearner(item: AdminLearnerUser) {
                       <div className="section-toolbar">
                         <div>
                           <h2>修改我的登录密码</h2>
-                          <p className="helper-text">当前登录账号的安全设置单独放在这里处理，避免和团队管理表格混在一起。</p>
+                          <p className="helper-text">当前登录账号的安全设置单独放在这里处理，避免和团队管理表格混在一起�?/p>
                         </div>
                       </div>
                       <form className="setup-form" onSubmit={handleChangePassword}>
                         <label className="form-field">
-                          <span>旧密码</span>
+                          <span>旧密�?/span>
                           <input
                             type="password"
                             value={passwordForm.oldPassword}
@@ -5500,7 +5491,7 @@ function startEditLearner(item: AdminLearnerUser) {
                           />
                         </label>
                         <label className="form-field">
-                          <span>新密码</span>
+                          <span>新密�?/span>
                           <input
                             type="password"
                             value={passwordForm.newPassword}
@@ -5510,7 +5501,7 @@ function startEditLearner(item: AdminLearnerUser) {
                           />
                         </label>
                         <label className="form-field">
-                          <span>确认新密码</span>
+                          <span>确认新密�?/span>
                           <input
                             type="password"
                             value={passwordForm.confirmPassword}
@@ -5520,8 +5511,7 @@ function startEditLearner(item: AdminLearnerUser) {
                           />
                         </label>
                         <button className="primary-button" disabled={busyAction === "password"} type="submit">
-                          保存新密码
-                        </button>
+                          保存新密�?                        </button>
                       </form>
                     </article>
                   </div>
@@ -5533,7 +5523,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       <div className="section-toolbar">
                         <div>
                           <h2>后台账号列表</h2>
-                          <p className="helper-text">新增和调整后台账号都通过弹窗处理，方便你边看列表边分配岗位和状态。</p>
+                          <p className="helper-text">新增和调整后台账号都通过弹窗处理，方便你边看列表边分配岗位和状态�?/p>
                         </div>
                         <div className="toolbar-controls">
                           <input
@@ -5543,7 +5533,7 @@ function startEditLearner(item: AdminLearnerUser) {
                               setAdminUserQuery(event.target.value);
                               setAdminUserPage(1);
                             }}
-                            placeholder="搜索账号或姓名"
+                            placeholder="搜索账号或姓�?
                           />
                           {canManageAdmins ? (
                             <button className="primary-button" onClick={openCreateAdminUserModal} type="button">
@@ -5555,8 +5545,8 @@ function startEditLearner(item: AdminLearnerUser) {
                       <DataTable
                         columns={
                           canManageAdmins
-                            ? ["后台账号", "成员姓名", "岗位", "使用状态", "全站权限", "最近登录", "操作"]
-                            : ["后台账号", "成员姓名", "岗位", "使用状态", "全站权限", "最近登录"]
+                            ? ["后台账号", "成员姓名", "岗位", "使用状�?, "全站权限", "最近登�?, "操作"]
+                            : ["后台账号", "成员姓名", "岗位", "使用状�?, "全站权限", "最近登�?]
                         }
                         rows={(adminUsers?.items ?? []).map((item) =>
                           canManageAdmins
@@ -5565,7 +5555,7 @@ function startEditLearner(item: AdminLearnerUser) {
                                 item.display_name,
                                 adminRoleLabel(item.role),
                                 item.status === "active" ? "启用" : "停用",
-                                item.is_super ? "是" : "否",
+                                item.is_super ? "�? : "�?,
                                 item.last_login_at ? formatDateTime(item.last_login_at) : "-",
                                 <button className="secondary-button small-button" onClick={() => startEditAdminUser(item)} type="button">
                                   调整
@@ -5576,11 +5566,11 @@ function startEditLearner(item: AdminLearnerUser) {
                                 item.display_name,
                                 adminRoleLabel(item.role),
                                 item.status === "active" ? "启用" : "停用",
-                                item.is_super ? "是" : "否",
+                                item.is_super ? "�? : "�?,
                                 item.last_login_at ? formatDateTime(item.last_login_at) : "-",
                               ],
                         )}
-                        emptyText="当前还没有后台账号。"
+                        emptyText="当前还没有后台账号�?
                       />
                       <PagerControls
                         page={adminUsers?.page ?? 1}
@@ -5598,7 +5588,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       <div className="section-toolbar">
                         <div>
                           <h2>岗位权限模板</h2>
-                          <p className="helper-text">岗位职责和权限范围统一放到弹窗里编辑，查看模板列表时不会被长表单压住页面。</p>
+                          <p className="helper-text">岗位职责和权限范围统一放到弹窗里编辑，查看模板列表时不会被长表单压住页面�?/p>
                         </div>
                         {canManageAdmins ? (
                           <button className="primary-button" onClick={openCreateRoleModal} type="button">
@@ -5625,7 +5615,7 @@ function startEditLearner(item: AdminLearnerUser) {
                                     </span>
                                   ))}
                                 </div>,
-                                role.system ? "是" : "否",
+                                role.system ? "�? : "�?,
                                 !role.system ? (
                                   <button className="secondary-button small-button" onClick={() => startEditRole(role)} type="button">
                                     调整模板
@@ -5645,10 +5635,10 @@ function startEditLearner(item: AdminLearnerUser) {
                                     </span>
                                   ))}
                                 </div>,
-                                role.system ? "是" : "否",
+                                role.system ? "�? : "�?,
                               ],
                         )}
-                        emptyText="当前还没有岗位权限模板。"
+                        emptyText="当前还没有岗位权限模板�?
                       />
                     </div>
                   </div>
@@ -5677,7 +5667,7 @@ function startEditLearner(item: AdminLearnerUser) {
               >
                 <div className="section-header">
                   <div>
-                    <p className="section-eyebrow">知识库文档内容</p>
+                    <p className="section-eyebrow">知识库文档内�?/p>
                     <h2>{knowledgeBasePreviewDocument.title || knowledgeBasePreviewDocument.sourceFileName}</h2>
                     <p className="helper-text">{knowledgeBasePreviewDocument.sourceFileName}</p>
                   </div>
@@ -5707,7 +5697,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       </article>
                     ))}
                     {knowledgeBasePreviewChunks.length === 0 ? (
-                      <div className="feedback-banner">这份文档暂时没有可展示的内容片段。</div>
+                      <div className="feedback-banner">这份文档暂时没有可展示的内容片段�?/div>
                     ) : null}
                   </div>
                 )}
@@ -5731,7 +5721,7 @@ function startEditLearner(item: AdminLearnerUser) {
                     <p className="section-eyebrow">弹窗编辑</p>
                     <h2 id="panel-edit-modal-title">
                       {panelEditModal === "plan" ? (planEditor.id > 0 ? "调整会员方案" : "新增会员方案") : null}
-                      {panelEditModal === "subscription" ? "调整会员服务状态" : null}
+                      {panelEditModal === "subscription" ? "调整会员服务状�? : null}
                       {panelEditModal === "learner" ? "调整学员资料" : null}
                       {panelEditModal === "admin" ? (adminEditor.id > 0 ? "调整后台账号" : "新增后台账号") : null}
                       {panelEditModal === "role" ? (roleEditor.id > 0 ? "调整岗位权限模板" : "新增岗位权限模板") : null}
@@ -5775,11 +5765,11 @@ function startEditLearner(item: AdminLearnerUser) {
                           }}
                         >
                           <option value="monthly">按月会员</option>
-                          <option value="lifetime">一次性买断</option>
+                          <option value="lifetime">一次性买�?/option>
                         </select>
                       </label>
                       <label className="form-field">
-                        <span>售价（元）</span>
+                        <span>售价（元�?/span>
                         <input
                           inputMode="decimal"
                           value={planEditor.priceYuan}
@@ -5830,11 +5820,11 @@ function startEditLearner(item: AdminLearnerUser) {
                         }}
                         type="checkbox"
                       />
-                      <span>前台标记为推荐方案</span>
+                      <span>前台标记为推荐方�?/span>
                     </label>
                     <div className="button-row">
                       <button className="primary-button" disabled={busyAction === "plan"} type="submit">
-                        {busyAction === "plan" ? "保存中..." : planEditor.id > 0 ? "保存方案" : "新增方案"}
+                        {busyAction === "plan" ? "保存�?.." : planEditor.id > 0 ? "保存方案" : "新增方案"}
                       </button>
                       <button className="secondary-button" onClick={closePanelEditModal} type="button">
                         取消
@@ -5851,13 +5841,13 @@ function startEditLearner(item: AdminLearnerUser) {
                         <input disabled value={subscriptionEditor.customerRef} />
                       </label>
                       <label className="form-field">
-                        <span>所属科目</span>
+                        <span>所属科�?/span>
                         <input disabled value={formatSubjectLabel(subscriptionEditor.subjectKey)} />
                       </label>
                     </div>
                     <div className="form-grid-two">
                       <label className="form-field">
-                        <span>开通方案</span>
+                        <span>开通方�?/span>
                         <select
                           value={subscriptionEditor.planKey}
                           onChange={(event) => {
@@ -5872,17 +5862,17 @@ function startEditLearner(item: AdminLearnerUser) {
                         </select>
                       </label>
                       <label className="form-field">
-                        <span>服务状态</span>
+                        <span>服务状�?/span>
                         <select
                           value={subscriptionEditor.status}
                           onChange={(event) => {
                             setSubscriptionEditor((current) => ({ ...current, status: event.target.value }));
                           }}
                         >
-                          <option value="active">生效中</option>
-                          <option value="pending">待生效</option>
-                          <option value="expired">已过期</option>
-                          <option value="cancelled">已取消</option>
+                          <option value="active">生效�?/option>
+                          <option value="pending">待生�?/option>
+                          <option value="expired">已过�?/option>
+                          <option value="cancelled">已取�?/option>
                         </select>
                       </label>
                     </div>
@@ -5894,11 +5884,11 @@ function startEditLearner(item: AdminLearnerUser) {
                         }}
                         type="checkbox"
                       />
-                      <span>标记为自动续费用户</span>
+                      <span>标记为自动续费用�?/span>
                     </label>
                     <div className="form-grid-two">
                       <label className="form-field">
-                        <span>开通时间</span>
+                        <span>开通时�?/span>
                         <input
                           type="datetime-local"
                           value={subscriptionEditor.startedAt}
@@ -5908,7 +5898,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         />
                       </label>
                       <label className="form-field">
-                        <span>当前服务周期开始</span>
+                        <span>当前服务周期开�?/span>
                         <input
                           type="datetime-local"
                           value={subscriptionEditor.currentPeriodStart}
@@ -5942,7 +5932,7 @@ function startEditLearner(item: AdminLearnerUser) {
                     </div>
                     <div className="button-row">
                       <button className="primary-button" disabled={busyAction === "subscription-save"} type="submit">
-                        {busyAction === "subscription-save" ? "保存中..." : "保存服务状态"}
+                        {busyAction === "subscription-save" ? "保存�?.." : "保存服务状�?}
                       </button>
                       <button className="secondary-button" onClick={closePanelEditModal} type="button">
                         取消
@@ -5968,7 +5958,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       />
                     </label>
                     <label className="form-field">
-                      <span>账号状态</span>
+                      <span>账号状�?/span>
                       <select
                         disabled={!canManageLearners}
                         value={learnerEditor.status}
@@ -5982,7 +5972,7 @@ function startEditLearner(item: AdminLearnerUser) {
                     </label>
                     <div className="button-row">
                       <button className="primary-button" disabled={busyAction === "learner-user"} type="submit">
-                        {busyAction === "learner-user" ? "保存中..." : "保存学员资料"}
+                        {busyAction === "learner-user" ? "保存�?.." : "保存学员资料"}
                       </button>
                       <button className="secondary-button" onClick={closePanelEditModal} type="button">
                         取消
@@ -6022,7 +6012,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         onChange={(event) => {
                           setAdminEditor((current) => ({ ...current, password: event.target.value }));
                         }}
-                        placeholder="至少 8 位"
+                        placeholder="至少 8 �?
                       />
                     </label>
                     <div className="form-grid-two">
@@ -6047,7 +6037,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         </select>
                       </label>
                       <label className="form-field">
-                        <span>使用状态</span>
+                        <span>使用状�?/span>
                         <select
                           value={adminEditor.status}
                           onChange={(event) => {
@@ -6068,7 +6058,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         }}
                         type="checkbox"
                       />
-                      <span>授予全站最高权限</span>
+                      <span>授予全站最高权�?/span>
                     </label>
                     <div className="button-row">
                       <button className="primary-button" disabled={busyAction === "admin-user"} type="submit">
@@ -6128,8 +6118,8 @@ function startEditLearner(item: AdminLearnerUser) {
                       <span>岗位能力范围</span>
                       <div className="permission-builder">
                         <div className="permission-builder-summary">
-                          <strong>{roleHasFullPermission ? "已授予全部后台能力" : `已选择 ${rolePermissionSelections.length} 项能力`}</strong>
-                          <p>直接勾选业务能力即可，系统会自动保存权限配置，不需要手动填写技术编码。</p>
+                          <strong>{roleHasFullPermission ? "已授予全部后台能�? : `已选择 ${rolePermissionSelections.length} 项能力`}</strong>
+                          <p>直接勾选业务能力即可，系统会自动保存权限配置，不需要手动填写技术编码�?/p>
                         </div>
 
                         {rolePermissionSelections.length > 0 ? (
@@ -6141,13 +6131,12 @@ function startEditLearner(item: AdminLearnerUser) {
                             ))}
                           </div>
                         ) : (
-                          <p className="helper-text">如果这个岗位暂时没有任何操作能力，可以先不勾选。</p>
+                          <p className="helper-text">如果这个岗位暂时没有任何操作能力，可以先不勾选�?/p>
                         )}
 
                         {roleUnknownPermissions.length > 0 ? (
                           <div className="feedback-banner">
-                            当前岗位还包含少量高级权限，暂时没有可视化说明，保存时会自动保留：
-                            <div className="tag-list">
+                            当前岗位还包含少量高级权限，暂时没有可视化说明，保存时会自动保留�?                            <div className="tag-list">
                               {roleUnknownPermissions.map((permission) => (
                                 <span className="tag" key={permission}>
                                   {permissionLabel(permission)}
@@ -6246,11 +6235,11 @@ function startEditLearner(item: AdminLearnerUser) {
                         onChange={(event) => {
                           setAPIConfigEditor((current) => ({ ...current, name: event.target.value }));
                         }}
-                        placeholder="例如：汇率查询"
+                        placeholder="例如：汇率查�?
                       />
                     </label>
                     <label className="form-field">
-                      <span>MCP 工具名</span>
+                      <span>MCP 工具�?/span>
                       <input
                         value={apiConfigEditor.tool_name}
                         onChange={(event) => {
@@ -6261,7 +6250,7 @@ function startEditLearner(item: AdminLearnerUser) {
                     </label>
                   </div>
 
-                  <div className="feedback-banner">这里按参数逐项填写即可，下面的 JSON 会自动生成，不需要手动写。</div>
+                  <div className="feedback-banner">这里按参数逐项填写即可，下面的 JSON 会自动生成，不需要手动写�?/div>
 
                   {getAPIConfigTestRows(apiConfigTestTarget).length > 0 ? (
                     <section className="api-test-parameter-builder">
@@ -6273,7 +6262,7 @@ function startEditLearner(item: AdminLearnerUser) {
                               {row.required ? " *" : ""}
                             </span>
                             <small className="helper-text">
-                              {row.description || (row.location === "url" ? "URL 参数" : row.location === "body" ? "请求体参数" : "请求头参数")}
+                              {row.description || (row.location === "url" ? "URL 参数" : row.location === "body" ? "请求体参�? : "请求头参�?)}
                             </small>
 
                             {row.type === "object" ? (
@@ -6302,7 +6291,7 @@ function startEditLearner(item: AdminLearnerUser) {
                                 onChange={(event) => {
                                   updateAPIConfigTestValue(row.name, event.target.value);
                                 }}
-                                placeholder={row.exampleValue || `请输入 ${row.name}`}
+                                placeholder={row.exampleValue || `请输�?${row.name}`}
                               />
                             )}
                           </label>
@@ -6346,7 +6335,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         onChange={(event) => {
                           setAPIConfigEditor((current) => ({ ...current, category: event.target.value }));
                         }}
-                        placeholder="例如：测试 / 查询 / 业务"
+                        placeholder="例如：测�?/ 查询 / 业务"
                       />
                     </label>
                   </div>
@@ -6359,7 +6348,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       onChange={(event) => {
                         setAPIConfigEditor((current) => ({ ...current, description: event.target.value }));
                       }}
-                      placeholder="简单说明这个接口是做什么的、适合什么场景调用。"
+                      placeholder="简单说明这个接口是做什么的、适合什么场景调用�?
                     />
                   </label>
 
@@ -6400,7 +6389,7 @@ function startEditLearner(item: AdminLearnerUser) {
                     <div className="api-parameter-builder-header">
                       <div>
                         <h3>接口参数</h3>
-                        <p className="helper-text">按参数名、类型、位置和说明添加，系统会自动生成 URL 参数、请求体和请求头。</p>
+                        <p className="helper-text">按参数名、类型、位置和说明添加，系统会自动生成 URL 参数、请求体和请求头�?/p>
                       </div>
                       <button
                         className="secondary-button small-button"
@@ -6418,7 +6407,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         <div className="api-parameter-card" key={row.id}>
                           <div className="api-parameter-row">
                             <input
-                              placeholder="参数名"
+                              placeholder="参数�?
                               value={row.name}
                               onChange={(event) => {
                                 updateAPIConfigParameterRow(row.id, { name: event.target.value });
@@ -6481,9 +6470,9 @@ function startEditLearner(item: AdminLearnerUser) {
                           </div>
                           <div className="api-parameter-example">
                             <label className="form-field">
-                              <span>测试示例值</span>
+                              <span>测试示例�?/span>
                               <input
-                                placeholder={row.type === "object" ? '{"keyword":"value"}' : "保存后点测试会自动带出这个值"}
+                                placeholder={row.type === "object" ? '{"keyword":"value"}' : "保存后点测试会自动带出这个�?}
                                 value={row.exampleValue}
                                 onChange={(event) => {
                                   updateAPIConfigParameterRow(row.id, { exampleValue: event.target.value });
@@ -6504,10 +6493,10 @@ function startEditLearner(item: AdminLearnerUser) {
                     open={apiConfigAdvancedOpen}
                   >
                     <summary>高级设置（可选）</summary>
-                    <p className="helper-text">只有遇到固定请求头、复杂请求体、签名字段这些特殊场景时，才需要展开填写。</p>
+                    <p className="helper-text">只有遇到固定请求头、复杂请求体、签名字段这些特殊场景时，才需要展开填写�?/p>
 
                     <label className="form-field">
-                      <span>额外请求头 JSON</span>
+                      <span>额外请求�?JSON</span>
                       <textarea
                         rows={5}
                         value={apiConfigAdvancedHeaders}
@@ -6519,7 +6508,7 @@ function startEditLearner(item: AdminLearnerUser) {
                     </label>
 
                     <label className="form-field">
-                      <span>额外请求体 JSON</span>
+                      <span>额外请求�?JSON</span>
                       <textarea
                         rows={6}
                         value={apiConfigAdvancedBody}
@@ -6534,7 +6523,7 @@ function startEditLearner(item: AdminLearnerUser) {
                   <div className="button-row">
                     <button className="primary-button" disabled={busyAction === "admin-api-config-save"} type="submit">
                       {busyAction === "admin-api-config-save"
-                        ? "保存中..."
+                        ? "保存�?.."
                         : apiConfigEditor.id > 0
                           ? "保存 API 工具"
                           : "添加 API 工具"}
@@ -6571,15 +6560,15 @@ function startEditLearner(item: AdminLearnerUser) {
 
                 <div className="api-test-meta">
                   <div>
-                    <span>工具名称</span>
+                    <span>��������</span>
                     <strong>{apiConfigTestTarget.name}</strong>
                   </div>
                   <div>
-                    <span>MCP 工具名</span>
+                    <span>MCP ������</span>
                     <strong>{apiConfigTestTarget.resolved_tool_name}</strong>
                   </div>
                   <div>
-                    <span>请求方式</span>
+                    <span>����ʽ</span>
                     <strong>{apiConfigTestTarget.method}</strong>
                   </div>
                 </div>
@@ -6592,21 +6581,21 @@ function startEditLearner(item: AdminLearnerUser) {
                   }}
                 >
                   <div className="feedback-banner">
-                    真实参数值要填在这里，不是填在上面的“参数描述”里。当前接口至少需要传
+                    ��ʵ����ֵҪ��д�������������ġ���������������ǰ�ӿ�������Ҫ��
                     {` ${buildAPIParameterEditorState(apiConfigTestTarget)
                       .rows.filter((row) => row.name.trim())
                       .map((row) => row.name)
-                      .join("、") || "测试参数"}`}
-                    。
+                      .join("��") || "���Բ���"}`}
+                    ��
                   </div>
 
                   <label className="form-field">
-                    <span>生成的测试参数 JSON（自动生成）</span>
+                    <span>生成的测试参�?JSON（自动生成）</span>
                     <textarea
                       rows={12}
                       value={apiConfigTestArguments}
                       readOnly
-                      placeholder='{"keyword":"请输入真实题目"}'
+                      placeholder='{"keyword":"请输入真实题�?}'
                     />
                   </label>
 
@@ -6620,7 +6609,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       </pre>
                     </div>
                   ) : (
-                    <div className="feedback-banner">输入测试参数后点击“开始测试”，返回结果会显示在这个弹窗里。</div>
+                    <div className="feedback-banner">输入测试参数后点击“开始测试”，返回结果会显示在这个弹窗里�?/div>
                   )}
 
                   <div className="button-row">
@@ -6629,7 +6618,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       disabled={busyAction === `admin-api-config-test-${apiConfigTestTarget.id}`}
                       type="submit"
                     >
-                      {busyAction === `admin-api-config-test-${apiConfigTestTarget.id}` ? "测试中..." : "开始测试"}
+                      {busyAction === `admin-api-config-test-${apiConfigTestTarget.id}` ? "测试�?.." : "开始测�?}
                     </button>
                     <button className="secondary-button" onClick={closeAPIConfigTestModal} type="button">
                       关闭弹窗
@@ -6653,7 +6642,7 @@ function startEditLearner(item: AdminLearnerUser) {
               >
                 <div className="admin-edit-modal-header">
                   <div>
-                    <p className="section-eyebrow">当前页编辑</p>
+                    <p className="section-eyebrow">当前页编�?/p>
                     <h2 id="content-edit-modal-title">
                       {contentEditModal === "subject" ? "编辑学习科目" : null}
                       {contentEditModal === "category" ? "编辑内容分组" : null}
@@ -6700,7 +6689,7 @@ function startEditLearner(item: AdminLearnerUser) {
                       />
                     </label>
                     <label className="form-field">
-                      <span>科目简介</span>
+                      <span>科目简�?/span>
                       <textarea
                         rows={3}
                         value={subjectForm.description}
@@ -6721,7 +6710,7 @@ function startEditLearner(item: AdminLearnerUser) {
                     </label>
                     <div className="button-row">
                       <button className="primary-button" disabled={busyAction === "subject"} type="submit">
-                        {busyAction === "subject" ? "保存中..." : "保存科目"}
+                        {busyAction === "subject" ? "保存�?.." : "保存科目"}
                       </button>
                       <button className="secondary-button" onClick={closeContentEditModal} type="button">
                         取消
@@ -6790,7 +6779,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         />
                       </label>
                       <label className="form-field">
-                        <span>当前状态</span>
+                        <span>当前状�?/span>
                         <select
                           value={categoryForm.enabled ? "enabled" : "disabled"}
                           onChange={(event) => {
@@ -6817,7 +6806,7 @@ function startEditLearner(item: AdminLearnerUser) {
                     </label>
                     <div className="button-row">
                       <button className="primary-button" disabled={busyAction === "category"} type="submit">
-                        {busyAction === "category" ? "保存中..." : "保存分组"}
+                        {busyAction === "category" ? "保存�?.." : "保存分组"}
                       </button>
                       <button className="secondary-button" onClick={closeContentEditModal} type="button">
                         取消
@@ -6871,7 +6860,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         />
                       </label>
                       <label className="form-field">
-                        <span>当前状态</span>
+                        <span>当前状�?/span>
                         <select
                           value={gradeForm.enabled ? "enabled" : "disabled"}
                           onChange={(event) => {
@@ -6898,7 +6887,7 @@ function startEditLearner(item: AdminLearnerUser) {
                     </label>
                     <div className="button-row">
                       <button className="primary-button" disabled={busyAction === "grade"} type="submit">
-                        {busyAction === "grade" ? "保存中..." : "保存阶段"}
+                        {busyAction === "grade" ? "保存�?.." : "保存阶段"}
                       </button>
                       <button className="secondary-button" onClick={closeContentEditModal} type="button">
                         取消
@@ -6911,7 +6900,7 @@ function startEditLearner(item: AdminLearnerUser) {
                   <form className="setup-form admin-edit-modal-form" onSubmit={handleSaveWord}>
                     <div className="form-grid-two">
                       <label className="form-field">
-                        <span>所属科目</span>
+                        <span>所属科�?/span>
                         <select
                           value={wordEditor.subjectKey}
                           onChange={(event) => {
@@ -6933,7 +6922,7 @@ function startEditLearner(item: AdminLearnerUser) {
                           onChange={(event) => {
                             setWordEditor((current) => ({ ...current, legacyId: event.target.value }));
                           }}
-                          placeholder="可留空"
+                          placeholder="可留�?
                         />
                       </label>
                     </div>
@@ -6955,7 +6944,7 @@ function startEditLearner(item: AdminLearnerUser) {
                           onChange={(event) => {
                             setWordEditor((current) => ({ ...current, translation: event.target.value }));
                           }}
-                          placeholder="登机牌"
+                          placeholder="登机�?
                         />
                       </label>
                     </div>
@@ -6975,7 +6964,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             <option key={category.id} value={category.name} />
                           ))}
                         </datalist>
-                        <p className="helper-text">可以直接选择已有分类，也可以输入新的分类名称，保存后会自动归类。</p>
+                        <p className="helper-text">可以直接选择已有分类，也可以输入新的分类名称，保存后会自动归类�?/p>
                       </label>
                       <label className="form-field">
                         <span>学习阶段</span>
@@ -7024,7 +7013,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         onChange={(event) => {
                           setWordEditor((current) => ({ ...current, explanation: event.target.value }));
                         }}
-                        placeholder="这里可以记录例句、适用场景或运营备注。"
+                        placeholder="这里可以记录例句、适用场景或运营备注�?
                       />
                     </label>
                     <div className="form-grid-two">
@@ -7042,7 +7031,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             </option>
                           ))}
                         </select>
-                        <p className="helper-text">学员第一次加入学习时，会默认带入这个掌握等级。</p>
+                        <p className="helper-text">学员第一次加入学习时，会默认带入这个掌握等级�?/p>
                       </label>
                       <label className="form-field">
                         <span>默认学习难度</span>
@@ -7058,7 +7047,7 @@ function startEditLearner(item: AdminLearnerUser) {
                             </option>
                           ))}
                         </select>
-                        <p className="helper-text">学员第一次复习这个单词时，会默认使用这里的难度。</p>
+                        <p className="helper-text">学员第一次复习这个单词时，会默认使用这里的难度�?/p>
                       </label>
                     </div>
                     <label className="checkbox-field">
@@ -7073,7 +7062,7 @@ function startEditLearner(item: AdminLearnerUser) {
                     </label>
                     <div className="button-row">
                       <button className="primary-button" disabled={busyAction === "word"} type="submit">
-                        {busyAction === "word" ? "保存中..." : "保存单词"}
+                        {busyAction === "word" ? "保存�?.." : "保存单词"}
                       </button>
                       <button className="secondary-button" onClick={closeContentEditModal} type="button">
                         取消
@@ -7182,19 +7171,16 @@ function PagerControls(props: {
         onClick={() => props.onChange(Math.max(1, props.page - 1))}
         type="button"
       >
-        上一页
-      </button>
+        上一�?      </button>
       <span>
-        第 {props.page} / {totalPages} 页
-      </span>
+        �?{props.page} / {totalPages} �?      </span>
       <button
         className="secondary-button small-button"
         disabled={props.disabled || props.page >= totalPages}
         onClick={() => props.onChange(Math.min(totalPages, props.page + 1))}
         type="button"
       >
-        下一页
-      </button>
+        下一�?      </button>
     </div>
   );
 }
@@ -7367,9 +7353,9 @@ function paymentStatusLabel(status?: string) {
     case "failed":
       return "支付失败";
     case "closed":
-      return "已关闭";
+      return "已关�?;
     default:
-      return "待支付";
+      return "待支�?;
   }
 }
 
@@ -7404,13 +7390,13 @@ function subscriptionStatusClass(status?: string) {
 function subscriptionStatusLabel(status?: string) {
   switch (status) {
     case "active":
-      return "生效中";
+      return "生效�?;
     case "expired":
-      return "已过期";
+      return "已过�?;
     case "pending":
-      return "待生效";
+      return "待生�?;
     case "cancelled":
-      return "已取消";
+      return "已取�?;
     default:
       return status || "-";
   }
@@ -7425,15 +7411,15 @@ function paymentChannelLabel(channel?: string) {
     case "wechat_native":
       return "微信扫码支付";
     case "wechat_jsapi":
-      return "微信内支付";
+      return "微信内支�?;
     case "wechat_contract_pay":
       return "微信自动续费";
     case "wechat":
       return "微信支付";
     case "bank":
-      return "银行卡";
+      return "银行�?;
     case "alipay":
-      return "支付宝";
+      return "支付�?;
     case "cash":
       return "线下收款";
     default:
@@ -7479,7 +7465,7 @@ function permissionLabel(permission: string) {
     case "payment.read":
       return "查看支付订单";
     case "payment.write":
-      return "处理订单与会员";
+      return "处理订单与会�?;
     case "plan.read":
       return "查看收费方案";
     case "plan.write":
@@ -7493,7 +7479,7 @@ function permissionLabel(permission: string) {
     case "mcp.write":
       return "管理 MCP 接入";
     case "invite.read":
-      return "查看邀请统计";
+      return "查看邀请统�?;
     default:
       return permission;
   }
@@ -7530,9 +7516,9 @@ function noticeDialogTitleTag(tone: NoticeDialogTone) {
     case "success":
       return "操作完成";
     case "warning":
-      return "请确认";
+      return "请确�?;
     case "error":
-      return "需要处理";
+      return "需要处�?;
     default:
       return "温馨提示";
   }

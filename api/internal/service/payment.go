@@ -692,6 +692,41 @@ func (s *Service) LearnerHasActiveMembership(ctx context.Context, customerRef, s
 	return true, nil
 }
 
+func (s *Service) LearnerHasAnyActiveMembership(ctx context.Context, customerRef string) (bool, error) {
+	customerRef = strings.TrimSpace(customerRef)
+	if customerRef == "" {
+		return false, nil
+	}
+
+	var models []storage.MemberSubscription
+	if err := s.db.WithContext(ctx).
+		Where("customer_ref = ?", customerRef).
+		Order("subject_key asc, id desc").
+		Find(&models).Error; err != nil {
+		return false, err
+	}
+
+	seenSubjects := make(map[string]struct{}, len(models))
+	now := time.Now()
+	for _, model := range models {
+		subjectKey := normalizeKey(model.SubjectKey)
+		if _, exists := seenSubjects[subjectKey]; exists {
+			continue
+		}
+		seenSubjects[subjectKey] = struct{}{}
+
+		status := toSubscriptionStatus(model)
+		if status.Status != subscriptionStatusActive {
+			continue
+		}
+		if status.CurrentPeriodEnd != nil && status.CurrentPeriodEnd.Before(now) {
+			continue
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
 func (s *Service) getWechatPayConfigModel(ctx context.Context) (storage.WechatPayConfig, bool, error) {
 	var model storage.WechatPayConfig
 	err := s.db.WithContext(ctx).Order("id desc").First(&model).Error

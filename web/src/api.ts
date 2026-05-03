@@ -1099,7 +1099,6 @@ export const api = {
     pageSize: number;
     query?: string;
     category?: string;
-    subjectKey?: string;
     token?: string;
   }) {
     const search = new URLSearchParams({
@@ -1111,9 +1110,6 @@ export const api = {
     }
     if (params.category) {
       search.set("category", params.category);
-    }
-    if (params.subjectKey?.trim()) {
-      search.set("subject", params.subjectKey.trim());
     }
     return request<PagedMCPMarketTools>(`/api/v1/mcp/tools/market?${search.toString()}`, {
       headers: params.token?.trim()
@@ -2107,14 +2103,9 @@ export const api = {
     token: string,
     id: number,
     payload: { arguments: Record<string, unknown> },
-    subjectKey?: string,
   ) {
-    const search = new URLSearchParams();
-    if (subjectKey?.trim()) {
-      search.set("subject", subjectKey.trim());
-    }
     return request<APIConfigTestResult>(
-      `/api/v1/admin/api-configs/${id}/test${search.toString() ? `?${search.toString()}` : ""}`,
+      `/api/v1/admin/api-configs/${id}/test`,
       {
         method: "POST",
         headers: authHeaders(token),

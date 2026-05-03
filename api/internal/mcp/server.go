@@ -888,8 +888,11 @@ func (s *Server) callTool(ctx context.Context, session Session, req CallToolRequ
 }
 
 func (s *Server) subjectMembershipAccess(ctx context.Context, session Session) (bool, error) {
-	if strings.TrimSpace(session.Username) == "" || strings.TrimSpace(session.SubjectKey) == "" {
+	if strings.TrimSpace(session.Username) == "" {
 		return false, nil
+	}
+	if strings.TrimSpace(session.SubjectKey) == "" {
+		return s.service.LearnerHasAnyActiveMembership(ctx, session.Username)
 	}
 	return s.service.LearnerHasActiveMembership(ctx, session.Username, session.SubjectKey)
 }
