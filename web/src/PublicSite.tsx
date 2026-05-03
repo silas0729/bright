@@ -1160,15 +1160,6 @@ export default function PublicSite() {
             <p>{currentSettings.site_tagline}</p>
           </div>
         </a>
-        <nav className="site-topnav">
-          <a href="#catalog">词库学习</a>
-          <a href="#plans">会员方案</a>
-          <a href="#profile">个人中心</a>
-          {currentUser ? <a href="#profile-knowledge-base">我的知识库</a> : null}
-          {currentUser ? <a href="#profile-invite">邀请好友</a> : null}
-          {currentUser ? <a href="#profile-orders">购买记录</a> : null}
-          <a href="#mcp">MCP连接</a>
-        </nav>
         <div className="site-header-actions">
           {currentUser ? (
             <div className="site-account-menu" ref={accountMenuRef}>
@@ -1577,7 +1568,7 @@ export default function PublicSite() {
                             购买会员后，后台会直接把会员状态和有效期关联到账号 <strong>{currentUser.username}</strong>，你在前台继续学习时就能一直使用同一个账号。
                           </div>
                           <p className="helper-text">
-                            如果你准备开通会员，可以从顶部导航、这里的按钮，或者会员方案页面进入购买；付款完成后，这个账号就是后续所有学习记录的承接入口。
+                            如果你准备开通会员，可以直接从这里的按钮或会员方案页面进入购买；付款完成后，这个账号就是后续所有学习记录的承接入口。
                           </p>
                           <div className="button-row">
                             <a className="primary-button" href="#plans">
