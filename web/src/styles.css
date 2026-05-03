@@ -989,13 +989,13 @@ textarea {
 
 .mcp-console-stack {
   display: grid;
-  gap: 20px;
+  gap: 22px;
 }
 
 .mcp-hub-card {
   background:
-    radial-gradient(circle at top right, rgba(31, 41, 55, 0.05), transparent 24%),
-    linear-gradient(180deg, #ffffff 0%, #fbfbf8 100%);
+    radial-gradient(circle at top right, rgba(24, 54, 80, 0.08), transparent 24%),
+    linear-gradient(180deg, #ffffff 0%, #f9f8f4 100%);
 }
 
 .mcp-hub-layout {
@@ -1020,12 +1020,13 @@ textarea {
 
 .mcp-connection-hero {
   display: grid;
-  gap: 18px;
-  padding: 24px;
+  gap: 22px;
+  padding: 28px;
   border: 1px solid #dce4ee;
-  border-radius: 24px;
+  border-radius: 28px;
   background:
-    linear-gradient(135deg, #183650 0%, #0f2436 100%);
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.14), transparent 20%),
+    linear-gradient(135deg, #173450 0%, #10253b 100%);
   color: #eff5fb;
   box-shadow: 0 18px 40px rgba(16, 37, 59, 0.18);
 }
@@ -1037,12 +1038,33 @@ textarea {
 
 .mcp-connection-hero h3 {
   margin: 0;
-  font-size: 1.6rem;
+  font-size: 1.9rem;
+  line-height: 1.2;
 }
 
 .mcp-connection-hero-copy {
   display: grid;
   gap: 8px;
+}
+
+.mcp-hero-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.mcp-hero-side {
+  display: grid;
+  gap: 14px;
+  justify-items: flex-end;
+}
+
+.mcp-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .mcp-mode-pills {
@@ -1086,11 +1108,14 @@ textarea {
 
 .mcp-summary-card {
   display: grid;
-  gap: 8px;
-  padding: 18px;
+  gap: 12px;
+  min-height: 134px;
+  padding: 20px;
   border: 1px solid var(--line);
-  border-radius: 18px;
-  background: #ffffff;
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #fcfcf9 100%);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
 }
 
 .mcp-summary-card span {
@@ -1102,7 +1127,8 @@ textarea {
 }
 
 .mcp-summary-card strong {
-  font-size: 1.08rem;
+  max-width: 16ch;
+  font-size: 1.18rem;
   line-height: 1.4;
 }
 
@@ -1125,10 +1151,12 @@ textarea {
 .mcp-console-panel {
   display: grid;
   gap: 16px;
-  padding: 20px;
+  padding: 22px;
   border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface-soft);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #fbfbf8 100%);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
 }
 
 .mcp-info-card,
@@ -1158,6 +1186,34 @@ textarea {
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
+.mcp-bridge-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.mcp-bridge-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid #dde5ef;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.mcp-bridge-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mcp-bridge-card strong {
+  font-size: 1.06rem;
+  line-height: 1.4;
+}
+
 .mcp-address-preview {
   padding: 14px 16px;
   border: 1px solid #dde5ef;
@@ -1179,7 +1235,7 @@ textarea {
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid #dde6ef;
   border-radius: 16px;
   background: #ffffff;
@@ -1272,6 +1328,58 @@ textarea {
   gap: 14px;
 }
 
+.mcp-management-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px;
+  border: 1px solid #dbe4ee;
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, #f9fbfd 0%, #ffffff 100%);
+}
+
+.mcp-management-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.mcp-management-copy strong {
+  font-size: 1rem;
+}
+
+.mcp-management-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.mcp-management-stat {
+  min-width: 104px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  text-align: center;
+  background: #ffffff;
+}
+
+.mcp-management-stat strong {
+  display: block;
+  font-size: 1.16rem;
+  line-height: 1.2;
+}
+
+.mcp-management-stat span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .mcp-sidebar-head {
   display: flex;
   align-items: flex-start;
@@ -1353,6 +1461,41 @@ textarea {
   background: #ffffff;
 }
 
+.mcp-endpoint-table {
+  min-width: 1140px;
+  table-layout: fixed;
+}
+
+.mcp-endpoint-table th:nth-child(1),
+.mcp-endpoint-table td:nth-child(1) {
+  width: 18%;
+}
+
+.mcp-endpoint-table th:nth-child(2),
+.mcp-endpoint-table td:nth-child(2) {
+  width: 28%;
+}
+
+.mcp-endpoint-table th:nth-child(3),
+.mcp-endpoint-table td:nth-child(3) {
+  width: 18%;
+}
+
+.mcp-endpoint-table th:nth-child(4),
+.mcp-endpoint-table td:nth-child(4) {
+  width: 10%;
+}
+
+.mcp-endpoint-table th:nth-child(5),
+.mcp-endpoint-table td:nth-child(5) {
+  width: 12%;
+}
+
+.mcp-endpoint-table th:nth-child(6),
+.mcp-endpoint-table td:nth-child(6) {
+  width: 14%;
+}
+
 .mcp-data-table th {
   white-space: nowrap;
 }
@@ -1382,6 +1525,48 @@ textarea {
   font-size: 0.84rem;
   line-height: 1.6;
   word-break: break-word;
+}
+
+.mcp-name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mcp-mini-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #183650;
+  font-size: 0.72rem;
+  font-weight: 800;
+  background: #e8f0f8;
+}
+
+.mcp-url-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.mcp-url-text {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  color: #183650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: #f8fbff;
+  font-family: "Consolas", "SFMono-Regular", "Courier New", monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .mcp-action-group {
@@ -1416,6 +1601,40 @@ textarea {
   font-weight: 700;
 }
 
+.mcp-inspector-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.mcp-selected-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid #dde5ef;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.mcp-selected-banner-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.mcp-selected-banner-copy strong {
+  font-size: 1.04rem;
+}
+
+.mcp-selected-banner-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .mcp-endpoint-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1428,14 +1647,24 @@ textarea {
 }
 
 .mcp-endpoint-modal {
-  width: min(760px, 100%);
+  width: min(820px, 100%);
   max-height: calc(100vh - 36px);
   overflow: auto;
-  padding: 28px;
+  padding: 30px;
   border: 1px solid rgba(255, 255, 255, 0.82);
   border-radius: 28px;
-  background: #ffffff;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #fbfbf8 100%);
   box-shadow: var(--shadow-strong);
+}
+
+.mcp-modal-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
 }
 
 .mcp-modal-preview {
@@ -1455,6 +1684,10 @@ textarea {
   font-family: "Consolas", "SFMono-Regular", "Courier New", monospace;
   font-size: 0.86rem;
   line-height: 1.7;
+}
+
+.mcp-modal-actions {
+  justify-content: flex-end;
 }
 
 .account-panel-grid {
@@ -2251,6 +2484,8 @@ textarea {
   .hero-card,
   .profile-grid,
   .mcp-hub-layout,
+  .mcp-inspector-grid,
+  .mcp-bridge-grid,
   .mcp-tool-grid,
   .account-panel-grid,
   .mcp-console-grid,
@@ -2361,6 +2596,30 @@ textarea {
     width: 100%;
     justify-content: space-between;
   }
+
+  .mcp-hero-topline,
+  .mcp-management-band,
+  .mcp-selected-banner,
+  .mcp-modal-hero {
+    flex-direction: column;
+  }
+
+  .mcp-hero-side,
+  .mcp-selected-banner-meta {
+    justify-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  .mcp-hero-actions,
+  .mcp-management-stats {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .mcp-management-stat {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 @media (max-width: 640px) {
@@ -2397,6 +2656,30 @@ textarea {
   .payment-modal,
   .admin-edit-modal {
     padding: 18px;
+  }
+
+  .mcp-console-panel,
+  .mcp-connection-hero,
+  .mcp-endpoint-modal {
+    padding: 18px;
+    border-radius: 20px;
+  }
+
+  .mcp-summary-card,
+  .mcp-bridge-card,
+  .mcp-management-band,
+  .mcp-selected-banner,
+  .mcp-modal-preview {
+    border-radius: 18px;
+  }
+
+  .mcp-connection-hero h3 {
+    font-size: 1.56rem;
+  }
+
+  .mcp-url-cell {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .hero-card {
