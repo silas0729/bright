@@ -4,6 +4,8 @@ import {
   api,
   type APIConfig,
   type APIConfigTestResult,
+  type AdminInviteWithdrawDetail,
+  type AdminInviteWithdrawItem,
   type AdminLearnerUser,
   type AdminRole,
   type AdminSession,
@@ -17,6 +19,7 @@ import {
   type PagedAPIConfigs,
   type PagedAdminUsers,
   type PagedAdminInviteStats,
+  type PagedAdminInviteWithdrawRequests,
   type PagedCategories,
   type PagedGrades,
   type PagedKnowledgeBaseDocuments,
@@ -181,6 +184,11 @@ const rolePermissionGroups = [
         label: "查看邀请统计",
         description: "可以查看邀请效果、来源和相关统计数据。",
       },
+      {
+        code: "invite.write",
+        label: "处理邀请返佣",
+        description: "可以审核返佣提现、记录打款并管理邀请佣金流程。",
+      },
     ],
   },
 ] as const;
@@ -193,11 +201,13 @@ type ImportWorkspaceTab = "catalog-upload" | "knowledge-base-upload" | "knowledg
 type CatalogWorkspaceTab = "word-create" | "words" | "categories" | "grades";
 type PaymentWorkspaceTab = "plan-setup" | "wechat-pay" | "plans" | "orders";
 type AdminWorkspaceTab = "security" | "admins" | "roles";
-type MCPWorkspaceTab = "api-tools" | "tool-access" | "invite-stats";
+type MCPWorkspaceTab = "api-tools" | "tool-access" | "invite-stats" | "invite-withdraws";
 type WorkspaceTabItem<K extends string> = { key: K; label: string; helper?: string; count?: number };
 type ContentEditModal = "subject" | "category" | "grade" | "word" | null;
 type PanelEditModal = "plan" | "subscription" | "learner" | "admin" | "role" | null;
 type NoticeDialogTone = "info" | "success" | "error" | "warning";
+type MCPToolEnabledFilter = "" | "enabled" | "disabled";
+type MCPToolMembershipFilter = "" | "members" | "public";
 type APIParameterValueType = "string" | "number" | "boolean" | "object";
 type APIParameterLocation = "url" | "body" | "header";
 type APIParameterEditorRow = {
@@ -244,6 +254,7 @@ const defaultSiteForm: SiteSetting = {
     "英语单词学习,高频英语单词,场景英语词汇,英语学习网站,英语会员学习,英语词汇记忆",
   footer_text: "Brights 适合以英语高频词汇为主线持续学习，也支持后续扩展更多学科内容。",
   contact_email: "support@brights.local",
+  invite_commission_rate: 0,
 };
 
 const emptyAdminAPIConfigEditor: SaveAPIConfigInput & { id: number } = {
@@ -299,6 +310,11 @@ export default function AdminPortal() {
     paymentStatusFilter?: string;
     subscriptionStatusFilter?: string;
     subjectFilter?: string;
+    mcpToolEnabledFilter?: MCPToolEnabledFilter;
+    mcpToolMembershipFilter?: MCPToolMembershipFilter;
+    inviteWithdrawPage?: number;
+    inviteWithdrawQuery?: string;
+    inviteWithdrawStatusFilter?: string;
   }>(adminUIStateStorageKey, {});
 
   const [token, setToken] = useState("");
@@ -324,6 +340,9 @@ export default function AdminPortal() {
   const [mcpToolConfigs, setMcpToolConfigs] = useState<PagedMCPToolConfigs | null>(null);
   const [apiConfigs, setAPIConfigs] = useState<PagedAPIConfigs | null>(null);
   const [inviteStats, setInviteStats] = useState<PagedAdminInviteStats | null>(null);
+  const [inviteWithdraws, setInviteWithdraws] = useState<PagedAdminInviteWithdrawRequests | null>(null);
+  const [inviteWithdrawDetail, setInviteWithdrawDetail] = useState<AdminInviteWithdrawDetail | null>(null);
+  const [inviteWithdrawDetailLoading, setInviteWithdrawDetailLoading] = useState(false);
   const [wordFilterCategories, setWordFilterCategories] = useState<Category[]>([]);
   const [wordEditorCategories, setWordEditorCategories] = useState<Category[]>([]);
   const [stats, setStats] = useState<CatalogStats | null>(null);
@@ -500,10 +519,21 @@ export default function AdminPortal() {
   const [gradeQuery, setGradeQuery] = useState(persistedUIState.gradeQuery ?? "");
   const [knowledgeBaseQuery, setKnowledgeBaseQuery] = useState("");
   const [mcpToolQuery, setMcpToolQuery] = useState("");
+  const [mcpToolEnabledFilter, setMcpToolEnabledFilter] = useState<MCPToolEnabledFilter>(
+    persistedUIState.mcpToolEnabledFilter ?? "",
+  );
+  const [mcpToolMembershipFilter, setMcpToolMembershipFilter] = useState<MCPToolMembershipFilter>(
+    persistedUIState.mcpToolMembershipFilter ?? "",
+  );
   const [apiConfigPage, setAPIConfigPage] = useState(1);
   const [apiConfigQuery, setAPIConfigQuery] = useState("");
   const [inviteStatPage, setInviteStatPage] = useState(1);
   const [inviteStatQuery, setInviteStatQuery] = useState("");
+  const [inviteWithdrawPage, setInviteWithdrawPage] = useState(persistedUIState.inviteWithdrawPage ?? 1);
+  const [inviteWithdrawQuery, setInviteWithdrawQuery] = useState(persistedUIState.inviteWithdrawQuery ?? "");
+  const [inviteWithdrawStatusFilter, setInviteWithdrawStatusFilter] = useState(
+    persistedUIState.inviteWithdrawStatusFilter ?? "",
+  );
   const [paymentQuery, setPaymentQuery] = useState(persistedUIState.paymentQuery ?? "");
   const [subscriptionQuery, setSubscriptionQuery] = useState(persistedUIState.subscriptionQuery ?? "");
   const [learnerStatusFilter, setLearnerStatusFilter] = useState(persistedUIState.learnerStatusFilter ?? "");
@@ -531,6 +561,7 @@ export default function AdminPortal() {
   const deferredMCPToolQuery = useDeferredValue(mcpToolQuery);
   const deferredAPIConfigQuery = useDeferredValue(apiConfigQuery);
   const deferredInviteStatQuery = useDeferredValue(inviteStatQuery);
+  const deferredInviteWithdrawQuery = useDeferredValue(inviteWithdrawQuery);
   const deferredPaymentQuery = useDeferredValue(paymentQuery);
   const deferredSubscriptionQuery = useDeferredValue(subscriptionQuery);
   const rolePermissionSelections = parsePermissionInput(roleEditor.permissions);
@@ -581,8 +612,11 @@ export default function AdminPortal() {
   const canViewInviteStats =
     currentAdmin?.is_super === true ||
     permissionSet.has("*") ||
+    permissionSet.has("invite.write") ||
     permissionSet.has("invite.read") ||
     permissionSet.has("learner.read");
+  const canManageInviteStats =
+    currentAdmin?.is_super === true || permissionSet.has("*") || permissionSet.has("invite.write");
   const useWechatPayPublicKeyMode = wechatPayForm.authMode !== "auto_certificate";
   const noticeDialog = authError
     ? {
@@ -1135,6 +1169,8 @@ export default function AdminPortal() {
             page: mcpToolPage,
             pageSize: adminPageSize,
             query: deferredMCPToolQuery,
+            enabled: mcpToolEnabledFilter,
+            requiresMembership: mcpToolMembershipFilter,
           })
         : Promise.resolve(null),
       canViewMCPTools
@@ -1149,6 +1185,14 @@ export default function AdminPortal() {
             page: inviteStatPage,
             pageSize: adminPageSize,
             query: deferredInviteStatQuery,
+          })
+        : Promise.resolve(null),
+      canViewInviteStats
+        ? api.adminInviteWithdraws(token, {
+            page: inviteWithdrawPage,
+            pageSize: adminPageSize,
+            query: deferredInviteWithdrawQuery,
+            status: inviteWithdrawStatusFilter || undefined,
           })
         : Promise.resolve(null),
       canViewSiteSettings ? api.adminSiteSettings(token) : Promise.resolve(null),
@@ -1194,6 +1238,7 @@ export default function AdminPortal() {
           mcpToolConfigData,
           apiConfigData,
           inviteStatData,
+          inviteWithdrawData,
           siteData,
           learnerData,
           configResult,
@@ -1215,6 +1260,7 @@ export default function AdminPortal() {
           setMcpToolConfigs((mcpToolConfigData as PagedMCPToolConfigs | null) ?? null);
           setAPIConfigs((apiConfigData as PagedAPIConfigs | null) ?? null);
           setInviteStats((inviteStatData as PagedAdminInviteStats | null) ?? null);
+          setInviteWithdraws((inviteWithdrawData as PagedAdminInviteWithdrawRequests | null) ?? null);
           setSiteSettings((siteData as SiteSetting | null) ?? null);
           if (siteData) {
             setSiteForm(siteData as SiteSetting);
@@ -1263,14 +1309,19 @@ export default function AdminPortal() {
     deferredCategoryQuery,
     deferredGradeQuery,
     deferredInviteStatQuery,
+    deferredInviteWithdrawQuery,
     deferredKnowledgeBaseQuery,
     deferredLearnerQuery,
     deferredMCPToolQuery,
+    mcpToolEnabledFilter,
+    mcpToolMembershipFilter,
     deferredPaymentQuery,
     deferredSubscriptionQuery,
     deferredWordQuery,
     gradePage,
     inviteStatPage,
+    inviteWithdrawPage,
+    inviteWithdrawStatusFilter,
     knowledgeBasePage,
     learnerPage,
     learnerStatusFilter,
@@ -1444,6 +1495,11 @@ export default function AdminPortal() {
         paymentStatusFilter,
         subscriptionStatusFilter,
         subjectFilter,
+        mcpToolEnabledFilter,
+        mcpToolMembershipFilter,
+        inviteWithdrawPage,
+        inviteWithdrawQuery,
+        inviteWithdrawStatusFilter,
       }),
     );
   }, [
@@ -1467,6 +1523,11 @@ export default function AdminPortal() {
     paymentStatusFilter,
     subscriptionStatusFilter,
     subjectFilter,
+    mcpToolEnabledFilter,
+    mcpToolMembershipFilter,
+    inviteWithdrawPage,
+    inviteWithdrawQuery,
+    inviteWithdrawStatusFilter,
   ]);
 
   async function handleSetupBootstrap(event: FormEvent<HTMLFormElement>) {
@@ -1754,6 +1815,59 @@ export default function AdminPortal() {
       await api.adminUpdateMCPToolConfig(token, toolName, payload);
       setReloadKey((current) => current + 1);
       setNotice("MCP 工具配置已更新。");
+    } catch (err) {
+      setDataError((err as Error).message);
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function handleLoadInviteWithdrawDetail(withdrawID: number) {
+    if (!token || withdrawID <= 0 || !canViewInviteStats) {
+      return;
+    }
+
+    setInviteWithdrawDetailLoading(true);
+    setDataError("");
+    try {
+      const result = await api.adminInviteWithdrawDetail(token, withdrawID);
+      setInviteWithdrawDetail(result);
+    } catch (err) {
+      setDataError((err as Error).message);
+      setInviteWithdrawDetail(null);
+    } finally {
+      setInviteWithdrawDetailLoading(false);
+    }
+  }
+
+  async function handleProcessInviteWithdraw(item: AdminInviteWithdrawItem, action: "approve" | "reject" | "pay") {
+    if (!token || !canManageInviteStats) {
+      return;
+    }
+
+    const actionLabel =
+      action === "approve" ? "审核通过" : action === "reject" ? "驳回提现" : "确认打款";
+    const note = window.prompt(`${actionLabel}备注，可留空：`, item.admin_note || "");
+    if (note === null) {
+      return;
+    }
+
+    setBusyAction(`invite-withdraw-${action}-${item.id}`);
+    setDataError("");
+    setNotice("");
+    try {
+      if (action === "approve") {
+        await api.adminApproveInviteWithdraw(token, item.id, note.trim());
+      } else if (action === "reject") {
+        await api.adminRejectInviteWithdraw(token, item.id, note.trim());
+      } else {
+        await api.adminPayInviteWithdraw(token, item.id, note.trim());
+      }
+      setReloadKey((current) => current + 1);
+      setNotice(`提现申请 #${item.id} 已${actionLabel}。`);
+      if (inviteWithdrawDetail?.withdraw.id === item.id) {
+        await handleLoadInviteWithdrawDetail(item.id);
+      }
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -3214,7 +3328,7 @@ function startEditLearner(item: AdminLearnerUser) {
 
   const importTabItems: Array<WorkspaceTabItem<ImportWorkspaceTab>> = [
     { key: "catalog-upload", label: "词库导入", helper: "CSV / Excel" },
-    { key: "knowledge-base-upload", label: "知识库导入", helper: "TXT / Markdown / 表格" },
+    { key: "knowledge-base-upload", label: "知识库导入", helper: "TXT / Markdown / 表格 / Word" },
     { key: "knowledge-base-docs", label: "知识库文档", helper: "已上传文档", count: knowledgeBaseDocuments?.total ?? 0 },
     { key: "subjects", label: "科目管理", helper: "已开通科目", count: subjects.length },
     { key: "categories", label: "分组管理", helper: "当前分组", count: categories?.total ?? 0 },
@@ -3480,7 +3594,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         <span>选择知识库文件</span>
                         <label className={`upload-picker ${knowledgeBaseForm.file ? "upload-picker-ready" : ""}`}>
                           <input
-                            accept=".txt,.md,.csv,.xlsx"
+                              accept=".txt,.md,.csv,.xlsx,.docx"
                             className="upload-picker-input"
                             onChange={(event) => {
                               const file = event.target.files?.[0] ?? null;
@@ -3499,7 +3613,7 @@ function startEditLearner(item: AdminLearnerUser) {
                               <span>
                                 {knowledgeBaseForm.file
                                   ? `文件大小 ${formatFileSize(knowledgeBaseForm.file.size)}，上传后会自动切分为可检索片段`
-                                  : "支持 TXT、Markdown、CSV、Excel，上传后可通过开放接口和 MCP 工具检索"}
+                                  : "支持 TXT、Markdown、CSV、Excel、Word(.docx)，上传后可通过开放接口和 MCP 工具检索"}
                               </span>
                             </div>
                             <span className="upload-picker-action">{knowledgeBaseForm.file ? "重新选择" : "选择文件"}</span>
@@ -3507,7 +3621,7 @@ function startEditLearner(item: AdminLearnerUser) {
                         </label>
                       </label>
                       <div className="upload-hint-list">
-                        <span className="tag">支持 TXT</span>
+                            <span className="tag">支持 TXT / Word</span>
                         <span className="tag">支持 Markdown</span>
                         <span className="tag">支持 CSV / Excel</span>
                         <span className="tag">自动切片检索</span>
@@ -3572,7 +3686,7 @@ function startEditLearner(item: AdminLearnerUser) {
                           formatCount(item.character_count),
                           formatDateTime(item.updated_at),
                         ])}
-                        emptyText="当前还没有知识库文档，先上传一份文本或表格文件试试。"
+                    emptyText="当前还没有知识库文档，先上传一份文本、表格或 Word 文件试试。"
                       />
                       {(knowledgeBaseDocuments?.items ?? []).length > 0 ? (
                         <div className="table-wrap">
@@ -5249,15 +5363,39 @@ function startEditLearner(item: AdminLearnerUser) {
                       <h2>MCP 工具配置</h2>
                       <p className="helper-text">管理员可以决定哪些工具开放、哪些工具需要会员才能调用。</p>
                     </div>
-                    <input
-                      className="toolbar-search"
-                      value={mcpToolQuery}
-                      onChange={(event) => {
-                        setMcpToolQuery(event.target.value);
-                        setMcpToolPage(1);
-                      }}
-                      placeholder="搜索工具名、标题、分类或来源"
-                    />
+                    <div className="button-row">
+                      <select
+                        value={mcpToolEnabledFilter}
+                        onChange={(event) => {
+                          setMcpToolEnabledFilter(event.target.value as MCPToolEnabledFilter);
+                          setMcpToolPage(1);
+                        }}
+                      >
+                        <option value="">全部状态</option>
+                        <option value="enabled">仅看已启用</option>
+                        <option value="disabled">仅看已停用</option>
+                      </select>
+                      <select
+                        value={mcpToolMembershipFilter}
+                        onChange={(event) => {
+                          setMcpToolMembershipFilter(event.target.value as MCPToolMembershipFilter);
+                          setMcpToolPage(1);
+                        }}
+                      >
+                        <option value="">全部权限</option>
+                        <option value="members">仅看需要会员</option>
+                        <option value="public">仅看公开可用</option>
+                      </select>
+                      <input
+                        className="toolbar-search"
+                        value={mcpToolQuery}
+                        onChange={(event) => {
+                          setMcpToolQuery(event.target.value);
+                          setMcpToolPage(1);
+                        }}
+                        placeholder="搜索工具名、标题、分类或来源"
+                      />
+                    </div>
                   </div>
                   <DataTable
                     columns={canManageMCPTools ? ["工具", "分类", "来源", "说明", "开关", "会员"] : ["工具", "分类", "来源", "说明", "开关", "会员"]}

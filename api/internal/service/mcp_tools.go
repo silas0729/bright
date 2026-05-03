@@ -103,6 +103,12 @@ func (s *Service) ListAdminMCPToolConfigs(ctx context.Context, filter domain.MCP
 	if category := strings.TrimSpace(filter.Category); category != "" {
 		query = query.Where("category = ?", normalizeToolCategory(category))
 	}
+	if filter.IsEnabled != nil {
+		query = query.Where("is_enabled = ?", *filter.IsEnabled)
+	}
+	if filter.RequiresMembership != nil {
+		query = query.Where("requires_membership = ?", *filter.RequiresMembership)
+	}
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {

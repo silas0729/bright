@@ -26,10 +26,12 @@ type MCPToolConfig struct {
 }
 
 type MCPToolConfigFilter struct {
-	Query    string
-	Category string
-	Page     int
-	PageSize int
+	Query              string
+	Category           string
+	IsEnabled          *bool
+	RequiresMembership *bool
+	Page               int
+	PageSize           int
 }
 
 type PagedMCPToolConfigs struct {
@@ -112,7 +114,7 @@ func DefaultMCPToolDefinitions() []MCPToolDefinition {
 		{
 			Name:                      "search_knowledge_base",
 			Title:                     "Search Knowledge Base",
-			Description:               "Search uploaded text or spreadsheet knowledge base content.",
+			Description:               "Search uploaded text, spreadsheet, or Word knowledge base content.",
 			Category:                  "knowledge",
 			SourceType:                "builtin",
 			DefaultEnabled:            true,
@@ -121,7 +123,7 @@ func DefaultMCPToolDefinitions() []MCPToolDefinition {
 		{
 			Name:                      "list_my_knowledge_base_documents",
 			Title:                     "List My Knowledge Base Documents",
-			Description:               "List the current learner's uploaded knowledge base documents.",
+			Description:               "List the current learner's uploaded text, spreadsheet, or Word knowledge base documents.",
 			Category:                  "knowledge",
 			SourceType:                "builtin",
 			DefaultEnabled:            true,

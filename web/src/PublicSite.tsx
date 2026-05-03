@@ -8,6 +8,7 @@ import {
   type CaptchaChallenge,
   type CatalogStats,
   type ClassificationStat,
+  type InvitePayoutProfile,
   type InviteSummary,
   type KnowledgeBaseChunk,
   type KnowledgeBaseDocument,
@@ -16,6 +17,8 @@ import {
   type LearnerUser,
   type PagedAPIConfigs,
   type PagedClassificationStats,
+  type PagedInviteCommissionRecords,
+  type PagedInviteWithdrawRequests,
   type PagedKnowledgeBaseDocuments,
   type PagedLearningWordProgress,
   type PagedMCPMarketTools,
@@ -123,6 +126,14 @@ const emptyAPIConfigEditor: SaveAPIConfigInput & { id: number } = {
   is_active: true,
   is_public: false,
   allow_admin_publish: false,
+};
+
+const emptyInvitePayoutProfile: InvitePayoutProfile = {
+  real_name: "",
+  wechat_account: "",
+  wechat_qr_code: "",
+  alipay_account: "",
+  alipay_qr_code: "",
 };
 
 const apiParameterTypeOptions: Array<{ value: APIParameterValueType; label: string }> = [
@@ -314,6 +325,9 @@ export default function PublicSite() {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
   const [noticeDialog, setNoticeDialog] = useState<NoticeDialogState | null>(null);
   const [inviteSummary, setInviteSummary] = useState<InviteSummary | null>(null);
+  const [invitePayoutProfile, setInvitePayoutProfile] = useState<InvitePayoutProfile>(emptyInvitePayoutProfile);
+  const [inviteCommissions, setInviteCommissions] = useState<PagedInviteCommissionRecords | null>(null);
+  const [inviteWithdraws, setInviteWithdraws] = useState<PagedInviteWithdrawRequests | null>(null);
   const [paymentOrders, setPaymentOrders] = useState<PagedPaymentOrders | null>(null);
   const [membershipHistory, setMembershipHistory] = useState<PagedSubscriptions | null>(null);
   const [knowledgeBaseDocuments, setKnowledgeBaseDocuments] = useState<PagedKnowledgeBaseDocuments | null>(null);
@@ -326,8 +340,14 @@ export default function PublicSite() {
   const [profileReloadKey, setProfileReloadKey] = useState(0);
   const [orderHistoryPage, setOrderHistoryPage] = useState(1);
   const [membershipHistoryPage, setMembershipHistoryPage] = useState(1);
+  const [inviteCommissionPage, setInviteCommissionPage] = useState(1);
+  const [inviteWithdrawPage, setInviteWithdrawPage] = useState(1);
   const [knowledgeBasePage, setKnowledgeBasePage] = useState(1);
   const [knowledgeBaseQuery, setKnowledgeBaseQuery] = useState("");
+  const [inviteWithdrawForm, setInviteWithdrawForm] = useState({
+    amount: "",
+    paymentType: "alipay",
+  });
   const [knowledgeBaseForm, setKnowledgeBaseForm] = useState({
     file: null as File | null,
     fileName: "",
@@ -378,6 +398,8 @@ export default function PublicSite() {
   const membershipExpiryText = formatMembershipExpiry(currentMembership);
   const currentInviteCode = (inviteSummary?.invite_code || currentUser?.invite_code || "").trim();
   const inviteRegistrationLink = buildInviteRegistrationLink(currentInviteCode);
+  const inviteAvailableCommissionCents = inviteSummary?.commission_available_cents ?? 0;
+  const inviteCommissionRate = inviteSummary?.commission_rate ?? 0;
   const membershipBadgeText = currentMembership
     ? hasActiveMembership
       ? "\u4f1a\u5458\u5df2\u5f00\u901a"
@@ -569,6 +591,9 @@ export default function PublicSite() {
   useEffect(() => {
     if (!session?.access_token) {
       setInviteSummary(null);
+      setInvitePayoutProfile(emptyInvitePayoutProfile);
+      setInviteCommissions(null);
+      setInviteWithdraws(null);
       setPaymentOrders(null);
       setMembershipHistory(null);
       setKnowledgeBaseDocuments(null);
@@ -580,6 +605,15 @@ export default function PublicSite() {
     let active = true;
     Promise.all([
       api.learnerInviteSummary(session.access_token),
+      api.learnerInvitePayoutProfile(session.access_token),
+      api.learnerInviteCommissions(session.access_token, {
+        page: inviteCommissionPage,
+        pageSize: profilePageSize,
+      }),
+      api.learnerInviteWithdraws(session.access_token, {
+        page: inviteWithdrawPage,
+        pageSize: profilePageSize,
+      }),
       api.learnerPaymentOrders(session.access_token, {
         page: orderHistoryPage,
         pageSize: profilePageSize,
@@ -597,11 +631,14 @@ export default function PublicSite() {
         subjectKey,
       }),
     ])
-      .then(([inviteData, orderData, membershipData, knowledgeBaseData]) => {
+      .then(([inviteData, payoutData, commissionData, withdrawData, orderData, membershipData, knowledgeBaseData]) => {
         if (!active) {
           return;
         }
         setInviteSummary(inviteData);
+        setInvitePayoutProfile(payoutData);
+        setInviteCommissions(commissionData);
+        setInviteWithdraws(withdrawData);
         setPaymentOrders(orderData);
         setMembershipHistory(membershipData);
         setKnowledgeBaseDocuments(knowledgeBaseData);
@@ -616,7 +653,17 @@ export default function PublicSite() {
     return () => {
       active = false;
     };
-  }, [session, subjectKey, orderHistoryPage, membershipHistoryPage, knowledgeBasePage, deferredKnowledgeBaseQuery, profileReloadKey]);
+  }, [
+    deferredKnowledgeBaseQuery,
+    inviteCommissionPage,
+    inviteWithdrawPage,
+    knowledgeBasePage,
+    membershipHistoryPage,
+    orderHistoryPage,
+    profileReloadKey,
+    session,
+    subjectKey,
+  ]);
 
   useEffect(() => {
     if (!session?.access_token) {
@@ -1369,6 +1416,115 @@ export default function PublicSite() {
       setProfileNotice("注册链接已复制。");
     } catch {
       setProfileError("复制注册链接失败，请手动复制。");
+    }
+  }
+
+  async function handleSaveInvitePayoutProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session?.access_token) {
+      return;
+    }
+
+    const payload = {
+      real_name: invitePayoutProfile.real_name.trim(),
+      wechat_account: invitePayoutProfile.wechat_account.trim(),
+      wechat_qr_code: invitePayoutProfile.wechat_qr_code.trim(),
+      alipay_account: invitePayoutProfile.alipay_account.trim(),
+      alipay_qr_code: invitePayoutProfile.alipay_qr_code.trim(),
+    };
+
+    setProfileBusyAction("invite-payout-save");
+    try {
+      const result = await api.learnerSaveInvitePayoutProfile(session.access_token, payload);
+      setInvitePayoutProfile(result);
+      setProfileNotice("返佣收款资料已保存。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  function handleFillInviteWithdrawAmount() {
+    setInviteWithdrawForm((current) => ({
+      ...current,
+      amount: formatPriceInput(inviteAvailableCommissionCents),
+    }));
+  }
+
+  async function handleCreateInviteWithdraw(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session?.access_token) {
+      return;
+    }
+    if (inviteAvailableCommissionCents <= 0) {
+      setProfileError("当前没有可提现的返佣金额。");
+      return;
+    }
+
+    const amountCents = parsePriceInputToCents(inviteWithdrawForm.amount);
+    if (amountCents <= 0) {
+      setProfileError("请输入正确的提现金额。");
+      return;
+    }
+
+    const paymentType = inviteWithdrawForm.paymentType === "wechat" ? "wechat" : "alipay";
+    if (
+      paymentType === "wechat" &&
+      !invitePayoutProfile.wechat_account.trim() &&
+      !invitePayoutProfile.wechat_qr_code.trim()
+    ) {
+      setProfileError("请先完善微信提现账号或收款码。");
+      return;
+    }
+    if (
+      paymentType === "alipay" &&
+      !invitePayoutProfile.alipay_account.trim() &&
+      !invitePayoutProfile.alipay_qr_code.trim()
+    ) {
+      setProfileError("请先完善支付宝收款账号或收款码。");
+      return;
+    }
+
+    setProfileBusyAction("invite-withdraw-create");
+    try {
+      await api.learnerCreateInviteWithdraw(session.access_token, {
+        amount_cents: amountCents,
+        payment_type: paymentType,
+      });
+      setInviteWithdrawForm((current) => ({ ...current, amount: "" }));
+      setInviteWithdrawPage(1);
+      setInviteCommissionPage(1);
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice("提现申请已提交，请等待管理员审核打款。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleCancelInviteWithdraw(item: { id: number; amount_cents: number }) {
+    if (!session?.access_token) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `确认取消这笔 ${formatPrice(item.amount_cents)} 的提现申请吗？取消后对应返佣会重新回到可提现余额。`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setProfileBusyAction(`invite-withdraw-cancel-${item.id}`);
+    try {
+      await api.learnerCancelInviteWithdraw(session.access_token, item.id);
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice("提现申请已取消。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
     }
   }
 
@@ -3194,6 +3350,114 @@ export default function PublicSite() {
                       {(inviteSummary?.items ?? []).length === 0 ? (
                         <div className="feedback-banner">分享邀请码后，你邀请注册的用户和他们的付费记录会显示在这里。</div>
                       ) : null}
+                      <div className="section-header">
+                        <div>
+                          <p className="section-eyebrow">邀请返佣明细</p>
+                          <h3>每一笔好友充值带来的佣金记录都在这里</h3>
+                        </div>
+                      </div>
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>好友账号</th>
+                              <th>订单号</th>
+                              <th>充值金额</th>
+                              <th>佣金比例</th>
+                              <th>佣金金额</th>
+                              <th>状态</th>
+                              <th>支付时间</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(inviteCommissions?.items ?? []).map((item) => (
+                              <tr key={item.id}>
+                                <td>{item.invited_display_name || item.invited_username || "-"}</td>
+                                <td>{item.payment_order_no}</td>
+                                <td>{formatPrice(item.order_amount_cents)}</td>
+                                <td>{formatCommissionRate(item.commission_rate)}</td>
+                                <td>{formatPrice(item.commission_cents)}</td>
+                                <td>
+                                  <span className={`pill ${inviteCommissionStatusClass(item)}`}>{inviteCommissionStatusLabel(item)}</span>
+                                </td>
+                                <td>{item.order_paid_at ? formatDateTime(item.order_paid_at) : "-"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {(inviteCommissions?.items ?? []).length === 0 ? (
+                        <div className="feedback-banner">好友充值成功后，返佣记录会自动出现在这里。</div>
+                      ) : null}
+                      <PagerControls
+                        onChange={setInviteCommissionPage}
+                        page={inviteCommissions?.page ?? inviteCommissionPage}
+                        pageSize={inviteCommissions?.page_size ?? profilePageSize}
+                        total={inviteCommissions?.total ?? 0}
+                      />
+                      <div className="section-header">
+                        <div>
+                          <p className="section-eyebrow">提现申请记录</p>
+                          <h3>提交、审核、打款状态一页看清</h3>
+                        </div>
+                      </div>
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>申请单号</th>
+                              <th>提现金额</th>
+                              <th>方式</th>
+                              <th>状态</th>
+                              <th>申请时间</th>
+                              <th>处理时间</th>
+                              <th>说明</th>
+                              <th>操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(inviteWithdraws?.items ?? []).map((item) => {
+                              const cancelBusy = profileBusyAction === `invite-withdraw-cancel-${item.id}`;
+                              return (
+                                <tr key={item.id}>
+                                  <td>{item.id}</td>
+                                  <td>{formatPrice(item.amount_cents)}</td>
+                                  <td>{invitePaymentTypeLabel(item.payment_type)}</td>
+                                  <td>
+                                    <span className={`pill ${inviteWithdrawStatusClass(item.status)}`}>{inviteWithdrawStatusLabel(item.status)}</span>
+                                  </td>
+                                  <td>{formatDateTime(item.created_at)}</td>
+                                  <td>{item.processed_at ? formatDateTime(item.processed_at) : "-"}</td>
+                                  <td>{item.admin_note || "-"}</td>
+                                  <td>
+                                    {item.status === "pending" ? (
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={cancelBusy}
+                                        onClick={() => void handleCancelInviteWithdraw(item)}
+                                        type="button"
+                                      >
+                                        {cancelBusy ? "取消中..." : "取消申请"}
+                                      </button>
+                                    ) : (
+                                      <span className="helper-text">-</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      {(inviteWithdraws?.items ?? []).length === 0 ? (
+                        <div className="feedback-banner">你提交的返佣提现申请会显示在这里。</div>
+                      ) : null}
+                      <PagerControls
+                        onChange={setInviteWithdrawPage}
+                        page={inviteWithdraws?.page ?? inviteWithdrawPage}
+                        pageSize={inviteWithdraws?.page_size ?? profilePageSize}
+                        total={inviteWithdraws?.total ?? 0}
+                      />
                     </>
                   ) : (
                     <div className="feedback-banner">登录后可查看邀请码、邀请人数和累计充值统计。</div>
@@ -3206,7 +3470,7 @@ export default function PublicSite() {
                   <div className="section-header">
                     <div>
                       <p className="section-eyebrow">我的知识库</p>
-                      <h2>上传文本、Markdown、CSV、Excel 作为你自己的 MCP 私有知识库</h2>
+                      <h2>上传文本、Markdown、CSV、Excel、Word 作为你自己的 MCP 私有知识库</h2>
                     </div>
                   </div>
                   {currentUser ? (
@@ -3218,7 +3482,7 @@ export default function PublicSite() {
                             <span>选择知识库文件</span>
                             <label className={`upload-picker ${knowledgeBaseForm.file ? "upload-picker-ready" : ""}`}>
                               <input
-                                accept=".txt,.md,.csv,.xlsx"
+                                accept=".txt,.md,.csv,.xlsx,.docx"
                                 className="upload-picker-input"
                                 onChange={(event) => {
                                   const file = event.target.files?.[0] ?? null;
@@ -3237,7 +3501,7 @@ export default function PublicSite() {
                                   <span>
                                     {knowledgeBaseForm.file
                                       ? `文件大小 ${formatFileSize(knowledgeBaseForm.file?.size ?? 0)}，上传后仅当前账号和对应 MCP 检索可见`
-                                      : "支持 TXT、Markdown、CSV、Excel，上传后会自动切片用于检索"}
+                                      : "支持 TXT、Markdown、CSV、Excel、Word(.docx)，上传后会自动切片用于检索"}
                                   </span>
                                 </div>
                                 <span className="upload-picker-action">{knowledgeBaseForm.file ? "重新选择" : "选择文件"}</span>
@@ -3246,7 +3510,7 @@ export default function PublicSite() {
                           </label>
                           <div className="upload-hint-list">
                             <span className="tag">私有知识库</span>
-                            <span className="tag">支持 TXT / Markdown</span>
+                            <span className="tag">支持 TXT / Markdown / Word</span>
                             <span className="tag">支持 CSV / Excel</span>
                             <span className="tag">支持 MCP 检索</span>
                           </div>
@@ -3362,7 +3626,7 @@ export default function PublicSite() {
                         </table>
                       </div>
                       {(knowledgeBaseDocuments?.items ?? []).length === 0 ? (
-                        <div className="feedback-banner">当前还没有上传个人知识库文件，先上传一份文本或表格试试。</div>
+                        <div className="feedback-banner">当前还没有上传个人知识库文件，先上传一份文本、表格或 Word 文件试试。</div>
                       ) : null}
                       <PagerControls
                         onChange={setKnowledgeBasePage}
@@ -5201,6 +5465,32 @@ function formatPrice(value: number) {
   return `${(value / 100).toFixed(2)} 元`;
 }
 
+function formatPriceInput(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "";
+  }
+  return (value / 100).toFixed(2);
+}
+
+function parsePriceInputToCents(value: string) {
+  const normalized = value.trim().replace(/[^0-9.]/g, "");
+  if (!normalized) {
+    return 0;
+  }
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return 0;
+  }
+  return Math.round(amount * 100);
+}
+
+function formatCommissionRate(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0%";
+  }
+  return `${Number(value.toFixed(2))}%`;
+}
+
 function formatPercent(value: number) {
   return `${Math.round(Math.max(0, value) * 100)}%`;
 }
@@ -5414,6 +5704,72 @@ function subscriptionStatusClass(status?: string) {
       return "pill-danger";
     default:
       return "pill-muted";
+  }
+}
+
+function inviteCommissionStatusLabel(item: { status?: string; withdraw_request_id?: number }) {
+  if (item.status === "paid") {
+    return "已打款";
+  }
+  if (item.status === "cancelled") {
+    return "已取消";
+  }
+  if (item.withdraw_request_id) {
+    return "提现处理中";
+  }
+  return "可提现";
+}
+
+function inviteCommissionStatusClass(item: { status?: string; withdraw_request_id?: number }) {
+  if (item.status === "paid") {
+    return "pill-success";
+  }
+  if (item.status === "cancelled") {
+    return "pill-danger";
+  }
+  if (item.withdraw_request_id) {
+    return "pill-warning";
+  }
+  return "pill-muted";
+}
+
+function inviteWithdrawStatusLabel(status?: string) {
+  switch (status) {
+    case "approved":
+      return "已审核";
+    case "paid":
+      return "已打款";
+    case "rejected":
+      return "已驳回";
+    case "cancelled":
+      return "已取消";
+    default:
+      return "待审核";
+  }
+}
+
+function inviteWithdrawStatusClass(status?: string) {
+  switch (status) {
+    case "approved":
+      return "pill-warning";
+    case "paid":
+      return "pill-success";
+    case "rejected":
+    case "cancelled":
+      return "pill-danger";
+    default:
+      return "pill-muted";
+  }
+}
+
+function invitePaymentTypeLabel(value?: string) {
+  switch ((value ?? "").trim().toLowerCase()) {
+    case "wechat":
+      return "微信";
+    case "alipay":
+      return "支付宝";
+    default:
+      return value || "-";
   }
 }
 

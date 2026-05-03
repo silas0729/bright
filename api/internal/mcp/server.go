@@ -530,7 +530,7 @@ func (s *Server) tools(ctx context.Context, session *Session) []Tool {
 		{
 			Name:        "search_knowledge_base",
 			Title:       "Search Knowledge Base",
-			Description: "Search uploaded text or spreadsheet knowledge base content.",
+			Description: "Search uploaded text, spreadsheet, or Word knowledge base content.",
 			Category:    "knowledge",
 			SourceType:  "builtin",
 			Enabled:     true,
@@ -546,7 +546,7 @@ func (s *Server) tools(ctx context.Context, session *Session) []Tool {
 		{
 			Name:        "list_my_knowledge_base_documents",
 			Title:       "List My Knowledge Base Documents",
-			Description: "List the current learner's uploaded knowledge base documents.",
+			Description: "List the current learner's uploaded text, spreadsheet, or Word knowledge base documents.",
 			Category:    "knowledge",
 			SourceType:  "builtin",
 			Enabled:     true,

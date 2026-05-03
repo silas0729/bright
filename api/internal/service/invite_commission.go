@@ -30,11 +30,11 @@ const (
 )
 
 type inviteCommissionStats struct {
-	CommissionRate       float64
-	AvailableCents       int64
-	WithdrawingCents     int64
-	PaidCents            int64
-	TotalCents           int64
+	CommissionRate   float64
+	AvailableCents   int64
+	WithdrawingCents int64
+	PaidCents        int64
+	TotalCents       int64
 }
 
 func (s *Service) GetInvitePayoutProfile(ctx context.Context, learnerID uint) (domain.InvitePayoutProfile, error) {

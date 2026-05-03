@@ -2245,7 +2245,17 @@ export const api = {
       body: JSON.stringify({ admin_note }),
     });
   },
-  adminMCPToolConfigs(token: string, params: { page: number; pageSize: number; query?: string; category?: string }) {
+  adminMCPToolConfigs(
+    token: string,
+    params: {
+      page: number;
+      pageSize: number;
+      query?: string;
+      category?: string;
+      enabled?: "enabled" | "disabled" | "";
+      requiresMembership?: "members" | "public" | "";
+    },
+  ) {
     const search = new URLSearchParams({
       page: String(params.page),
       page_size: String(params.pageSize),
@@ -2255,6 +2265,14 @@ export const api = {
     }
     if (params.category) {
       search.set("category", params.category);
+    }
+    if (params.enabled) {
+      search.set("enabled", params.enabled);
+    }
+    if (params.requiresMembership === "members") {
+      search.set("requires_membership", "true");
+    } else if (params.requiresMembership === "public") {
+      search.set("requires_membership", "false");
     }
     return request<PagedMCPToolConfigs>(`/api/v1/admin/mcp/tools?${search.toString()}`, {
       headers: { Authorization: `Bearer ${token}` },

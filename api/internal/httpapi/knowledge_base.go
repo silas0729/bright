@@ -52,7 +52,7 @@ func (s *Server) handleAdminKnowledgeBaseDocumentChunks(c *gin.Context) {
 func (s *Server) handleAdminImportKnowledgeBase(c *gin.Context) {
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
-		writeError(c, http.StatusBadRequest, domainError("please choose a txt, md, csv, or xlsx file"))
+		writeError(c, http.StatusBadRequest, domainError("please choose a txt, md, csv, xlsx, or docx file"))
 		return
 	}
 
@@ -210,7 +210,7 @@ func (s *Server) handleLearnerImportKnowledgeBase(c *gin.Context) {
 
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
-		writeError(c, http.StatusBadRequest, domainError("please choose a txt, md, csv, or xlsx file"))
+		writeError(c, http.StatusBadRequest, domainError("please choose a txt, md, csv, xlsx, or docx file"))
 		return
 	}
 
