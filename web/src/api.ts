@@ -287,6 +287,156 @@ export interface PagedKnowledgeBaseChunks {
   page_size: number;
 }
 
+export interface APIConfig {
+  id: number;
+  name: string;
+  tool_name: string;
+  resolved_tool_name: string;
+  url: string;
+  method: string;
+  category: string;
+  category_color: string;
+  icon: string;
+  description: string;
+  headers: string;
+  body: string;
+  parameters: string;
+  is_active: boolean;
+  is_public: boolean;
+  allow_admin_publish: boolean;
+  owner_learner_user_id?: number;
+  owner_admin_user_id?: number;
+  owner_name?: string;
+  owner_type?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PagedAPIConfigs {
+  items: APIConfig[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface SaveAPIConfigInput {
+  name: string;
+  tool_name: string;
+  url: string;
+  method: string;
+  category: string;
+  category_color: string;
+  icon: string;
+  description: string;
+  headers: string;
+  body: string;
+  parameters: string;
+  is_active: boolean;
+  is_public?: boolean;
+  allow_admin_publish?: boolean;
+}
+
+export interface APIConfigTestResult {
+  status_code: number;
+  headers?: Record<string, string>;
+  body?: unknown;
+  raw_body?: string;
+}
+
+export interface APIConfigMarketResponse {
+  items: APIConfig[];
+  total: number;
+}
+
+export interface XiaomiConfig {
+  id?: number;
+  learner_user_id: number;
+  username: string;
+  xiaomi_user_id: string;
+  server: string;
+  is_active: boolean;
+  has_credentials: boolean;
+  device_count: number;
+  last_sync_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SaveXiaomiConfigInput {
+  username: string;
+  xiaomi_user_id: string;
+  server: string;
+  ssecurity: string;
+  service_token: string;
+  is_active: boolean;
+}
+
+export interface XiaomiHome {
+  id: string;
+  name: string;
+  owner_id?: string;
+  raw?: Record<string, unknown>;
+}
+
+export interface XiaomiDevice {
+  did: string;
+  name: string;
+  model: string;
+  token?: string;
+  localip?: string;
+  spec_type?: string;
+  home_id?: string;
+  home_name?: string;
+  room_id?: string;
+  room_name?: string;
+  is_online: boolean;
+  is_shared?: boolean;
+  raw?: Record<string, unknown>;
+}
+
+export interface XiaomiDeviceListResult {
+  account: {
+    username: string;
+    xiaomi_user_id: string;
+    server: string;
+    is_active: boolean;
+    has_credentials: boolean;
+    device_count: number;
+    last_sync_at?: string;
+  };
+  devices: XiaomiDevice[];
+  total: number;
+  refreshed: boolean;
+}
+
+export interface XiaomiDeviceMatch {
+  did: string;
+  name: string;
+  model: string;
+  spec_type?: string;
+}
+
+export interface XiaomiQRLoginResult {
+  success: boolean;
+  session_id: string;
+  qr_image: string;
+  login_url?: string;
+  timeout: number;
+  server: string;
+  message?: string;
+}
+
+export interface XiaomiQRCheckResult {
+  success?: boolean;
+  status?: string;
+  message?: string;
+  user_id?: string | number;
+  xiaomi_user_id?: string;
+  ssecurity?: string;
+  service_token?: string;
+  config?: XiaomiConfig;
+}
+
 export interface MCPToolConfig {
   id: number;
   tool_name: string;
@@ -621,12 +771,19 @@ export interface MCPInfo {
   websocketPath: string;
   websocketURL: string;
   availableMethods: string[];
+  toolCount?: number;
   tools: MCPInfoTool[];
   auth?: {
     mode?: string;
     queryTokenParam?: string;
     querySubjectParam?: string;
     requiresMembership?: boolean;
+    tokenOptionalForInfo?: boolean;
+  };
+  viewer?: {
+    isAuthenticated?: boolean;
+    username?: string;
+    subjectKey?: string;
   };
   examples?: Record<string, unknown>;
 }
@@ -825,13 +982,19 @@ export const api = {
   getPlans() {
     return request<Plan[]>("/api/v1/plans");
   },
-  getMCPInfo(subjectKey?: string) {
+  getMCPInfo(subjectKey?: string, token?: string) {
     const search = new URLSearchParams();
     if (subjectKey?.trim()) {
       search.set("subject", subjectKey.trim());
     }
     const query = search.toString();
-    return request<MCPInfo>(query ? `/mcp/info?${query}` : "/mcp/info");
+    return request<MCPInfo>(query ? `/mcp/info?${query}` : "/mcp/info", {
+      headers: token?.trim()
+        ? {
+            Authorization: `Bearer ${token.trim()}`,
+          }
+        : undefined,
+    });
   },
   listLearnerMCPEndpoints(token: string) {
     return request<MCPEndpoint[]>("/api/v1/auth/mcp/endpoints", {
@@ -1028,6 +1191,190 @@ export const api = {
   learnerDeleteKnowledgeBaseDocument(token: string, id: number) {
     return request<{ success: boolean }>(`/api/v1/auth/knowledge-base/documents/${id}`, {
       method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerAPIConfigMarket(params?: { query?: string; category?: string; token?: string }) {
+    const search = new URLSearchParams();
+    if (params?.query) {
+      search.set("q", params.query);
+    }
+    if (params?.category) {
+      search.set("category", params.category);
+    }
+    return request<APIConfigMarketResponse>(`/api/v1/api-configs/market${search.toString() ? `?${search.toString()}` : ""}`, {
+      headers: params?.token
+        ? {
+            Authorization: `Bearer ${params.token}`,
+          }
+        : undefined,
+    });
+  },
+  learnerAPIConfigs(token: string, params: { page: number; pageSize: number; query?: string; category?: string }) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.category) {
+      search.set("category", params.category);
+    }
+    return request<PagedAPIConfigs>(`/api/v1/auth/api-configs?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerCreateAPIConfig(token: string, payload: SaveAPIConfigInput) {
+    return request<APIConfig>("/api/v1/auth/api-configs", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerUpdateAPIConfig(token: string, id: number, payload: SaveAPIConfigInput) {
+    return request<APIConfig>(`/api/v1/auth/api-configs/${id}`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerDeleteAPIConfig(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/auth/api-configs/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerTestAPIConfig(
+    token: string,
+    id: number,
+    payload: { arguments: Record<string, unknown> },
+    subjectKey?: string,
+  ) {
+    const search = new URLSearchParams();
+    if (subjectKey?.trim()) {
+      search.set("subject", subjectKey.trim());
+    }
+    return request<APIConfigTestResult>(
+      `/api/v1/auth/api-configs/${id}/test${search.toString() ? `?${search.toString()}` : ""}`,
+      {
+        method: "POST",
+        headers: authHeaders(token),
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  learnerXiaomiConfig(token: string) {
+    return request<XiaomiConfig>("/api/v1/auth/xiaomi/config", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerSaveXiaomiConfig(token: string, payload: SaveXiaomiConfigInput) {
+    return request<XiaomiConfig>("/api/v1/auth/xiaomi/config", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerClearXiaomiTokens(token: string) {
+    return request<{ success: boolean }>("/api/v1/auth/xiaomi/tokens", {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerStartXiaomiQRLogin(token: string, server: string) {
+    return request<XiaomiQRLoginResult>("/api/v1/auth/xiaomi/qr-login", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ server }),
+    });
+  },
+  learnerCheckXiaomiQRLogin(token: string, sessionID: string) {
+    return request<XiaomiQRCheckResult>(`/api/v1/auth/xiaomi/qr-check/${encodeURIComponent(sessionID)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerXiaomiHomes(token: string) {
+    return request<XiaomiHome[]>("/api/v1/auth/xiaomi/homes", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerXiaomiDevices(token: string, refresh?: boolean) {
+    const search = new URLSearchParams();
+    if (refresh) {
+      search.set("refresh", "true");
+    }
+    return request<XiaomiDeviceListResult>(
+      `/api/v1/auth/xiaomi/devices${search.toString() ? `?${search.toString()}` : ""}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+  },
+  learnerRefreshXiaomiDevices(token: string) {
+    return request<{ success: boolean; device_count: number; devices: XiaomiDevice[] }>("/api/v1/auth/xiaomi/devices/refresh", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerSearchXiaomiDevices(token: string, query: string, limit = 10) {
+    const search = new URLSearchParams({ q: query, limit: String(limit) });
+    return request<{ items: XiaomiDeviceMatch[]; total: number }>(`/api/v1/auth/xiaomi/devices/search?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerXiaomiDeviceStatus(token: string, did: string, options?: { properties?: string[]; includeMetadata?: boolean }) {
+    const search = new URLSearchParams();
+    if (options?.properties?.length) {
+      search.set("properties", options.properties.join(","));
+    }
+    if (options?.includeMetadata === false) {
+      search.set("include_metadata", "false");
+    }
+    return request<Record<string, unknown>>(
+      `/api/v1/auth/xiaomi/devices/${encodeURIComponent(did)}/status${search.toString() ? `?${search.toString()}` : ""}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+  },
+  learnerControlXiaomiDevice(token: string, payload: Record<string, unknown>) {
+    return request<Record<string, unknown>>("/api/v1/auth/xiaomi/devices/control", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerXiaomiPropGet(token: string, payload: Record<string, unknown>) {
+    return request<unknown>("/api/v1/auth/xiaomi/miot/prop/get", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerXiaomiPropSet(token: string, payload: Record<string, unknown>) {
+    return request<unknown>("/api/v1/auth/xiaomi/miot/prop/set", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerXiaomiAction(token: string, payload: Record<string, unknown>) {
+    return request<unknown>("/api/v1/auth/xiaomi/miot/action", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerXiaomiPropGetBatch(token: string, items: Array<Record<string, unknown>>) {
+    return request<unknown>("/api/v1/auth/xiaomi/miot/prop/get-batch", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ items }),
+    });
+  },
+  learnerXiaomiMiotSpec(token: string, model: string) {
+    return request<{ spec: unknown; summary: unknown }>(`/api/v1/auth/xiaomi/miot/spec?model=${encodeURIComponent(model)}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
   },
@@ -1487,6 +1834,60 @@ export const api = {
     return request<MCPToolConfig[]>("/api/v1/admin/mcp/tools", {
       headers: { Authorization: `Bearer ${token}` },
     });
+  },
+  adminAPIConfigs(token: string, params: { page: number; pageSize: number; query?: string; category?: string }) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.category) {
+      search.set("category", params.category);
+    }
+    return request<PagedAPIConfigs>(`/api/v1/admin/api-configs?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminCreateAPIConfig(token: string, payload: SaveAPIConfigInput) {
+    return request<APIConfig>("/api/v1/admin/api-configs", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  adminUpdateAPIConfig(token: string, id: number, payload: SaveAPIConfigInput) {
+    return request<APIConfig>(`/api/v1/admin/api-configs/${id}`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  adminDeleteAPIConfig(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/admin/api-configs/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminTestAPIConfig(
+    token: string,
+    id: number,
+    payload: { arguments: Record<string, unknown> },
+    subjectKey?: string,
+  ) {
+    const search = new URLSearchParams();
+    if (subjectKey?.trim()) {
+      search.set("subject", subjectKey.trim());
+    }
+    return request<APIConfigTestResult>(
+      `/api/v1/admin/api-configs/${id}/test${search.toString() ? `?${search.toString()}` : ""}`,
+      {
+        method: "POST",
+        headers: authHeaders(token),
+        body: JSON.stringify(payload),
+      },
+    );
   },
   adminUpdateMCPToolConfig(token: string, toolName: string, payload: UpdateMCPToolConfigInput) {
     return request<MCPToolConfig>(`/api/v1/admin/mcp/tools/${encodeURIComponent(toolName)}`, {

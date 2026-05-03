@@ -144,11 +144,11 @@ func (s *Server) HandleInfo(c *gin.Context) {
 		"toolCount":        len(toolItems),
 		"tools":            toolItems,
 		"auth": gin.H{
-			"mode":                  "learner_bearer_or_query_token",
-			"queryTokenParam":       "token",
-			"querySubjectParam":     "subject",
-			"tokenOptionalForInfo":  true,
-			"requiresMembership":    true,
+			"mode":                 "learner_bearer_or_query_token",
+			"queryTokenParam":      "token",
+			"querySubjectParam":    "subject",
+			"tokenOptionalForInfo": true,
+			"requiresMembership":   true,
 		},
 		"viewer": gin.H{
 			"isAuthenticated": session != nil && strings.TrimSpace(session.Username) != "",
@@ -292,10 +292,10 @@ func (s *Server) handleRequest(ctx context.Context, session Session, req Request
 }
 
 type Session struct {
-	UserID     uint
-	Username   string
-	SubjectKey string
-	Token      string
+	UserID      uint
+	Username    string
+	SubjectKey  string
+	Token       string
 	HTTPBaseURL string
 }
 
@@ -316,10 +316,10 @@ func (s *Server) authenticateRequest(c *gin.Context) (Session, error) {
 	}
 
 	return Session{
-		UserID:     claims.UserID,
-		Username:   claims.Username,
-		SubjectKey: strings.TrimSpace(subjectKey),
-		Token:      token,
+		UserID:      claims.UserID,
+		Username:    claims.Username,
+		SubjectKey:  strings.TrimSpace(subjectKey),
+		Token:       token,
 		HTTPBaseURL: requestHTTPBaseURL(c.Request),
 	}, nil
 }

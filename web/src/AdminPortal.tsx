@@ -2,6 +2,8 @@ import { useDeferredValue, useEffect, useState, type ChangeEvent, type FormEvent
 
 import {
   api,
+  type APIConfig,
+  type APIConfigTestResult,
   type AdminLearnerUser,
   type AdminRole,
   type AdminSession,
@@ -12,6 +14,7 @@ import {
   type CatalogStats,
   type Grade,
   type MCPToolConfig,
+  type PagedAPIConfigs,
   type PagedAdminUsers,
   type PagedAdminInviteStats,
   type PagedCategories,
@@ -23,6 +26,7 @@ import {
   type PagedWords,
   type PaymentOrderStatus,
   type Plan,
+  type SaveAPIConfigInput,
   type SiteSetting,
   type Subject,
   type SubscriptionStatus,
@@ -206,6 +210,24 @@ const defaultSiteForm: SiteSetting = {
   contact_email: "support@brights.local",
 };
 
+const emptyAdminAPIConfigEditor: SaveAPIConfigInput & { id: number } = {
+  id: 0,
+  name: "",
+  tool_name: "",
+  url: "",
+  method: "GET",
+  category: "admin",
+  category_color: "",
+  icon: "",
+  description: "",
+  headers: "{}",
+  body: "",
+  parameters: "[]",
+  is_active: true,
+  is_public: true,
+  allow_admin_publish: true,
+};
+
 export default function AdminPortal() {
   const persistedUIState = readStoredState<{
     activeSection?: AdminSection;
@@ -244,6 +266,7 @@ export default function AdminPortal() {
   const [grades, setGrades] = useState<PagedGrades | null>(null);
   const [knowledgeBaseDocuments, setKnowledgeBaseDocuments] = useState<PagedKnowledgeBaseDocuments | null>(null);
   const [mcpToolConfigs, setMcpToolConfigs] = useState<MCPToolConfig[]>([]);
+  const [apiConfigs, setAPIConfigs] = useState<PagedAPIConfigs | null>(null);
   const [inviteStats, setInviteStats] = useState<PagedAdminInviteStats | null>(null);
   const [wordFilterCategories, setWordFilterCategories] = useState<Category[]>([]);
   const [wordEditorCategories, setWordEditorCategories] = useState<Category[]>([]);
@@ -416,6 +439,8 @@ export default function AdminPortal() {
   const [categoryQuery, setCategoryQuery] = useState(persistedUIState.categoryQuery ?? "");
   const [gradeQuery, setGradeQuery] = useState(persistedUIState.gradeQuery ?? "");
   const [knowledgeBaseQuery, setKnowledgeBaseQuery] = useState("");
+  const [apiConfigPage, setAPIConfigPage] = useState(1);
+  const [apiConfigQuery, setAPIConfigQuery] = useState("");
   const [inviteStatPage, setInviteStatPage] = useState(1);
   const [inviteStatQuery, setInviteStatQuery] = useState("");
   const [paymentQuery, setPaymentQuery] = useState(persistedUIState.paymentQuery ?? "");
@@ -425,6 +450,9 @@ export default function AdminPortal() {
   const [subscriptionStatusFilter, setSubscriptionStatusFilter] =
     useState(persistedUIState.subscriptionStatusFilter ?? "");
   const [subjectFilter, setSubjectFilter] = useState(persistedUIState.subjectFilter ?? "english");
+  const [apiConfigEditor, setAPIConfigEditor] = useState(emptyAdminAPIConfigEditor);
+  const [apiConfigTestArguments, setAPIConfigTestArguments] = useState("{}");
+  const [apiConfigTestResult, setAPIConfigTestResult] = useState<APIConfigTestResult | null>(null);
 
   const deferredAdminUserQuery = useDeferredValue(adminUserQuery);
   const deferredLearnerQuery = useDeferredValue(learnerQuery);
@@ -432,6 +460,7 @@ export default function AdminPortal() {
   const deferredCategoryQuery = useDeferredValue(categoryQuery);
   const deferredGradeQuery = useDeferredValue(gradeQuery);
   const deferredKnowledgeBaseQuery = useDeferredValue(knowledgeBaseQuery);
+  const deferredAPIConfigQuery = useDeferredValue(apiConfigQuery);
   const deferredInviteStatQuery = useDeferredValue(inviteStatQuery);
   const deferredPaymentQuery = useDeferredValue(paymentQuery);
   const deferredSubscriptionQuery = useDeferredValue(subscriptionQuery);
@@ -702,6 +731,13 @@ export default function AdminPortal() {
         subjectKey: subjectFilter,
       }),
       canViewMCPTools ? api.adminMCPToolConfigs(token) : Promise.resolve([]),
+      canViewMCPTools
+        ? api.adminAPIConfigs(token, {
+            page: apiConfigPage,
+            pageSize: adminPageSize,
+            query: deferredAPIConfigQuery,
+          })
+        : Promise.resolve(null),
       canViewInviteStats
         ? api.adminInviteStats(token, {
             page: inviteStatPage,
@@ -750,6 +786,7 @@ export default function AdminPortal() {
           gradeData,
           knowledgeBaseData,
           mcpToolConfigData,
+          apiConfigData,
           inviteStatData,
           siteData,
           learnerData,
@@ -770,6 +807,7 @@ export default function AdminPortal() {
           setGrades(gradeData);
           setKnowledgeBaseDocuments(knowledgeBaseData);
           setMcpToolConfigs((mcpToolConfigData as MCPToolConfig[]) ?? []);
+          setAPIConfigs((apiConfigData as PagedAPIConfigs | null) ?? null);
           setInviteStats((inviteStatData as PagedAdminInviteStats | null) ?? null);
           setSiteSettings((siteData as SiteSetting | null) ?? null);
           if (siteData) {
@@ -806,6 +844,7 @@ export default function AdminPortal() {
     };
   }, [
     adminUserPage,
+    apiConfigPage,
     canViewLearners,
     canViewInviteStats,
     canViewMCPTools,
@@ -814,6 +853,7 @@ export default function AdminPortal() {
     categoryPage,
     currentAdmin,
     deferredAdminUserQuery,
+    deferredAPIConfigQuery,
     deferredCategoryQuery,
     deferredGradeQuery,
     deferredInviteStatQuery,
@@ -1286,6 +1326,117 @@ export default function AdminPortal() {
       await api.adminUpdateMCPToolConfig(token, toolName, payload);
       setReloadKey((current) => current + 1);
       setNotice("MCP 工具配置已更新。");
+    } catch (err) {
+      setDataError((err as Error).message);
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  function resetAPIConfigEditor() {
+    setAPIConfigEditor(emptyAdminAPIConfigEditor);
+    setAPIConfigTestArguments("{}");
+    setAPIConfigTestResult(null);
+  }
+
+  function toAPIConfigPayload(item: APIConfig | (SaveAPIConfigInput & { id?: number })): SaveAPIConfigInput {
+    return {
+      name: item.name,
+      tool_name: item.tool_name,
+      url: item.url,
+      method: item.method,
+      category: item.category,
+      category_color: item.category_color,
+      icon: item.icon,
+      description: item.description,
+      headers: item.headers,
+      body: item.body,
+      parameters: item.parameters,
+      is_active: item.is_active,
+      is_public: item.is_public,
+      allow_admin_publish: item.allow_admin_publish,
+    };
+  }
+
+  function startEditAPIConfig(item: APIConfig) {
+    setAPIConfigEditor({
+      id: item.id,
+      ...toAPIConfigPayload(item),
+    });
+    setAPIConfigTestResult(null);
+  }
+
+  async function handleSaveAPIConfig(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !canManageMCPTools) {
+      return;
+    }
+    setBusyAction("admin-api-config-save");
+    setDataError("");
+    setNotice("");
+    setAPIConfigTestResult(null);
+    try {
+      const payload = toAPIConfigPayload(apiConfigEditor);
+      if (apiConfigEditor.id > 0) {
+        await api.adminUpdateAPIConfig(token, apiConfigEditor.id, payload);
+        setNotice("API 工具配置已更新。");
+      } else {
+        await api.adminCreateAPIConfig(token, payload);
+        setNotice("API 工具配置已创建。");
+      }
+      resetAPIConfigEditor();
+      setAPIConfigPage(1);
+      setReloadKey((current) => current + 1);
+    } catch (err) {
+      setDataError((err as Error).message);
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function handleDeleteAPIConfig(item: APIConfig) {
+    if (!token || !canManageMCPTools) {
+      return;
+    }
+    const confirmed = window.confirm(`确认删除 API 配置“${item.name || item.resolved_tool_name}”吗？`);
+    if (!confirmed) {
+      return;
+    }
+    setBusyAction(`admin-api-config-delete-${item.id}`);
+    setDataError("");
+    setNotice("");
+    try {
+      await api.adminDeleteAPIConfig(token, item.id);
+      if (apiConfigEditor.id === item.id) {
+        resetAPIConfigEditor();
+      }
+      setReloadKey((current) => current + 1);
+      setNotice("API 工具配置已删除。");
+    } catch (err) {
+      setDataError((err as Error).message);
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function handleTestAPIConfig(item: APIConfig) {
+    if (!token || !canViewMCPTools) {
+      return;
+    }
+    let argumentsPayload: Record<string, unknown> = {};
+    try {
+      argumentsPayload = apiConfigTestArguments.trim() ? (JSON.parse(apiConfigTestArguments) as Record<string, unknown>) : {};
+    } catch {
+      setDataError("测试参数必须是有效 JSON。");
+      return;
+    }
+    setBusyAction(`admin-api-config-test-${item.id}`);
+    setDataError("");
+    setNotice("");
+    try {
+      const result = await api.adminTestAPIConfig(token, item.id, { arguments: argumentsPayload }, subjectFilter);
+      setAPIConfigTestResult(result);
+      setNotice("API 工具测试已完成。");
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -4374,6 +4525,251 @@ function startEditLearner(item: AdminLearnerUser) {
                   <h1>MCP 工具权限、会员门槛与邀请统计</h1>
                 </div>
               </div>
+
+              {canViewMCPTools ? (
+                <article className="content-card">
+                  <div className="section-toolbar">
+                    <div>
+                      <h2>API 接口工具管理</h2>
+                      <p className="helper-text">这里维护后台和用户可见的动态 API 工具，保存后会自动同步进 MCP 工具列表。</p>
+                    </div>
+                  </div>
+
+                  <div className="profile-grid">
+                    <form className="setup-form" onSubmit={handleSaveAPIConfig}>
+                      <label className="form-field">
+                        <span>工具名称</span>
+                        <input
+                          value={apiConfigEditor.name}
+                          onChange={(event) => {
+                            setAPIConfigEditor((current) => ({ ...current, name: event.target.value }));
+                          }}
+                          placeholder="例如：查询工单"
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>MCP 工具名</span>
+                        <input
+                          value={apiConfigEditor.tool_name}
+                          onChange={(event) => {
+                            setAPIConfigEditor((current) => ({ ...current, tool_name: event.target.value }));
+                          }}
+                          placeholder="例如：query_ticket_status"
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>请求地址</span>
+                        <input
+                          value={apiConfigEditor.url}
+                          onChange={(event) => {
+                            setAPIConfigEditor((current) => ({ ...current, url: event.target.value }));
+                          }}
+                          placeholder="https://example.com/api"
+                        />
+                      </label>
+                      <div className="button-row">
+                        <label className="form-field" style={{ flex: 1 }}>
+                          <span>请求方法</span>
+                          <select
+                            value={apiConfigEditor.method}
+                            onChange={(event) => {
+                              setAPIConfigEditor((current) => ({ ...current, method: event.target.value }));
+                            }}
+                          >
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="PATCH">PATCH</option>
+                            <option value="DELETE">DELETE</option>
+                            <option value="HEAD">HEAD</option>
+                          </select>
+                        </label>
+                        <label className="form-field" style={{ flex: 1 }}>
+                          <span>分类</span>
+                          <input
+                            value={apiConfigEditor.category}
+                            onChange={(event) => {
+                              setAPIConfigEditor((current) => ({ ...current, category: event.target.value }));
+                            }}
+                            placeholder="admin"
+                          />
+                        </label>
+                      </div>
+                      <label className="form-field">
+                        <span>说明</span>
+                        <textarea
+                          rows={3}
+                          value={apiConfigEditor.description}
+                          onChange={(event) => {
+                            setAPIConfigEditor((current) => ({ ...current, description: event.target.value }));
+                          }}
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>Headers JSON</span>
+                        <textarea
+                          rows={4}
+                          value={apiConfigEditor.headers}
+                          onChange={(event) => {
+                            setAPIConfigEditor((current) => ({ ...current, headers: event.target.value }));
+                          }}
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>Body JSON / 模板</span>
+                        <textarea
+                          rows={4}
+                          value={apiConfigEditor.body}
+                          onChange={(event) => {
+                            setAPIConfigEditor((current) => ({ ...current, body: event.target.value }));
+                          }}
+                        />
+                      </label>
+                      <label className="form-field">
+                        <span>参数定义 JSON</span>
+                        <textarea
+                          rows={4}
+                          value={apiConfigEditor.parameters}
+                          onChange={(event) => {
+                            setAPIConfigEditor((current) => ({ ...current, parameters: event.target.value }));
+                          }}
+                        />
+                      </label>
+                      <div className="button-row">
+                        <label className="tag">
+                          <input
+                            checked={apiConfigEditor.is_active}
+                            onChange={(event) => {
+                              setAPIConfigEditor((current) => ({ ...current, is_active: event.target.checked }));
+                            }}
+                            type="checkbox"
+                          />
+                          启用
+                        </label>
+                        <label className="tag">
+                          <input
+                            checked={Boolean(apiConfigEditor.is_public)}
+                            onChange={(event) => {
+                              setAPIConfigEditor((current) => ({ ...current, is_public: event.target.checked }));
+                            }}
+                            type="checkbox"
+                          />
+                          公开
+                        </label>
+                        <label className="tag">
+                          <input
+                            checked={Boolean(apiConfigEditor.allow_admin_publish)}
+                            onChange={(event) => {
+                              setAPIConfigEditor((current) => ({ ...current, allow_admin_publish: event.target.checked }));
+                            }}
+                            type="checkbox"
+                          />
+                          允许代发
+                        </label>
+                      </div>
+                      <div className="button-row">
+                        <button className="primary-button" disabled={busyAction === "admin-api-config-save"} type="submit">
+                          {busyAction === "admin-api-config-save"
+                            ? "保存中..."
+                            : apiConfigEditor.id > 0
+                              ? "更新 API 配置"
+                              : "创建 API 配置"}
+                        </button>
+                        <button className="secondary-button" onClick={resetAPIConfigEditor} type="button">
+                          新建空白
+                        </button>
+                      </div>
+                    </form>
+
+                    <div className="profile-card-body">
+                      <label className="form-field">
+                        <span>测试参数 JSON</span>
+                        <textarea
+                          rows={10}
+                          value={apiConfigTestArguments}
+                          onChange={(event) => {
+                            setAPIConfigTestArguments(event.target.value);
+                          }}
+                          placeholder='{"query":"hello"}'
+                        />
+                      </label>
+                      {apiConfigTestResult ? (
+                        <div className="feedback-banner">
+                          <strong>最近一次状态：</strong> {apiConfigTestResult.status_code}
+                          <pre className="code-panel">
+                            {JSON.stringify(apiConfigTestResult.body ?? apiConfigTestResult.raw_body ?? apiConfigTestResult, null, 2)}
+                          </pre>
+                        </div>
+                      ) : (
+                        <div className="feedback-banner">从下面表格挑一个已有 API 工具来测试，结果会显示在这里。</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="section-toolbar">
+                    <div>
+                      <h2>API 配置列表</h2>
+                      <p className="helper-text">管理员创建的工具会自动进入工具市场，也会同步到 MCP 工具权限配置表。</p>
+                    </div>
+                    <input
+                      className="toolbar-search"
+                      value={apiConfigQuery}
+                      onChange={(event) => {
+                        setAPIConfigQuery(event.target.value);
+                        setAPIConfigPage(1);
+                      }}
+                      placeholder="搜索名称、工具名或分类"
+                    />
+                  </div>
+                  <DataTable
+                    columns={["名称", "工具名", "方法", "分类", "归属", "状态", "公开", "操作"]}
+                    rows={(apiConfigs?.items ?? []).map((item) => [
+                      item.name,
+                      item.resolved_tool_name,
+                      item.method,
+                      item.category || "-",
+                      item.owner_name || item.owner_type || "-",
+                      <span className={item.is_active ? "pill pill-success" : "pill pill-muted"}>
+                        {item.is_active ? "启用中" : "已停用"}
+                      </span>,
+                      item.is_public ? "公开" : "私有",
+                      <div className="button-row">
+                        <button className="secondary-button small-button" onClick={() => startEditAPIConfig(item)} type="button">
+                          编辑
+                        </button>
+                        <button
+                          className="secondary-button small-button"
+                          disabled={busyAction === `admin-api-config-test-${item.id}`}
+                          onClick={() => {
+                            void handleTestAPIConfig(item);
+                          }}
+                          type="button"
+                        >
+                          {busyAction === `admin-api-config-test-${item.id}` ? "测试中..." : "测试"}
+                        </button>
+                        <button
+                          className="secondary-button small-button"
+                          disabled={busyAction === `admin-api-config-delete-${item.id}`}
+                          onClick={() => {
+                            void handleDeleteAPIConfig(item);
+                          }}
+                          type="button"
+                        >
+                          {busyAction === `admin-api-config-delete-${item.id}` ? "删除中..." : "删除"}
+                        </button>
+                      </div>,
+                    ])}
+                    emptyText="当前还没有 API 配置。"
+                  />
+                  <PagerControls
+                    disabled={dataLoading}
+                    onChange={setAPIConfigPage}
+                    page={apiConfigs?.page ?? apiConfigPage}
+                    pageSize={apiConfigs?.page_size ?? adminPageSize}
+                    total={apiConfigs?.total ?? 0}
+                  />
+                </article>
+              ) : null}
 
               {canViewMCPTools ? (
                 <article className="content-card">

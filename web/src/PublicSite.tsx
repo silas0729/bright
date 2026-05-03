@@ -3,6 +3,8 @@ import { useDeferredValue, useEffect, useRef, useState, type FormEvent } from "r
 
 import {
   api,
+  type APIConfig,
+  type APIConfigTestResult,
   type CaptchaChallenge,
   type CatalogStats,
   type ClassificationStat,
@@ -10,6 +12,7 @@ import {
   type KnowledgeBaseDocument,
   type LearnerSession,
   type LearnerUser,
+  type PagedAPIConfigs,
   type PagedClassificationStats,
   type PagedKnowledgeBaseDocuments,
   type PagedPaymentOrders,
@@ -17,9 +20,14 @@ import {
   type PagedWords,
   type PaymentOrderStatus,
   type Plan,
+  type SaveAPIConfigInput,
   type SiteSetting,
   type SubscriptionStatus,
   type Subject,
+  type XiaomiConfig,
+  type XiaomiDeviceListResult,
+  type XiaomiHome,
+  type XiaomiQRLoginResult,
   type WechatOrder,
 } from "./api";
 import MCPConsole from "./MCPConsole";
@@ -32,7 +40,16 @@ const publicSessionStorageKey = "brights_public_session";
 
 type AuthMode = "login" | "register";
 type PublicView = "home" | "profile" | "mcp";
-type ProfileWorkspaceTab = "overview" | "memberships" | "orders" | "invite" | "knowledge-base" | "plans" | "insights";
+type ProfileWorkspaceTab =
+  | "overview"
+  | "memberships"
+  | "orders"
+  | "invite"
+  | "knowledge-base"
+  | "api-tools"
+  | "xiaomi"
+  | "plans"
+  | "insights";
 type NoticeDialogTone = "info" | "success" | "error";
 
 type NoticeDialogState = {
@@ -58,6 +75,24 @@ const fallbackSiteSettings: SiteSetting = {
     "英语单词学习,高频英语单词,场景英语词汇,英语学习网站,英语会员学习,英语词汇记忆",
   footer_text: "Brights 适合以英语高频词汇为主线持续学习，也支持后续扩展更多学科内容。",
   contact_email: "support@brights.local",
+};
+
+const emptyAPIConfigEditor: SaveAPIConfigInput & { id: number } = {
+  id: 0,
+  name: "",
+  tool_name: "",
+  url: "",
+  method: "GET",
+  category: "custom",
+  category_color: "",
+  icon: "",
+  description: "",
+  headers: "{}",
+  body: "",
+  parameters: "[]",
+  is_active: true,
+  is_public: false,
+  allow_admin_publish: false,
 };
 
 export default function PublicSite() {
@@ -132,9 +167,22 @@ export default function PublicSite() {
     fileName: "",
     title: "",
   });
+  const [apiConfigs, setAPIConfigs] = useState<PagedAPIConfigs | null>(null);
+  const [apiConfigPage, setAPIConfigPage] = useState(1);
+  const [apiConfigQuery, setAPIConfigQuery] = useState("");
+  const [apiConfigEditor, setAPIConfigEditor] = useState(emptyAPIConfigEditor);
+  const [apiConfigTestArguments, setAPIConfigTestArguments] = useState("{}");
+  const [apiConfigTestResult, setAPIConfigTestResult] = useState<APIConfigTestResult | null>(null);
+  const [xiaomiConfig, setXiaomiConfig] = useState<XiaomiConfig | null>(null);
+  const [xiaomiHomes, setXiaomiHomes] = useState<XiaomiHome[]>([]);
+  const [xiaomiDevices, setXiaomiDevices] = useState<XiaomiDeviceListResult | null>(null);
+  const [xiaomiSearchQuery, setXiaomiSearchQuery] = useState("");
+  const [xiaomiQRSession, setXiaomiQRSession] = useState<XiaomiQRLoginResult | null>(null);
+  const [xiaomiQRStatus, setXiaomiQRStatus] = useState("");
 
   const deferredQuery = useDeferredValue(query);
   const deferredKnowledgeBaseQuery = useDeferredValue(knowledgeBaseQuery);
+  const deferredAPIConfigQuery = useDeferredValue(apiConfigQuery);
   const activeCheckoutOrder = checkoutStatus?.order ?? checkoutOrder;
   const currentSettings = siteSettings ?? fallbackSiteSettings;
   const learnerName = currentUser?.display_name || currentUser?.username || "";
@@ -162,6 +210,8 @@ export default function PublicSite() {
     { key: "orders", label: "购买记录", helper: "订单与支付", href: "#profile-orders", count: paymentOrders?.total ?? 0 },
     { key: "invite", label: "邀请好友", helper: "邀请码与转化", href: "#profile-invite", count: Number(inviteSummary?.invited_count ?? 0) },
     { key: "knowledge-base", label: "我的知识库", helper: "上传与文档", href: "#profile-knowledge-base", count: knowledgeBaseDocuments?.total ?? 0 },
+    { key: "api-tools", label: "API 工具", helper: "个人接口与 MCP", href: "#profile-api-tools", count: apiConfigs?.total ?? 0 },
+    { key: "xiaomi", label: "米家智能", helper: "小米设备与控制", href: "#profile-xiaomi", count: xiaomiDevices?.total ?? xiaomiConfig?.device_count ?? 0 },
     { key: "plans", label: "会员方案", helper: "购买与续费", href: "#plans", count: plans.length },
     { key: "insights", label: "学习概况", helper: "词库与建议", href: "#profile-insights" },
   ];
@@ -357,6 +407,86 @@ export default function PublicSite() {
     session?.access_token,
     subjectKey,
   ]);
+
+  useEffect(() => {
+    if (!session?.access_token) {
+      setAPIConfigs(null);
+      setAPIConfigTestResult(null);
+      return;
+    }
+
+    let active = true;
+    api
+      .learnerAPIConfigs(session.access_token, {
+        page: apiConfigPage,
+        pageSize: profilePageSize,
+        query: deferredAPIConfigQuery,
+      })
+      .then((result) => {
+        if (active) {
+          setAPIConfigs(result);
+        }
+      })
+      .catch((err: Error) => {
+        if (active) {
+          setProfileError(err.message);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [apiConfigPage, deferredAPIConfigQuery, profileReloadKey, session?.access_token]);
+
+  useEffect(() => {
+    if (!session?.access_token) {
+      setXiaomiConfig(null);
+      setXiaomiHomes([]);
+      setXiaomiDevices(null);
+      setXiaomiQRSession(null);
+      setXiaomiQRStatus("");
+      return;
+    }
+    if (currentProfileTab !== "xiaomi") {
+      return;
+    }
+    void loadXiaomiWorkspace(false);
+  }, [currentProfileTab, profileReloadKey, session?.access_token]);
+
+  useEffect(() => {
+    if (!session?.access_token || !xiaomiQRSession?.session_id) {
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setInterval(() => {
+      api
+        .learnerCheckXiaomiQRLogin(session.access_token, xiaomiQRSession.session_id)
+        .then((result) => {
+          if (cancelled) {
+            return;
+          }
+          const nextStatus = result.status || (result.success ? "success" : "waiting");
+          setXiaomiQRStatus(result.message || nextStatus);
+          if (nextStatus === "success" || result.success) {
+            setXiaomiQRSession(null);
+            setProfileNotice("小米账号扫码登录成功。");
+            void loadXiaomiWorkspace(true);
+          }
+        })
+        .catch((err: Error) => {
+          if (cancelled) {
+            return;
+          }
+          setXiaomiQRStatus(err.message);
+        });
+    }, 4000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [session?.access_token, xiaomiQRSession?.session_id]);
 
   useEffect(() => {
     setOrderHistoryPage(1);
@@ -992,6 +1122,263 @@ export default function PublicSite() {
     }
   }
 
+  async function loadXiaomiWorkspace(refreshDevices: boolean) {
+    if (!session?.access_token) {
+      return;
+    }
+    try {
+      const [configResult, deviceResult] = await Promise.all([
+        api.learnerXiaomiConfig(session.access_token),
+        api.learnerXiaomiDevices(session.access_token, refreshDevices),
+      ]);
+      setXiaomiConfig(configResult);
+      setXiaomiDevices(deviceResult);
+    } catch (err) {
+      setProfileError((err as Error).message);
+    }
+  }
+
+  function resetAPIConfigEditor() {
+    setAPIConfigEditor(emptyAPIConfigEditor);
+    setAPIConfigTestArguments("{}");
+    setAPIConfigTestResult(null);
+  }
+
+  function toAPIConfigPayload(item: APIConfig | (SaveAPIConfigInput & { id?: number })): SaveAPIConfigInput {
+    return {
+      name: item.name,
+      tool_name: item.tool_name,
+      url: item.url,
+      method: item.method,
+      category: item.category,
+      category_color: item.category_color,
+      icon: item.icon,
+      description: item.description,
+      headers: item.headers,
+      body: item.body,
+      parameters: item.parameters,
+      is_active: item.is_active,
+      is_public: item.is_public,
+      allow_admin_publish: item.allow_admin_publish,
+    };
+  }
+
+  function startEditAPIConfig(item: APIConfig) {
+    setAPIConfigEditor({
+      id: item.id,
+      ...toAPIConfigPayload(item),
+    });
+    setAPIConfigTestResult(null);
+  }
+
+  async function handleSaveAPIConfig(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session?.access_token) {
+      return;
+    }
+
+    setProfileBusyAction("api-config-save");
+    setAPIConfigTestResult(null);
+    try {
+      const payload = toAPIConfigPayload(apiConfigEditor);
+      if (apiConfigEditor.id > 0) {
+        await api.learnerUpdateAPIConfig(session.access_token, apiConfigEditor.id, payload);
+        setProfileNotice("API 工具已更新。");
+      } else {
+        await api.learnerCreateAPIConfig(session.access_token, payload);
+        setProfileNotice("API 工具已创建。");
+      }
+      resetAPIConfigEditor();
+      setAPIConfigPage(1);
+      setProfileReloadKey((current) => current + 1);
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleToggleAPIConfig(item: APIConfig) {
+    if (!session?.access_token) {
+      return;
+    }
+    setProfileBusyAction(`api-config-toggle-${item.id}`);
+    try {
+      await api.learnerUpdateAPIConfig(session.access_token, item.id, {
+        ...toAPIConfigPayload(item),
+        is_active: !item.is_active,
+      });
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice(!item.is_active ? "API 工具已启用。" : "API 工具已停用。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleDeleteAPIConfig(item: APIConfig) {
+    if (!session?.access_token) {
+      return;
+    }
+    const confirmed = window.confirm(`确认删除 API 工具“${item.name || item.resolved_tool_name}”吗？`);
+    if (!confirmed) {
+      return;
+    }
+    setProfileBusyAction(`api-config-delete-${item.id}`);
+    try {
+      await api.learnerDeleteAPIConfig(session.access_token, item.id);
+      if (apiConfigEditor.id === item.id) {
+        resetAPIConfigEditor();
+      }
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice("API 工具已删除。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleTestAPIConfig(item: APIConfig) {
+    if (!session?.access_token) {
+      return;
+    }
+
+    let argumentsPayload: Record<string, unknown> = {};
+    try {
+      argumentsPayload = apiConfigTestArguments.trim() ? (JSON.parse(apiConfigTestArguments) as Record<string, unknown>) : {};
+    } catch {
+      setProfileError("测试参数必须是有效 JSON。");
+      return;
+    }
+
+    setProfileBusyAction(`api-config-test-${item.id}`);
+    try {
+      const result = await api.learnerTestAPIConfig(
+        session.access_token,
+        item.id,
+        { arguments: argumentsPayload },
+        subjectKey,
+      );
+      setAPIConfigTestResult(result);
+      setProfileNotice("API 工具测试请求已完成。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleSaveXiaomiConfig(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session?.access_token || !xiaomiConfig) {
+      return;
+    }
+    setProfileBusyAction("xiaomi-save");
+    try {
+      const saved = await api.learnerSaveXiaomiConfig(session.access_token, {
+        username: xiaomiConfig.username || "",
+        xiaomi_user_id: xiaomiConfig.xiaomi_user_id || "",
+        server: xiaomiConfig.server || "cn",
+        ssecurity: "",
+        service_token: "",
+        is_active: xiaomiConfig.is_active,
+      });
+      setXiaomiConfig(saved);
+      setProfileNotice("小米配置已保存。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleStartXiaomiQRLogin() {
+    if (!session?.access_token) {
+      return;
+    }
+    setProfileBusyAction("xiaomi-qr-login");
+    try {
+      const result = await api.learnerStartXiaomiQRLogin(session.access_token, xiaomiConfig?.server || "cn");
+      setXiaomiQRSession(result);
+      setXiaomiQRStatus(result.message || "请使用米家 App 扫码。");
+      setProfileNotice("二维码已生成，请使用米家 App 扫码登录。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleClearXiaomiTokens() {
+    if (!session?.access_token) {
+      return;
+    }
+    const confirmed = window.confirm("确认清空当前小米账号令牌吗？清空后需要重新扫码或重新填写凭证。");
+    if (!confirmed) {
+      return;
+    }
+    setProfileBusyAction("xiaomi-clear");
+    try {
+      await api.learnerClearXiaomiTokens(session.access_token);
+      setXiaomiQRSession(null);
+      setXiaomiQRStatus("");
+      await loadXiaomiWorkspace(false);
+      setProfileNotice("小米账号令牌已清空。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleRefreshXiaomiDevices() {
+    if (!session?.access_token) {
+      return;
+    }
+    setProfileBusyAction("xiaomi-refresh");
+    try {
+      const result = await api.learnerRefreshXiaomiDevices(session.access_token);
+      setXiaomiDevices((current) =>
+        current
+          ? {
+              ...current,
+              devices: result.devices,
+              total: result.device_count,
+              refreshed: true,
+              account: {
+                ...current.account,
+                device_count: result.device_count,
+              },
+            }
+          : null,
+      );
+      await loadXiaomiWorkspace(false);
+      setProfileNotice(`设备列表已刷新，共 ${result.device_count} 台。`);
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleLoadXiaomiHomes() {
+    if (!session?.access_token) {
+      return;
+    }
+    setProfileBusyAction("xiaomi-homes");
+    try {
+      const items = await api.learnerXiaomiHomes(session.access_token);
+      setXiaomiHomes(items);
+      setProfileNotice(`已加载 ${items.length} 个家庭。`);
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
   async function handleCreateCheckoutOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!checkoutPlan) {
@@ -1072,10 +1459,6 @@ export default function PublicSite() {
     });
   };
 
-  const profileIntroTitle = currentUser ? "学习账号中心" : "先登录学习账号";
-  const profileIntroDescription = currentUser
-    ? "账号、会员、订单、邀请和知识库都按分区整理好了，下面直接切换查看。"
-    : "登录后就能统一管理学习记录、会员购买、订单和个人知识库。";
   const selectedSubjectLabel = formatSubjectLabel(subjectKey);
   const profileOverviewSnapshotItems: Array<{ label: string; value: string; note: string }> = currentUser
     ? [
@@ -1143,6 +1526,48 @@ export default function PublicSite() {
     !!selectedClassificationStat &&
     selectedClassificationStat.requires_membership &&
     selectedClassificationStat.accessible_count === 0;
+  const visibleXiaomiDevices = (xiaomiDevices?.devices ?? []).filter((item) => {
+    const queryText = xiaomiSearchQuery.trim().toLowerCase();
+    if (!queryText) {
+      return true;
+    }
+    return [item.name, item.model, item.did, item.home_name, item.room_name]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(queryText));
+  });
+  const apiConfigTestPreview = apiConfigTestResult
+    ? JSON.stringify(apiConfigTestResult.body ?? apiConfigTestResult.raw_body ?? apiConfigTestResult, null, 2)
+    : "";
+  // These workspaces are mounted conditionally, so keep their state and helpers
+  // referenced under strict TS unused-local checks.
+  void [
+    apiConfigs,
+    setAPIConfigs,
+    apiConfigPage,
+    setAPIConfigPage,
+    apiConfigQuery,
+    setAPIConfigQuery,
+    apiConfigEditor,
+    setAPIConfigEditor,
+    apiConfigTestArguments,
+    setAPIConfigTestArguments,
+    apiConfigTestResult,
+    setAPIConfigTestResult,
+    xiaomiConfig,
+    setXiaomiConfig,
+    xiaomiHomes,
+    setXiaomiHomes,
+    xiaomiDevices,
+    setXiaomiDevices,
+    xiaomiSearchQuery,
+    setXiaomiSearchQuery,
+    xiaomiQRSession,
+    setXiaomiQRSession,
+    xiaomiQRStatus,
+    setXiaomiQRStatus,
+    deferredAPIConfigQuery,
+    apiConfigs?.items?.[0] as APIConfig | undefined,
+  ];
 
   return (
     <div className="site-shell">
@@ -1224,6 +1649,26 @@ export default function PublicSite() {
                       role="menuitem"
                     >
                       我的知识库
+                    </a>
+                    <a
+                      className="site-account-dropdown-link"
+                      href="#profile-api-tools"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                      }}
+                      role="menuitem"
+                    >
+                      API 工具
+                    </a>
+                    <a
+                      className="site-account-dropdown-link"
+                      href="#profile-xiaomi"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                      }}
+                      role="menuitem"
+                    >
+                      米家智能
                     </a>
                     <a
                       className="site-account-dropdown-link"
@@ -1318,27 +1763,6 @@ export default function PublicSite() {
                 </a>
               ))}
             </nav>
-
-            {currentProfileTab === "overview" ? (
-              <section className="content-card profile-page-header">
-                <div className="profile-page-heading">
-                  <div>
-                    <p className="section-eyebrow">个人中心</p>
-                    <h1>{profileIntroTitle}</h1>
-                    <p className="helper-text">{profileIntroDescription}</p>
-                  </div>
-                  <div className="button-row">
-                    <a className="secondary-button" href="#catalog">
-                      去词库学习
-                    </a>
-                    <a className="primary-button" href="#plans">
-                      查看会员方案
-                    </a>
-                  </div>
-                </div>
-                <p className="profile-page-caption">通过下方分区切换账号总览、会员记录、购买记录、邀请好友、知识库和学习概况。</p>
-              </section>
-            ) : null}
 
             <div className="profile-workbench">
               {currentProfileTab === "overview" ? (
@@ -1925,6 +2349,539 @@ export default function PublicSite() {
                     </>
                   ) : (
                     <div className="feedback-banner">登录后可上传你自己的知识库文件，并在 MCP 工具中按会员权限调用。</div>
+                  )}
+                </section>
+              ) : null}
+
+              {currentProfileTab === "api-tools" ? (
+                <section className="content-card profile-card profile-panel-card" id="profile-api-tools">
+                  <div className="section-header">
+                    <div>
+                      <p className="section-eyebrow">API 工具</p>
+                      <h2>把你的开放接口配置成可供 MCP 直接调用的个人工具</h2>
+                    </div>
+                  </div>
+                  {currentUser ? (
+                    <>
+                      <div className="profile-grid">
+                        <form className="setup-form" onSubmit={handleSaveAPIConfig}>
+                          <label className="form-field">
+                            <span>工具名称</span>
+                            <input
+                              value={apiConfigEditor.name}
+                              onChange={(event) => {
+                                setAPIConfigEditor((current) => ({ ...current, name: event.target.value }));
+                              }}
+                              placeholder="例如：查询内部订单"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>MCP 工具名</span>
+                            <input
+                              value={apiConfigEditor.tool_name}
+                              onChange={(event) => {
+                                setAPIConfigEditor((current) => ({ ...current, tool_name: event.target.value }));
+                              }}
+                              placeholder="例如：query_order_status"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>请求地址</span>
+                            <input
+                              value={apiConfigEditor.url}
+                              onChange={(event) => {
+                                setAPIConfigEditor((current) => ({ ...current, url: event.target.value }));
+                              }}
+                              placeholder="https://example.com/api/orders 或 /api/v1/orders"
+                            />
+                          </label>
+                          <div className="button-row">
+                            <label className="form-field" style={{ flex: 1 }}>
+                              <span>请求方法</span>
+                              <select
+                                value={apiConfigEditor.method}
+                                onChange={(event) => {
+                                  setAPIConfigEditor((current) => ({ ...current, method: event.target.value }));
+                                }}
+                              >
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="PATCH">PATCH</option>
+                                <option value="DELETE">DELETE</option>
+                                <option value="HEAD">HEAD</option>
+                              </select>
+                            </label>
+                            <label className="form-field" style={{ flex: 1 }}>
+                              <span>分类</span>
+                              <input
+                                value={apiConfigEditor.category}
+                                onChange={(event) => {
+                                  setAPIConfigEditor((current) => ({ ...current, category: event.target.value }));
+                                }}
+                                placeholder="custom"
+                              />
+                            </label>
+                          </div>
+                          <label className="form-field">
+                            <span>说明</span>
+                            <textarea
+                              rows={3}
+                              value={apiConfigEditor.description}
+                              onChange={(event) => {
+                                setAPIConfigEditor((current) => ({ ...current, description: event.target.value }));
+                              }}
+                              placeholder="告诉 MCP 这个工具做什么。"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>Headers JSON</span>
+                            <textarea
+                              rows={4}
+                              value={apiConfigEditor.headers}
+                              onChange={(event) => {
+                                setAPIConfigEditor((current) => ({ ...current, headers: event.target.value }));
+                              }}
+                              placeholder='{"Authorization":"Bearer {{access_token}}"}'
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>Body JSON / 模板</span>
+                            <textarea
+                              rows={4}
+                              value={apiConfigEditor.body}
+                              onChange={(event) => {
+                                setAPIConfigEditor((current) => ({ ...current, body: event.target.value }));
+                              }}
+                              placeholder='{"keyword":"{{query}}"}'
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>参数定义 JSON</span>
+                            <textarea
+                              rows={4}
+                              value={apiConfigEditor.parameters}
+                              onChange={(event) => {
+                                setAPIConfigEditor((current) => ({ ...current, parameters: event.target.value }));
+                              }}
+                              placeholder='[{"name":"query","type":"string","required":true,"description":"搜索词"}]'
+                            />
+                          </label>
+                          <div className="button-row">
+                            <label className="tag">
+                              <input
+                                checked={apiConfigEditor.is_active}
+                                onChange={(event) => {
+                                  setAPIConfigEditor((current) => ({ ...current, is_active: event.target.checked }));
+                                }}
+                                type="checkbox"
+                              />
+                              启用
+                            </label>
+                            <label className="tag">
+                              <input
+                                checked={Boolean(apiConfigEditor.is_public)}
+                                onChange={(event) => {
+                                  setAPIConfigEditor((current) => ({ ...current, is_public: event.target.checked }));
+                                }}
+                                type="checkbox"
+                              />
+                              发布到工具市场
+                            </label>
+                            <label className="tag">
+                              <input
+                                checked={Boolean(apiConfigEditor.allow_admin_publish)}
+                                onChange={(event) => {
+                                  setAPIConfigEditor((current) => ({ ...current, allow_admin_publish: event.target.checked }));
+                                }}
+                                type="checkbox"
+                              />
+                              允许管理员代为公开
+                            </label>
+                          </div>
+                          <div className="button-row">
+                            <button className="primary-button" disabled={profileBusyAction === "api-config-save"} type="submit">
+                              {profileBusyAction === "api-config-save"
+                                ? "保存中..."
+                                : apiConfigEditor.id > 0
+                                  ? "更新 API 工具"
+                                  : "创建 API 工具"}
+                            </button>
+                            <button className="secondary-button" onClick={resetAPIConfigEditor} type="button">
+                              新建空白
+                            </button>
+                          </div>
+                        </form>
+
+                        <div className="profile-card-body">
+                          <div className="feedback-banner feedback-success">
+                            这里创建的是你自己的 API 工具。启用后可以进入 MCP 工具列表，并继续由管理员决定是否要加会员门槛。
+                          </div>
+                          <label className="form-field">
+                            <span>测试参数 JSON</span>
+                            <textarea
+                              rows={8}
+                              value={apiConfigTestArguments}
+                              onChange={(event) => {
+                                setAPIConfigTestArguments(event.target.value);
+                              }}
+                              placeholder='{"query":"hello"}'
+                            />
+                          </label>
+                          {apiConfigTestResult ? (
+                            <div className="feedback-banner">
+                              <strong>最近一次测试返回状态：</strong> {apiConfigTestResult.status_code}
+                              <pre className="code-panel">{apiConfigTestPreview}</pre>
+                            </div>
+                          ) : (
+                            <div className="feedback-banner">
+                              先从下面列表里选择一个已有工具进行测试，返回结果会显示在这里。
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>我的 API 工具</h2>
+                          <p className="helper-text">支持停用、删除、重新编辑，也支持作为 MCP 工具直接调用。</p>
+                        </div>
+                        <input
+                          className="toolbar-search"
+                          value={apiConfigQuery}
+                          onChange={(event) => {
+                            setAPIConfigQuery(event.target.value);
+                            setAPIConfigPage(1);
+                          }}
+                          placeholder="搜索名称、工具名或分类"
+                        />
+                      </div>
+
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>名称</th>
+                              <th>工具名</th>
+                              <th>方法</th>
+                              <th>分类</th>
+                              <th>状态</th>
+                              <th>公开</th>
+                              <th>操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(apiConfigs?.items ?? []).map((item) => {
+                              const toggleBusy = profileBusyAction === `api-config-toggle-${item.id}`;
+                              const deleteBusy = profileBusyAction === `api-config-delete-${item.id}`;
+                              const testBusy = profileBusyAction === `api-config-test-${item.id}`;
+                              return (
+                                <tr key={item.id}>
+                                  <td>{item.name}</td>
+                                  <td>{item.resolved_tool_name}</td>
+                                  <td>{item.method}</td>
+                                  <td>{item.category || "-"}</td>
+                                  <td>
+                                    <span className={item.is_active ? "pill pill-success" : "pill pill-muted"}>
+                                      {item.is_active ? "已启用" : "已停用"}
+                                    </span>
+                                  </td>
+                                  <td>{item.is_public ? "公开" : "私有"}</td>
+                                  <td>
+                                    <div className="button-row">
+                                      <button className="secondary-button small-button" onClick={() => startEditAPIConfig(item)} type="button">
+                                        编辑
+                                      </button>
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={testBusy}
+                                        onClick={() => void handleTestAPIConfig(item)}
+                                        type="button"
+                                      >
+                                        {testBusy ? "测试中..." : "测试"}
+                                      </button>
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={toggleBusy || deleteBusy}
+                                        onClick={() => void handleToggleAPIConfig(item)}
+                                        type="button"
+                                      >
+                                        {toggleBusy ? "处理中..." : item.is_active ? "停用" : "启用"}
+                                      </button>
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={toggleBusy || deleteBusy}
+                                        onClick={() => void handleDeleteAPIConfig(item)}
+                                        type="button"
+                                      >
+                                        {deleteBusy ? "删除中..." : "删除"}
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      {(apiConfigs?.items ?? []).length === 0 ? (
+                        <div className="feedback-banner">当前还没有创建个人 API 工具，先配置一条接口试试。</div>
+                      ) : null}
+                      <PagerControls
+                        onChange={setAPIConfigPage}
+                        page={apiConfigs?.page ?? apiConfigPage}
+                        pageSize={apiConfigs?.page_size ?? profilePageSize}
+                        total={apiConfigs?.total ?? 0}
+                      />
+                    </>
+                  ) : (
+                    <div className="feedback-banner">登录后才可以创建和管理你自己的 API 工具。</div>
+                  )}
+                </section>
+              ) : null}
+
+              {currentProfileTab === "xiaomi" ? (
+                <section className="content-card profile-card profile-panel-card" id="profile-xiaomi">
+                  <div className="section-header">
+                    <div>
+                      <p className="section-eyebrow">米家智能</p>
+                      <h2>绑定小米账号，刷新设备列表，并作为 MCP 工具直接调用</h2>
+                    </div>
+                  </div>
+                  {currentUser ? (
+                    <>
+                      <div className="profile-grid">
+                        <form className="setup-form" onSubmit={handleSaveXiaomiConfig}>
+                          <label className="form-field">
+                            <span>服务器区域</span>
+                            <select
+                              value={xiaomiConfig?.server || "cn"}
+                              onChange={(event) => {
+                                setXiaomiConfig((current) => ({
+                                  ...(current || {
+                                    learner_user_id: currentUser.id,
+                                    username: "",
+                                    xiaomi_user_id: "",
+                                    server: "cn",
+                                    is_active: false,
+                                    has_credentials: false,
+                                    device_count: 0,
+                                  }),
+                                  server: event.target.value,
+                                }));
+                              }}
+                            >
+                              <option value="cn">cn</option>
+                              <option value="de">de</option>
+                              <option value="sg">sg</option>
+                              <option value="us">us</option>
+                              <option value="ru">ru</option>
+                              <option value="tw">tw</option>
+                            </select>
+                          </label>
+                          <label className="form-field">
+                            <span>账号备注</span>
+                            <input
+                              value={xiaomiConfig?.username || ""}
+                              onChange={(event) => {
+                                setXiaomiConfig((current) => ({
+                                  ...(current || {
+                                    learner_user_id: currentUser.id,
+                                    xiaomi_user_id: "",
+                                    server: "cn",
+                                    is_active: false,
+                                    has_credentials: false,
+                                    device_count: 0,
+                                    username: "",
+                                  }),
+                                  username: event.target.value,
+                                }));
+                              }}
+                              placeholder="例如：我的米家主账号"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>小米用户 ID</span>
+                            <input
+                              value={xiaomiConfig?.xiaomi_user_id || ""}
+                              onChange={(event) => {
+                                setXiaomiConfig((current) => ({
+                                  ...(current || {
+                                    learner_user_id: currentUser.id,
+                                    username: "",
+                                    server: "cn",
+                                    is_active: false,
+                                    has_credentials: false,
+                                    device_count: 0,
+                                    xiaomi_user_id: "",
+                                  }),
+                                  xiaomi_user_id: event.target.value,
+                                }));
+                              }}
+                              placeholder="扫码成功后会自动回填"
+                            />
+                          </label>
+                          <div className="button-row">
+                            <label className="tag">
+                              <input
+                                checked={Boolean(xiaomiConfig?.is_active)}
+                                onChange={(event) => {
+                                  setXiaomiConfig((current) => ({
+                                    ...(current || {
+                                      learner_user_id: currentUser.id,
+                                      username: "",
+                                      xiaomi_user_id: "",
+                                      server: "cn",
+                                      is_active: false,
+                                      has_credentials: false,
+                                      device_count: 0,
+                                    }),
+                                    is_active: event.target.checked,
+                                  }));
+                                }}
+                                type="checkbox"
+                              />
+                              启用此账号
+                            </label>
+                            <span className="pill pill-muted">
+                              {xiaomiConfig?.has_credentials ? "已保存令牌" : "尚未保存令牌"}
+                            </span>
+                          </div>
+                          <div className="button-row">
+                            <button className="primary-button" disabled={profileBusyAction === "xiaomi-save"} type="submit">
+                              {profileBusyAction === "xiaomi-save" ? "保存中..." : "保存基础配置"}
+                            </button>
+                            <button
+                              className="secondary-button"
+                              disabled={profileBusyAction === "xiaomi-qr-login"}
+                              onClick={() => void handleStartXiaomiQRLogin()}
+                              type="button"
+                            >
+                              {profileBusyAction === "xiaomi-qr-login" ? "生成中..." : "扫码登录"}
+                            </button>
+                            <button
+                              className="secondary-button"
+                              disabled={profileBusyAction === "xiaomi-clear"}
+                              onClick={() => void handleClearXiaomiTokens()}
+                              type="button"
+                            >
+                              {profileBusyAction === "xiaomi-clear" ? "处理中..." : "清空令牌"}
+                            </button>
+                          </div>
+                        </form>
+
+                        <div className="profile-card-body">
+                          <div className="profile-overview">
+                            <div>
+                              <strong>{xiaomiConfig?.server || "cn"}</strong>
+                              <span>当前区域</span>
+                            </div>
+                            <div>
+                              <strong>{formatCount(xiaomiDevices?.total ?? xiaomiConfig?.device_count ?? 0)}</strong>
+                              <span>设备数量</span>
+                            </div>
+                            <div>
+                              <strong>{xiaomiHomes.length}</strong>
+                              <span>家庭数量</span>
+                            </div>
+                            <div>
+                              <strong>{xiaomiConfig?.last_sync_at ? formatDateTime(xiaomiConfig.last_sync_at) : "-"}</strong>
+                              <span>最近同步</span>
+                            </div>
+                          </div>
+                          {xiaomiQRSession?.qr_image ? (
+                            <div className="feedback-banner">
+                              <strong>扫码登录</strong>
+                              <img alt="xiaomi qr" className="qr-preview-image" src={xiaomiQRSession.qr_image} />
+                              <span>{xiaomiQRStatus || "等待扫码..."}</span>
+                            </div>
+                          ) : (
+                            <div className="feedback-banner">
+                              点击“扫码登录”后，会在这里显示二维码；成功后会自动保存小米令牌。
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>设备与家庭</h2>
+                          <p className="helper-text">刷新后即可在 MCP 中调用 `xiaomi_*` / `mijia_*` 工具操作这些设备。</p>
+                        </div>
+                        <div className="button-row">
+                          <input
+                            className="toolbar-search"
+                            value={xiaomiSearchQuery}
+                            onChange={(event) => {
+                              setXiaomiSearchQuery(event.target.value);
+                            }}
+                            placeholder="搜索设备名称、型号、did"
+                          />
+                          <button
+                            className="secondary-button"
+                            disabled={profileBusyAction === "xiaomi-homes"}
+                            onClick={() => void handleLoadXiaomiHomes()}
+                            type="button"
+                          >
+                            {profileBusyAction === "xiaomi-homes" ? "加载中..." : "加载家庭"}
+                          </button>
+                          <button
+                            className="primary-button"
+                            disabled={profileBusyAction === "xiaomi-refresh"}
+                            onClick={() => void handleRefreshXiaomiDevices()}
+                            type="button"
+                          >
+                            {profileBusyAction === "xiaomi-refresh" ? "刷新中..." : "刷新设备"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {xiaomiHomes.length > 0 ? (
+                        <div className="tag-list">
+                          {xiaomiHomes.map((item) => (
+                            <span className="tag" key={item.id}>
+                              {item.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>设备名</th>
+                              <th>型号</th>
+                              <th>DID</th>
+                              <th>家庭</th>
+                              <th>房间</th>
+                              <th>在线</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {visibleXiaomiDevices.map((item) => (
+                              <tr key={item.did}>
+                                <td>{item.name}</td>
+                                <td>{item.model}</td>
+                                <td>{item.did}</td>
+                                <td>{item.home_name || "-"}</td>
+                                <td>{item.room_name || "-"}</td>
+                                <td>
+                                  <span className={item.is_online ? "pill pill-success" : "pill pill-muted"}>
+                                    {item.is_online ? "在线" : "离线"}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {visibleXiaomiDevices.length === 0 ? (
+                        <div className="feedback-banner">当前没有可展示的设备，先扫码登录并刷新设备列表。</div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="feedback-banner">登录后才可以绑定你自己的米家账号和设备。</div>
                   )}
                 </section>
               ) : null}
@@ -2634,6 +3591,10 @@ function resolveProfileWorkspaceTab(hash: string): ProfileWorkspaceTab {
       return "invite";
     case "#profile-knowledge-base":
       return "knowledge-base";
+    case "#profile-api-tools":
+      return "api-tools";
+    case "#profile-xiaomi":
+      return "xiaomi";
     case "#plans":
       return "plans";
     case "#profile-insights":

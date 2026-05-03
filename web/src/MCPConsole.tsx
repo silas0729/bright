@@ -73,7 +73,7 @@ export default function MCPConsole(props: MCPConsoleProps) {
     setInfoError("");
 
     api
-      .getMCPInfo(props.subjectKey)
+      .getMCPInfo(props.subjectKey, props.token)
       .then((payload) => {
         if (!active) {
           return;
