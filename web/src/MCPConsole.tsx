@@ -190,6 +190,12 @@ export default function MCPConsole(props: MCPConsoleProps) {
     }
   }
 
+  function selectEndpoint(endpoint: MCPEndpoint) {
+    setSelectedEndpointID(endpoint.id);
+    setToolPreviewError("");
+    void loadEndpointToolPreview(endpoint);
+  }
+
   async function refreshAllConnections() {
     if (!props.token.trim()) {
       setEndpointBusyMessage("请先登录学员账号，再刷新 MCP 接入状态。");
@@ -500,30 +506,41 @@ export default function MCPConsole(props: MCPConsoleProps) {
                 </div>
               ) : (
                 <>
-                  <dl className="detail-grid">
-                    <div>
-                      <dt>接入点名称</dt>
-                      <dd>{selectedEndpoint.name}</dd>
-                    </div>
-                    <div>
-                      <dt>连接状态</dt>
-                      <dd>
-                        <span className={`pill ${statusPillClass(selectedEndpoint.connection_status, selectedEndpoint.enabled)}`}>
-                          {statusLabel(selectedEndpoint.connection_status, selectedEndpoint.enabled)}
-                        </span>
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>远程地址</dt>
-                      <dd className="mcp-inline-break">{selectedEndpoint.url}</dd>
-                    </div>
-                    <div>
-                      <dt>最近连接时间</dt>
-                      <dd>{formatDateTime(selectedEndpoint.connected_at)}</dd>
-                    </div>
-                  </dl>
+                  <div className="table-wrap mcp-table-wrap">
+                    <table className="data-table mcp-data-table mcp-detail-table">
+                      <tbody>
+                        <tr>
+                          <th scope="row">接入点名称</th>
+                          <td>{selectedEndpoint.name}</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">连接状态</th>
+                          <td>
+                            <span className={`pill ${statusPillClass(selectedEndpoint.connection_status, selectedEndpoint.enabled)}`}>
+                              {statusLabel(selectedEndpoint.connection_status, selectedEndpoint.enabled)}
+                            </span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <th scope="row">远程地址</th>
+                          <td className="mcp-inline-break mcp-cell-code">{selectedEndpoint.url}</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">最近连接时间</th>
+                          <td>{formatDateTime(selectedEndpoint.connected_at)}</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">当前工具数</th>
+                          <td>{selectedEndpointTools.length}</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">备注说明</th>
+                          <td>{selectedEndpoint.description || "-"}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
 
-                  {selectedEndpoint.description ? <p className="helper-text">{selectedEndpoint.description}</p> : null}
                   {selectedEndpoint.last_error ? (
                     <div className="feedback-banner feedback-error">{selectedEndpoint.last_error}</div>
                   ) : (
@@ -551,16 +568,29 @@ export default function MCPConsole(props: MCPConsoleProps) {
               ) : selectedEndpointTools.length === 0 ? (
                 <div className="feedback-banner">当前还没有可展示的工具，请先刷新连接状态。</div>
               ) : (
-                <div className="mcp-tool-grid">
-                  {selectedEndpointTools.map((tool) => (
-                    <article className="mcp-tool-card" key={tool.name}>
-                      <div className="mcp-tool-card-head">
-                        <strong>{tool.title || tool.name}</strong>
-                        <span className="pill pill-muted">{tool.name}</span>
-                      </div>
-                      <p className="helper-text">{tool.description || "暂无描述"}</p>
-                    </article>
-                  ))}
+                <div className="table-wrap mcp-table-wrap">
+                  <table className="data-table mcp-data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">工具名称</th>
+                        <th scope="col">方法名</th>
+                        <th scope="col">入参字段</th>
+                        <th scope="col">说明</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedEndpointTools.map((tool) => (
+                        <tr key={tool.name}>
+                          <td>
+                            <strong>{tool.title || tool.name}</strong>
+                          </td>
+                          <td className="mcp-cell-code">{tool.name}</td>
+                          <td>{countSchemaFields(tool.inputSchema)}</td>
+                          <td>{tool.description || "暂无描述"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </section>
@@ -590,83 +620,100 @@ export default function MCPConsole(props: MCPConsoleProps) {
                   <p className="helper-text">点击“新增”，手动填写一个远程 ws / wss 地址即可开始接入。</p>
                 </div>
               ) : (
-                endpoints.map((endpoint) => {
-                  const endpointTools = toolPreviewMap[endpoint.id] ?? globalTools;
-                  const isSelected = endpoint.id === selectedEndpoint?.id;
+                <div className="table-wrap mcp-table-wrap">
+                  <table className="data-table mcp-data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">接入点</th>
+                        <th scope="col">远程地址</th>
+                        <th scope="col">状态</th>
+                        <th scope="col">工具数</th>
+                        <th scope="col">最近连接</th>
+                        <th scope="col">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {endpoints.map((endpoint) => {
+                        const endpointTools = toolPreviewMap[endpoint.id] ?? globalTools;
+                        const isSelected = endpoint.id === selectedEndpoint?.id;
 
-                  return (
-                    <article
-                      className={isSelected ? "mcp-endpoint-card mcp-endpoint-card-selected" : "mcp-endpoint-card"}
-                      key={endpoint.id}
-                    >
-                      <div
-                        onClick={() => {
-                          setSelectedEndpointID(endpoint.id);
-                          void loadEndpointToolPreview(endpoint);
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            setSelectedEndpointID(endpoint.id);
-                            void loadEndpointToolPreview(endpoint);
-                          }
-                        }}
-                      >
-                        <div className="mcp-endpoint-card-head">
-                          <div>
-                            <strong>{endpoint.name}</strong>
-                            <p className="helper-text mcp-inline-break">{endpoint.url}</p>
-                          </div>
-                          <span className={`pill ${statusPillClass(endpoint.connection_status, endpoint.enabled)}`}>
-                            {statusLabel(endpoint.connection_status, endpoint.enabled)}
-                          </span>
-                        </div>
-
-                        {endpoint.description ? <p className="helper-text">{endpoint.description}</p> : null}
-
-                        <div className="mcp-endpoint-tags">
-                          <span className="tag">{endpoint.enabled ? "自动连接已开启" : "已停用"}</span>
-                          <span className="tag">{endpointTools.length} 个工具</span>
-                          <span className="tag">{endpoint.is_connected ? "当前在线" : "等待连接"}</span>
-                        </div>
-
-                        {endpoint.last_error ? (
-                          <div className="feedback-banner feedback-error">{endpoint.last_error}</div>
-                        ) : null}
-
-                        <div className="mcp-endpoint-tool-list">
-                          {endpointTools.slice(0, 4).map((tool) => (
-                            <span className="tag" key={`${endpoint.id}-${tool.name}`}>
-                              {tool.title || tool.name}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="button-row">
-                        <button
-                          className="secondary-button small-button"
-                          disabled={toolPreviewLoadingID === endpoint.id}
-                          onClick={() => {
-                            setSelectedEndpointID(endpoint.id);
-                            void loadEndpointToolPreview(endpoint);
-                          }}
-                          type="button"
-                        >
-                          {toolPreviewLoadingID === endpoint.id ? "加载中..." : "查看工具"}
-                        </button>
-                        <button className="secondary-button small-button" onClick={() => openEditModal(endpoint)} type="button">
-                          编辑
-                        </button>
-                        <button className="secondary-button small-button" onClick={() => void deleteEndpoint(endpoint)} type="button">
-                          删除
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })
+                        return (
+                          <tr
+                            className={isSelected ? "mcp-table-row-selected mcp-table-row-clickable" : "mcp-table-row-clickable"}
+                            key={endpoint.id}
+                            onClick={() => {
+                              selectEndpoint(endpoint);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                selectEndpoint(endpoint);
+                              }
+                            }}
+                            tabIndex={0}
+                          >
+                            <td>
+                              <div className="mcp-cell-stack">
+                                <strong>{endpoint.name}</strong>
+                                <span className="mcp-table-muted">{endpoint.description || "未填写说明"}</span>
+                              </div>
+                            </td>
+                            <td className="mcp-cell-code mcp-inline-break">{endpoint.url}</td>
+                            <td>
+                              <div className="mcp-cell-stack">
+                                <span className={`pill ${statusPillClass(endpoint.connection_status, endpoint.enabled)}`}>
+                                  {statusLabel(endpoint.connection_status, endpoint.enabled)}
+                                </span>
+                                {endpoint.last_error ? (
+                                  <span className="mcp-table-error">{endpoint.last_error}</span>
+                                ) : (
+                                  <span className="mcp-table-muted">{endpoint.enabled ? "自动连接已开启" : "已停用"}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td>{endpointTools.length}</td>
+                            <td>{formatDateTime(endpoint.connected_at)}</td>
+                            <td>
+                              <div className="mcp-action-group">
+                                <button
+                                  className="secondary-button small-button"
+                                  disabled={toolPreviewLoadingID === endpoint.id}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    selectEndpoint(endpoint);
+                                  }}
+                                  type="button"
+                                >
+                                  {toolPreviewLoadingID === endpoint.id ? "加载中..." : "查看"}
+                                </button>
+                                <button
+                                  className="secondary-button small-button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openEditModal(endpoint);
+                                  }}
+                                  type="button"
+                                >
+                                  编辑
+                                </button>
+                                <button
+                                  className="secondary-button small-button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void deleteEndpoint(endpoint);
+                                  }}
+                                  type="button"
+                                >
+                                  删除
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </aside>
@@ -859,6 +906,14 @@ function formatDateTime(value?: string) {
     return value;
   }
   return date.toLocaleString("zh-CN");
+}
+
+function countSchemaFields(schema?: Record<string, unknown>) {
+  const properties = schema?.properties;
+  if (!properties || typeof properties !== "object" || Array.isArray(properties)) {
+    return 0;
+  }
+  return Object.keys(properties).length;
 }
 
 function buildMCPInfoURL(subjectKey: string) {

@@ -1341,6 +1341,81 @@ textarea {
   font-size: 1rem;
 }
 
+.mcp-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.mcp-data-table {
+  min-width: 100%;
+  background: #ffffff;
+}
+
+.mcp-data-table th {
+  white-space: nowrap;
+}
+
+.mcp-cell-stack {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mcp-cell-code {
+  color: #223247;
+  font-family: "Consolas", "SFMono-Regular", "Courier New", monospace;
+  font-size: 0.84rem;
+  line-height: 1.7;
+  word-break: break-all;
+}
+
+.mcp-table-muted {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.mcp-table-error {
+  color: var(--danger-text);
+  font-size: 0.84rem;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.mcp-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mcp-action-group .small-button {
+  min-width: 64px;
+}
+
+.mcp-table-row-clickable {
+  cursor: pointer;
+}
+
+.mcp-table-row-clickable:focus-visible {
+  outline: 2px solid rgba(24, 54, 80, 0.22);
+  outline-offset: -2px;
+}
+
+.mcp-data-table .mcp-table-row-selected td,
+.mcp-data-table .mcp-table-row-selected:hover td {
+  background: linear-gradient(180deg, #fbfdff 0%, #f2f7fc 100%);
+}
+
+.mcp-detail-table th {
+  width: 148px;
+}
+
+.mcp-detail-table td {
+  font-weight: 700;
+}
+
 .mcp-endpoint-modal-backdrop {
   position: fixed;
   inset: 0;
