@@ -46,11 +46,11 @@ type KnowledgeBaseDocumentFilter struct {
 }
 
 type SearchKnowledgeBaseInput struct {
-	SubjectKey     string
-	Query          string
-	Page           int
-	PageSize       int
-	LearnerUserID  uint
+	SubjectKey    string
+	Query         string
+	Page          int
+	PageSize      int
+	LearnerUserID uint
 }
 
 type ImportKnowledgeBaseInput struct {

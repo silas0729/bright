@@ -241,6 +241,9 @@ export interface KnowledgeBaseDocument {
   source_file_name: string;
   source_type: string;
   status: string;
+  visibility?: string;
+  owner_learner_user_id?: number;
+  owner_username?: string;
   chunk_count: number;
   character_count: number;
   created_at: string;
@@ -981,6 +984,53 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     });
   },
+  learnerKnowledgeBaseDocuments(
+    token: string,
+    params: { page: number; pageSize: number; query?: string; subjectKey?: string },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.subjectKey) {
+      search.set("subject", params.subjectKey);
+    }
+    return request<PagedKnowledgeBaseDocuments>(`/api/v1/auth/knowledge-base/documents?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerImportKnowledgeBase(
+    token: string,
+    payload: { file: File; subject_key: string; title: string },
+  ) {
+    const formData = new FormData();
+    formData.set("file", payload.file);
+    formData.set("subject_key", payload.subject_key);
+    formData.set("title", payload.title);
+    return request<ImportKnowledgeBaseResult>("/api/v1/auth/knowledge-base/import", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+  },
+  learnerUpdateKnowledgeBaseDocumentStatus(token: string, id: number, status: "active" | "disabled") {
+    return request<KnowledgeBaseDocument>(`/api/v1/auth/knowledge-base/documents/${id}/status`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify({ status }),
+    });
+  },
+  learnerDeleteKnowledgeBaseDocument(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/auth/knowledge-base/documents/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
   adminCaptcha() {
     return request<CaptchaChallenge>("/api/v1/admin/auth/captcha");
   },
@@ -1199,7 +1249,7 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     });
   },
-  searchKnowledgeBase(params: { query: string; page: number; pageSize: number; subjectKey?: string }) {
+  searchKnowledgeBase(params: { query: string; page: number; pageSize: number; subjectKey?: string; token?: string }) {
     const search = new URLSearchParams({
       page: String(params.page),
       page_size: String(params.pageSize),
@@ -1210,7 +1260,13 @@ export const api = {
     if (params.subjectKey) {
       search.set("subject", params.subjectKey);
     }
-    return request<PagedKnowledgeBaseChunks>(`/api/v1/knowledge-base/search?${search.toString()}`);
+    return request<PagedKnowledgeBaseChunks>(`/api/v1/knowledge-base/search?${search.toString()}`, {
+      headers: params.token
+        ? {
+            Authorization: `Bearer ${params.token}`,
+          }
+        : undefined,
+    });
   },
   adminCreateSubject(token: string, payload: CreateSubjectInput) {
     return request<Subject>("/api/v1/admin/subjects", {

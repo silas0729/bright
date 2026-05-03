@@ -657,10 +657,11 @@ func (s *Server) callTool(ctx context.Context, session Session, req CallToolRequ
 		return newToolResult(canonicalName, data, err)
 	case "search_knowledge_base":
 		data, err := s.service.SearchKnowledgeBase(ctx, domain.SearchKnowledgeBaseInput{
-			SubjectKey: stringArg(req.Arguments, "subject_key", session.SubjectKey),
-			Query:      firstNonEmpty(stringArg(req.Arguments, "query", ""), stringArg(req.Arguments, "q", "")),
-			Page:       intArg(req.Arguments, "page", 1),
-			PageSize:   intArg(req.Arguments, "page_size", 10),
+			SubjectKey:    stringArg(req.Arguments, "subject_key", session.SubjectKey),
+			Query:         firstNonEmpty(stringArg(req.Arguments, "query", ""), stringArg(req.Arguments, "q", "")),
+			Page:          intArg(req.Arguments, "page", 1),
+			PageSize:      intArg(req.Arguments, "page_size", 10),
+			LearnerUserID: session.UserID,
 		})
 		return newToolResult(canonicalName, data, err)
 	case "list_my_payment_orders":

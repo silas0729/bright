@@ -39,6 +39,7 @@ type AdminSection = "dashboard" | "import" | "catalog" | "site" | "payments" | "
 type ImportWorkspaceTab = "catalog-upload" | "knowledge-base-upload" | "knowledge-base-docs" | "subjects" | "categories" | "grades";
 type CatalogWorkspaceTab = "word-create" | "words" | "categories" | "grades";
 type PaymentWorkspaceTab = "plan-setup" | "wechat-pay" | "plans" | "orders";
+type AdminWorkspaceTab = "security" | "admins" | "roles";
 type ContentEditModal = "subject" | "category" | "grade" | "word" | null;
 type PanelEditModal = "plan" | "subscription" | "learner" | "admin" | "role" | null;
 type NoticeDialogTone = "info" | "success" | "error" | "warning";
@@ -127,6 +128,7 @@ export default function AdminPortal() {
   const [activeImportTab, setActiveImportTab] = useState<ImportWorkspaceTab>("catalog-upload");
   const [activeCatalogTab, setActiveCatalogTab] = useState<CatalogWorkspaceTab>("words");
   const [activePaymentTab, setActivePaymentTab] = useState<PaymentWorkspaceTab>("plans");
+  const [activeAdminTab, setActiveAdminTab] = useState<AdminWorkspaceTab>("admins");
   const [contentEditModal, setContentEditModal] = useState<ContentEditModal>(null);
   const [panelEditModal, setPanelEditModal] = useState<PanelEditModal>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
@@ -307,6 +309,8 @@ export default function AdminPortal() {
     permissionSet.has("learner.write");
   const canManageLearners =
     currentAdmin?.is_super === true || permissionSet.has("*") || permissionSet.has("learner.write");
+  const canManageCatalog =
+    currentAdmin?.is_super === true || permissionSet.has("*") || permissionSet.has("catalog.write");
   const canViewSiteSettings =
     currentAdmin?.is_super === true ||
     permissionSet.has("*") ||
@@ -1065,6 +1069,76 @@ export default function AdminPortal() {
       setNotice(
         `知识库导入完成：${result.document.source_file_name}，生成 ${result.chunk_count} 个片段，共 ${result.character_count} 字。`,
       );
+    } catch (err) {
+      setDataError((err as Error).message);
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function handleUpdateKnowledgeBaseDocumentStatus(id: number, status: "active" | "disabled") {
+    if (!token || !canManageCatalog || id <= 0) {
+      return;
+    }
+
+    setBusyAction(`kb-status-${id}`);
+    setDataError("");
+    setNotice("");
+    try {
+      await api.adminUpdateKnowledgeBaseDocumentStatus(token, id, status);
+      setReloadKey((current) => current + 1);
+      setNotice(status === "active" ? "知识库文档已启用。" : "知识库文档已停用。");
+    } catch (err) {
+      setDataError((err as Error).message);
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function handleDeleteKnowledgeBaseDocument(id: number, title: string, confirmed = false) {
+    if (!token || !canManageCatalog || id <= 0) {
+      return;
+    }
+
+    if (!confirmed) {
+      setConfirmDialog({
+        tone: "warning",
+        title: "删除知识库文档",
+        message: `确定删除“${title || "未命名文档"}”吗？删除后它的检索片段也会一起移除。`,
+        confirmLabel: "确认删除",
+        onConfirm: () => {
+          void handleDeleteKnowledgeBaseDocument(id, title, true);
+        },
+      });
+      return;
+    }
+
+    setBusyAction(`kb-delete-${id}`);
+    setDataError("");
+    setNotice("");
+    try {
+      await api.adminDeleteKnowledgeBaseDocument(token, id);
+      setReloadKey((current) => current + 1);
+      setNotice("知识库文档已删除。");
+    } catch (err) {
+      setDataError((err as Error).message);
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function handleUpdateMCPToolRequirement(toolName: string, payload: { is_enabled?: boolean; requires_membership?: boolean }) {
+    if (!token || !canManageMCPTools || !toolName.trim()) {
+      return;
+    }
+
+    setBusyAction(`mcp-tool-${toolName}`);
+    setDataError("");
+    setNotice("");
+    try {
+      await api.adminUpdateMCPToolConfig(token, toolName, payload);
+      setReloadKey((current) => current + 1);
+      setNotice("MCP 工具配置已更新。");
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -2222,6 +2296,12 @@ function startEditLearner(item: AdminLearnerUser) {
     { key: "wechat-pay", label: "微信收款", helper: "支付参数配置", hidden: !canViewPayments },
     { key: "plans", label: "方案列表", helper: "价格与渠道管理", count: plans.length },
     { key: "orders", label: "支付订单", helper: "订单跟进与详情", count: paymentOrders?.total ?? 0, hidden: !canViewPayments },
+  ];
+
+  const adminTabItems: Array<{ key: AdminWorkspaceTab; label: string; helper: string; count?: number }> = [
+    { key: "security", label: "我的安全", helper: "修改当前登录密码" },
+    { key: "admins", label: "后台账号", helper: canManageAdmins ? "账号与岗位分配" : "查看团队账号", count: adminUsers?.total ?? 0 },
+    { key: "roles", label: "岗位模板", helper: canManageAdmins ? "职责与权限模板" : "查看权限模板", count: roles.length },
   ];
 
   const visiblePaymentTabItems = paymentTabItems.filter((item) => !item.hidden);
@@ -4158,178 +4238,199 @@ function startEditLearner(item: AdminLearnerUser) {
                 </div>
               </div>
 
-              <div className="admin-card-grid">
-                <article className="content-card">
-                  <h2>修改我的登录密码</h2>
-                  <form className="setup-form" onSubmit={handleChangePassword}>
-                    <label className="form-field">
-                      <span>旧密码</span>
-                      <input
-                        type="password"
-                        value={passwordForm.oldPassword}
-                        onChange={(event) => {
-                          setPasswordForm((current) => ({ ...current, oldPassword: event.target.value }));
-                        }}
-                      />
-                    </label>
-                    <label className="form-field">
-                      <span>新密码</span>
-                      <input
-                        type="password"
-                        value={passwordForm.newPassword}
-                        onChange={(event) => {
-                          setPasswordForm((current) => ({ ...current, newPassword: event.target.value }));
-                        }}
-                      />
-                    </label>
-                    <label className="form-field">
-                      <span>确认新密码</span>
-                      <input
-                        type="password"
-                        value={passwordForm.confirmPassword}
-                        onChange={(event) => {
-                          setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }));
-                        }}
-                      />
-                    </label>
-                    <button className="primary-button" disabled={busyAction === "password"} type="submit">
-                      保存新密码
+              <div className="import-workbench">
+                <div className="import-tabbar" role="tablist" aria-label="团队与权限内部导航">
+                  {adminTabItems.map((item) => (
+                    <button
+                      aria-selected={activeAdminTab === item.key}
+                      className={activeAdminTab === item.key ? "import-tab-button import-tab-button-active" : "import-tab-button"}
+                      key={item.key}
+                      onClick={() => setActiveAdminTab(item.key)}
+                      role="tab"
+                      type="button"
+                    >
+                      <span>{item.label}</span>
+                      <small>{item.helper}</small>
+                      {item.count !== undefined ? <em>{formatCount(item.count)}</em> : null}
                     </button>
-                  </form>
-                </article>
+                  ))}
+                </div>
 
-{canManageAdmins ? (
-                  <article className="content-card">
-                    <h2>后台账号管理</h2>
-                    <p className="helper-text">新增和调整后台账号都改成弹窗处理，方便你边看账号列表边分配岗位和状态。</p>
-                    <div className="button-row">
-                      <button className="primary-button" onClick={openCreateAdminUserModal} type="button">
-                        新增后台账号
-                      </button>
-                    </div>
-                  </article>
+                {activeAdminTab === "security" ? (
+                  <div className="import-panel-stack">
+                    <article className="content-card import-panel-card">
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>修改我的登录密码</h2>
+                          <p className="helper-text">当前登录账号的安全设置单独放在这里处理，避免和团队管理表格混在一起。</p>
+                        </div>
+                      </div>
+                      <form className="setup-form" onSubmit={handleChangePassword}>
+                        <label className="form-field">
+                          <span>旧密码</span>
+                          <input
+                            type="password"
+                            value={passwordForm.oldPassword}
+                            onChange={(event) => {
+                              setPasswordForm((current) => ({ ...current, oldPassword: event.target.value }));
+                            }}
+                          />
+                        </label>
+                        <label className="form-field">
+                          <span>新密码</span>
+                          <input
+                            type="password"
+                            value={passwordForm.newPassword}
+                            onChange={(event) => {
+                              setPasswordForm((current) => ({ ...current, newPassword: event.target.value }));
+                            }}
+                          />
+                        </label>
+                        <label className="form-field">
+                          <span>确认新密码</span>
+                          <input
+                            type="password"
+                            value={passwordForm.confirmPassword}
+                            onChange={(event) => {
+                              setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }));
+                            }}
+                          />
+                        </label>
+                        <button className="primary-button" disabled={busyAction === "password"} type="submit">
+                          保存新密码
+                        </button>
+                      </form>
+                    </article>
+                  </div>
                 ) : null}
 
-                {canManageAdmins ? (
-                  <article className="content-card">
-                    <h2>岗位模板管理</h2>
-                    <p className="helper-text">岗位职责和权限范围也统一放到弹窗里编辑，查看模板列表时不会被长表单压住页面。</p>
-                    <div className="button-row">
-                      <button className="primary-button" onClick={openCreateRoleModal} type="button">
-                        新增岗位模板
-                      </button>
+                {activeAdminTab === "admins" ? (
+                  <div className="import-panel-stack">
+                    <div className="table-section import-panel-table">
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>后台账号列表</h2>
+                          <p className="helper-text">新增和调整后台账号都通过弹窗处理，方便你边看列表边分配岗位和状态。</p>
+                        </div>
+                        <div className="toolbar-controls">
+                          <input
+                            className="toolbar-search"
+                            value={adminUserQuery}
+                            onChange={(event) => {
+                              setAdminUserQuery(event.target.value);
+                              setAdminUserPage(1);
+                            }}
+                            placeholder="搜索账号或姓名"
+                          />
+                          {canManageAdmins ? (
+                            <button className="primary-button" onClick={openCreateAdminUserModal} type="button">
+                              新增后台账号
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                      <DataTable
+                        columns={
+                          canManageAdmins
+                            ? ["后台账号", "成员姓名", "岗位", "使用状态", "全站权限", "最近登录", "操作"]
+                            : ["后台账号", "成员姓名", "岗位", "使用状态", "全站权限", "最近登录"]
+                        }
+                        rows={(adminUsers?.items ?? []).map((item) =>
+                          canManageAdmins
+                            ? [
+                                item.username,
+                                item.display_name,
+                                adminRoleLabel(item.role),
+                                item.status === "active" ? "启用" : "停用",
+                                item.is_super ? "是" : "否",
+                                item.last_login_at ? formatDateTime(item.last_login_at) : "-",
+                                <button className="secondary-button small-button" onClick={() => startEditAdminUser(item)} type="button">
+                                  调整
+                                </button>,
+                              ]
+                            : [
+                                item.username,
+                                item.display_name,
+                                adminRoleLabel(item.role),
+                                item.status === "active" ? "启用" : "停用",
+                                item.is_super ? "是" : "否",
+                                item.last_login_at ? formatDateTime(item.last_login_at) : "-",
+                              ],
+                        )}
+                        emptyText="当前还没有后台账号。"
+                      />
+                      <PagerControls
+                        page={adminUsers?.page ?? 1}
+                        total={adminUsers?.total ?? 0}
+                        pageSize={adminUsers?.page_size ?? adminPageSize}
+                        onChange={setAdminUserPage}
+                      />
                     </div>
-                  </article>
+                  </div>
+                ) : null}
+
+                {activeAdminTab === "roles" ? (
+                  <div className="import-panel-stack">
+                    <div className="table-section import-panel-table">
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>岗位权限模板</h2>
+                          <p className="helper-text">岗位职责和权限范围统一放到弹窗里编辑，查看模板列表时不会被长表单压住页面。</p>
+                        </div>
+                        {canManageAdmins ? (
+                          <button className="primary-button" onClick={openCreateRoleModal} type="button">
+                            新增岗位模板
+                          </button>
+                        ) : null}
+                      </div>
+                      <DataTable
+                        columns={
+                          canManageAdmins
+                            ? ["岗位名称", "岗位编码", "职责说明", "权限范围", "系统内置", "操作"]
+                            : ["岗位名称", "岗位编码", "职责说明", "权限范围", "系统内置"]
+                        }
+                        rows={roles.map((role) =>
+                          canManageAdmins
+                            ? [
+                                adminRoleLabel(role.key, role.name),
+                                role.key,
+                                role.description || "-",
+                                <div className="tag-list">
+                                  {role.permissions.map((permission) => (
+                                    <span className="tag" key={permission} title={permission}>
+                                      {permissionLabel(permission)}
+                                    </span>
+                                  ))}
+                                </div>,
+                                role.system ? "是" : "否",
+                                !role.system ? (
+                                  <button className="secondary-button small-button" onClick={() => startEditRole(role)} type="button">
+                                    调整模板
+                                  </button>
+                                ) : (
+                                  <span className="helper-text">系统内置</span>
+                                ),
+                              ]
+                            : [
+                                adminRoleLabel(role.key, role.name),
+                                role.key,
+                                role.description || "-",
+                                <div className="tag-list">
+                                  {role.permissions.map((permission) => (
+                                    <span className="tag" key={permission} title={permission}>
+                                      {permissionLabel(permission)}
+                                    </span>
+                                  ))}
+                                </div>,
+                                role.system ? "是" : "否",
+                              ],
+                        )}
+                        emptyText="当前还没有岗位权限模板。"
+                      />
+                    </div>
+                  </div>
                 ) : null}
               </div>
-
-              <article className="content-card">
-                <div className="section-toolbar">
-                  <h2>后台账号列表</h2>
-                  <input
-                    className="toolbar-search"
-                    value={adminUserQuery}
-                    onChange={(event) => {
-                      setAdminUserQuery(event.target.value);
-                      setAdminUserPage(1);
-                    }}
-                    placeholder="搜索账号或姓名"
-                  />
-                </div>
-                <div className="table-wrap">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>后台账号</th>
-                        <th>成员姓名</th>
-                        <th>岗位</th>
-                        <th>使用状态</th>
-                        <th>全站权限</th>
-                        <th>最近登录</th>
-                        {canManageAdmins ? <th>操作</th> : null}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(adminUsers?.items ?? []).map((item) => (
-                        <tr key={item.id}>
-                          <td>{item.username}</td>
-                          <td>{item.display_name}</td>
-                          <td>{adminRoleLabel(item.role)}</td>
-                          <td>{item.status === "active" ? "启用" : "停用"}</td>
-                          <td>{item.is_super ? "是" : "否"}</td>
-                          <td>{item.last_login_at ? formatDateTime(item.last_login_at) : "-"}</td>
-                          {canManageAdmins ? (
-                            <td>
-                              <button className="secondary-button small-button" onClick={() => startEditAdminUser(item)} type="button">
-                                调整
-                              </button>
-                            </td>
-                          ) : null}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {(adminUsers?.items ?? []).length === 0 ? <div className="feedback-banner">当前还没有后台账号。</div> : null}
-                </div>
-                <PagerControls
-                  page={adminUsers?.page ?? 1}
-                  total={adminUsers?.total ?? 0}
-                  pageSize={adminUsers?.page_size ?? adminPageSize}
-                  onChange={setAdminUserPage}
-                />
-              </article>
-
-              <article className="content-card">
-                <h2>岗位权限模板</h2>
-                <div className="table-wrap">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>岗位名称</th>
-                        <th>岗位编码</th>
-                        <th>职责说明</th>
-                        <th>权限范围</th>
-                        <th>系统内置</th>
-                        {canManageAdmins ? <th>操作</th> : null}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {roles.map((role) => (
-                        <tr key={role.key}>
-                          <td>{adminRoleLabel(role.key, role.name)}</td>
-                          <td>{role.key}</td>
-                          <td>{role.description || "-"}</td>
-                          <td>
-                            <div className="tag-list">
-                              {role.permissions.map((permission) => (
-                                <span className="tag" key={permission} title={permission}>
-                                  {permissionLabel(permission)}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                          <td>{role.system ? "是" : "否"}</td>
-                          {canManageAdmins ? (
-                            <td>
-                              {!role.system ? (
-                                <button
-                                  className="secondary-button small-button"
-                                  onClick={() => startEditRole(role)}
-                                  type="button"
-                                >
-                                  调整模板
-                                </button>
-                              ) : (
-                                <span className="helper-text">系统内置</span>
-                              )}
-                            </td>
-                          ) : null}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </article>
             </section>
           ) : null}
 
