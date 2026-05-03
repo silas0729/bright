@@ -308,6 +308,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&WechatPayConfig{},
 		&PaymentOrder{},
 		&MemberSubscription{},
+		&LearnerMCPEndpoint{},
 		&ImportJob{},
 	)
 }

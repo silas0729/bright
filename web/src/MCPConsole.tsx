@@ -1,6 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { api, buildMCPWebSocketUrl, type MCPInfo, type MCPInfoTool } from "./api";
+import {
+  api,
+  buildMCPWebSocketUrlWithToken,
+  type MCPEndpoint,
+  type MCPInfo,
+  type MCPInfoTool,
+  type SaveMCPEndpointInput,
+} from "./api";
 
 type MCPConsoleProps = {
   subjectKey: string;
@@ -8,80 +15,57 @@ type MCPConsoleProps = {
   learnerName: string;
 };
 
-type MCPConnectionState = "disconnected" | "connecting" | "connected";
+type EndpointFormState = SaveMCPEndpointInput;
 
-type MCPEnvelope = {
-  jsonrpc: string;
-  id?: number | string | null;
-  method?: string;
-  params?: unknown;
-  result?: unknown;
-  error?: {
-    code?: number;
-    message?: string;
-    data?: unknown;
-  };
-};
-
-type MCPLogEntry = {
-  id: number;
-  direction: "sent" | "received" | "status" | "error";
-  text: string;
-  timestamp: string;
-};
-
-const defaultArgsByTool: Record<string, Record<string, unknown>> = {
-  search_words: {
-    query: "travel",
-    page: 1,
-    page_size: 10,
-  },
-  list_classification_stats: {
-    page: 1,
-    page_size: 8,
-  },
-  list_categories: {
-    kind: "topic",
-  },
+const emptyEndpointForm: EndpointFormState = {
+  name: "",
+  url: "",
+  description: "",
+  enabled: true,
+  token_query_param: "token",
+  subject_query_param: "subject",
 };
 
 export default function MCPConsole(props: MCPConsoleProps) {
   const [mcpInfo, setMcpInfo] = useState<MCPInfo | null>(null);
-  const [infoError, setInfoError] = useState("");
   const [infoLoading, setInfoLoading] = useState(false);
+  const [infoError, setInfoError] = useState("");
 
-  const [connectionState, setConnectionState] = useState<MCPConnectionState>("disconnected");
-  const [selectedTool, setSelectedTool] = useState("search_words");
-  const [argumentsText, setArgumentsText] = useState("");
-  const [logs, setLogs] = useState<MCPLogEntry[]>([]);
-  const [callResultText, setCallResultText] = useState("");
-  const [connectionError, setConnectionError] = useState("");
+  const [endpoints, setEndpoints] = useState<MCPEndpoint[]>([]);
+  const [endpointsLoading, setEndpointsLoading] = useState(false);
+  const [endpointsError, setEndpointsError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
-  const socketRef = useRef<WebSocket | null>(null);
-  const logIdRef = useRef(1);
-  const initializeWaiterRef = useRef<{
-    resolve: () => void;
-    reject: (error: Error) => void;
-  } | null>(null);
-  const listToolsWaiterRef = useRef<{
-    resolve: (payload: MCPInfoTool[]) => void;
-    reject: (error: Error) => void;
-  } | null>(null);
-  const callToolWaiterRef = useRef<{
-    resolve: (payload: unknown) => void;
-    reject: (error: Error) => void;
-  } | null>(null);
+  const [selectedEndpointID, setSelectedEndpointID] = useState<number | null>(null);
+  const [toolPreviewMap, setToolPreviewMap] = useState<Record<number, MCPInfoTool[]>>({});
+  const [toolPreviewLoadingID, setToolPreviewLoadingID] = useState<number | null>(null);
+  const [toolPreviewError, setToolPreviewError] = useState("");
 
-  const tools = useMemo(() => mcpInfo?.tools ?? [], [mcpInfo]);
-  const resolvedSocketUrl = useMemo(() => buildMCPWebSocketUrl(props.subjectKey), [props.subjectKey]);
+  const [endpointModalOpen, setEndpointModalOpen] = useState(false);
+  const [editingEndpointID, setEditingEndpointID] = useState<number | null>(null);
+  const [endpointForm, setEndpointForm] = useState<EndpointFormState>(emptyEndpointForm);
+  const [savingEndpoint, setSavingEndpoint] = useState(false);
+  const [endpointBusyMessage, setEndpointBusyMessage] = useState("");
+  const [copiedMessage, setCopiedMessage] = useState("");
 
-  useEffect(() => {
-    const initialArgs = {
-      subject_key: props.subjectKey,
-      ...(defaultArgsByTool[selectedTool] ?? {}),
-    };
-    setArgumentsText(JSON.stringify(initialArgs, null, 2));
-  }, [props.subjectKey, selectedTool]);
+  const localSocketURL = useMemo(
+    () => buildMCPWebSocketUrlWithToken(props.subjectKey, props.token),
+    [props.subjectKey, props.token],
+  );
+
+  const enabledEndpoints = useMemo(() => endpoints.filter((item) => item.enabled), [endpoints]);
+  const connectedEndpoints = useMemo(() => endpoints.filter((item) => item.is_connected), [endpoints]);
+  const globalTools = useMemo(() => mcpInfo?.tools ?? [], [mcpInfo]);
+  const selectedEndpoint = useMemo(
+    () => endpoints.find((item) => item.id === selectedEndpointID) ?? endpoints[0] ?? null,
+    [endpoints, selectedEndpointID],
+  );
+  const selectedEndpointTools = useMemo(() => {
+    if (!selectedEndpoint) {
+      return globalTools;
+    }
+    return toolPreviewMap[selectedEndpoint.id] ?? globalTools;
+  }, [globalTools, selectedEndpoint, toolPreviewMap]);
 
   useEffect(() => {
     let active = true;
@@ -115,417 +99,776 @@ export default function MCPConsole(props: MCPConsoleProps) {
   }, [props.subjectKey]);
 
   useEffect(() => {
-    return () => {
-      const socket = socketRef.current;
-      socketRef.current = null;
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.close(1000, "component unmounted");
-      }
-    };
-  }, []);
-
-  function appendLog(direction: MCPLogEntry["direction"], text: string) {
-    const entry: MCPLogEntry = {
-      id: logIdRef.current++,
-      direction,
-      text,
-      timestamp: new Date().toLocaleTimeString("zh-CN", { hour12: false }),
-    };
-    setLogs((current) => [entry, ...current].slice(0, 60));
-  }
-
-  function sendPayload(payload: MCPEnvelope) {
-    const socket = socketRef.current;
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      throw new Error("MCP websocket is not connected");
-    }
-    const text = JSON.stringify(payload);
-    socket.send(text);
-    appendLog("sent", text);
-  }
-
-  function parseErrorMessage(error: unknown) {
-    if (error instanceof Error) {
-      return error.message;
-    }
-    return String(error);
-  }
-
-  async function connect() {
     if (!props.token.trim()) {
-      setConnectionError("请先登录学员账号，再建立 MCP websocket 连接。");
+      setEndpoints([]);
+      setSelectedEndpointID(null);
+      setToolPreviewMap({});
       return;
     }
-    if (!props.subjectKey.trim()) {
-      setConnectionError("请先选择学科。");
-      return;
-    }
-    if (!resolvedSocketUrl) {
-      setConnectionError("当前环境无法推导 websocket 地址。");
+    void loadEndpoints();
+  }, [props.token]);
+
+  useEffect(() => {
+    if (endpoints.length === 0) {
+      if (selectedEndpointID !== null) {
+        setSelectedEndpointID(null);
+      }
       return;
     }
 
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      appendLog("status", "websocket already connected");
+    if (!selectedEndpointID || !endpoints.some((item) => item.id === selectedEndpointID)) {
+      setSelectedEndpointID(endpoints[0].id);
+    }
+  }, [endpoints, selectedEndpointID]);
+
+  useEffect(() => {
+    if (!props.token.trim()) {
       return;
     }
 
-    setConnectionError("");
-    setConnectionState("connecting");
-    appendLog("status", `connecting ${resolvedSocketUrl}`);
+    const timer = window.setInterval(() => {
+      void loadEndpoints({ silent: true });
+    }, 15000);
 
-    const socket = new WebSocket(resolvedSocketUrl);
-    socketRef.current = socket;
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [props.token]);
+
+  useEffect(() => {
+    if (!props.token.trim() || !selectedEndpoint) {
+      return;
+    }
+    if (toolPreviewMap[selectedEndpoint.id]) {
+      return;
+    }
+    void loadEndpointToolPreview(selectedEndpoint);
+  }, [props.token, selectedEndpoint, toolPreviewMap]);
+
+  async function loadEndpoints(options?: { silent?: boolean }) {
+    if (!props.token.trim()) {
+      return;
+    }
+
+    if (!options?.silent) {
+      setEndpointsLoading(true);
+      setEndpointsError("");
+    }
 
     try {
-      await new Promise<void>((resolve, reject) => {
-        const cleanup = () => {
-          socket.removeEventListener("open", handleOpen);
-          socket.removeEventListener("error", handleError);
-        };
-
-        const handleOpen = () => {
-          cleanup();
-          resolve();
-        };
-
-        const handleError = () => {
-          cleanup();
-          reject(new Error("websocket connection failed"));
-        };
-
-        socket.addEventListener("open", handleOpen);
-        socket.addEventListener("error", handleError);
-      });
+      const items = await api.listLearnerMCPEndpoints(props.token);
+      setEndpoints(items);
     } catch (error) {
-      const message = parseErrorMessage(error);
-      setConnectionState("disconnected");
-      setConnectionError(message);
-      appendLog("error", message);
-      socketRef.current = null;
-      socket.close();
+      setEndpointsError(parseErrorMessage(error));
+    } finally {
+      if (!options?.silent) {
+        setEndpointsLoading(false);
+      }
+    }
+  }
+
+  async function loadEndpointToolPreview(endpoint: MCPEndpoint) {
+    if (!props.token.trim()) {
+      return;
+    }
+    if (toolPreviewMap[endpoint.id]) {
       return;
     }
 
-    socket.onmessage = (event) => {
-      const text = typeof event.data === "string" ? event.data : "[binary message]";
-      appendLog("received", text);
-
-      if (typeof event.data !== "string") {
-        return;
-      }
-
-      let payload: MCPEnvelope;
-      try {
-        payload = JSON.parse(event.data) as MCPEnvelope;
-      } catch {
-        return;
-      }
-
-      if (payload.id === 1 && initializeWaiterRef.current) {
-        if (payload.error) {
-          initializeWaiterRef.current.reject(new Error(payload.error.message || "initialize failed"));
-        } else {
-          initializeWaiterRef.current.resolve();
-        }
-        initializeWaiterRef.current = null;
-        return;
-      }
-
-      if (payload.id === 2 && listToolsWaiterRef.current) {
-        if (payload.error) {
-          listToolsWaiterRef.current.reject(new Error(payload.error.message || "tools/list failed"));
-        } else {
-          const toolPayload = ((payload.result as { tools?: MCPInfoTool[] } | undefined)?.tools ?? []) as MCPInfoTool[];
-          listToolsWaiterRef.current.resolve(toolPayload);
-        }
-        listToolsWaiterRef.current = null;
-        return;
-      }
-
-      if (payload.id === 3 && callToolWaiterRef.current) {
-        if (payload.error) {
-          callToolWaiterRef.current.reject(new Error(payload.error.message || "tools/call failed"));
-        } else {
-          callToolWaiterRef.current.resolve(payload.result);
-        }
-        callToolWaiterRef.current = null;
-      }
-    };
-
-    socket.onclose = (event) => {
-      if (socketRef.current === socket) {
-        socketRef.current = null;
-      }
-      setConnectionState("disconnected");
-      appendLog("status", `socket closed code=${event.code} reason=${event.reason || "none"}`);
-    };
-
-    socket.onerror = () => {
-      appendLog("error", "websocket error event");
-    };
-
+    setToolPreviewLoadingID(endpoint.id);
+    setToolPreviewError("");
     try {
-      await initializeAndLoadTools();
-      setConnectionState("connected");
-      appendLog("status", `connected as ${props.learnerName || "learner"}`);
+      const payload = await api.getLearnerMCPEndpointTools(props.token, endpoint.id);
+      setToolPreviewMap((current) => ({
+        ...current,
+        [endpoint.id]: payload.tools,
+      }));
     } catch (error) {
-      const message = parseErrorMessage(error);
-      setConnectionError(message);
-      setConnectionState("disconnected");
-      appendLog("error", message);
-      socket.close();
+      setToolPreviewError(parseErrorMessage(error));
+    } finally {
+      setToolPreviewLoadingID(null);
     }
   }
 
-  async function initializeAndLoadTools() {
-    await new Promise<void>((resolve, reject) => {
-      initializeWaiterRef.current = { resolve, reject };
-      sendPayload({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "initialize",
-        params: {
-          protocolVersion: "2024-11-05",
-          capabilities: {},
-          clientInfo: {
-            name: "brights-web-console",
-            version: "1.0.0",
-          },
-        },
-      });
-    });
-
-    sendPayload({
-      jsonrpc: "2.0",
-      method: "notifications/initialized",
-    });
-
-    const listedTools = await new Promise<MCPInfoTool[]>((resolve, reject) => {
-      listToolsWaiterRef.current = { resolve, reject };
-      sendPayload({
-        jsonrpc: "2.0",
-        id: 2,
-        method: "tools/list",
-      });
-    });
-
-    setMcpInfo((current) =>
-      current
-        ? {
-            ...current,
-            tools: listedTools,
-          }
-        : {
-            name: "brights-mcp",
-            version: "0.1.0",
-            protocolVersion: "2024-11-05",
-            websocketPath: "/mcp",
-            websocketURL: resolvedSocketUrl,
-            availableMethods: ["initialize", "ping", "tools/list", "tools/call"],
-            tools: listedTools,
-          },
-    );
-  }
-
-  function disconnect() {
-    const socket = socketRef.current;
-    socketRef.current = null;
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.close(1000, "manual disconnect");
-    }
-    setConnectionState("disconnected");
-  }
-
-  async function callSelectedTool() {
-    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
-      setConnectionError("请先建立 websocket 连接。");
+  async function refreshAllConnections() {
+    if (!props.token.trim()) {
+      setEndpointBusyMessage("请先登录学员账号，再刷新 MCP 接入状态。");
       return;
     }
 
-    let parsedArguments: Record<string, unknown> = {};
+    setRefreshing(true);
+    setEndpointBusyMessage("");
+    setEndpointsError("");
+    setCopiedMessage("");
     try {
-      parsedArguments = argumentsText.trim()
-        ? (JSON.parse(argumentsText) as Record<string, unknown>)
-        : {};
+      const payload = await api.refreshLearnerMCPConnections(props.token);
+      setEndpoints(payload.endpoints);
+      setEndpointBusyMessage("已刷新远程接入点状态。");
+    } catch (error) {
+      setEndpointsError(parseErrorMessage(error));
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  async function refreshSelectedEndpointStatus() {
+    if (!props.token.trim() || !selectedEndpoint) {
+      return;
+    }
+
+    setEndpointBusyMessage("");
+    try {
+      const payload = await api.getLearnerMCPEndpointStatus(props.token, selectedEndpoint.id);
+      setEndpoints((current) => current.map((item) => (item.id === payload.id ? payload : item)));
+    } catch (error) {
+      setEndpointBusyMessage(parseErrorMessage(error));
+    }
+  }
+
+  function resetEndpointForm() {
+    setEndpointForm(emptyEndpointForm);
+    setEditingEndpointID(null);
+    setEndpointBusyMessage("");
+  }
+
+  function openCreateModal() {
+    resetEndpointForm();
+    setEndpointModalOpen(true);
+  }
+
+  function openEditModal(endpoint: MCPEndpoint) {
+    setEditingEndpointID(endpoint.id);
+    setEndpointForm({
+      name: endpoint.name,
+      url: endpoint.url,
+      description: endpoint.description,
+      enabled: endpoint.enabled,
+      token_query_param: endpoint.token_query_param || "token",
+      subject_query_param: endpoint.subject_query_param || "subject",
+    });
+    setEndpointBusyMessage("");
+    setEndpointModalOpen(true);
+  }
+
+  function closeEndpointModal() {
+    if (savingEndpoint) {
+      return;
+    }
+    setEndpointModalOpen(false);
+    resetEndpointForm();
+  }
+
+  async function saveEndpoint() {
+    if (!props.token.trim()) {
+      setEndpointBusyMessage("请先登录学员账号，再保存远程 ws / wss 地址。");
+      return;
+    }
+
+    setSavingEndpoint(true);
+    setEndpointBusyMessage("");
+
+    try {
+      const payload = {
+        ...endpointForm,
+        name: endpointForm.name.trim(),
+        url: endpointForm.url.trim(),
+        description: endpointForm.description.trim(),
+      };
+      const saved = editingEndpointID
+        ? await api.updateLearnerMCPEndpoint(props.token, editingEndpointID, payload)
+        : await api.createLearnerMCPEndpoint(props.token, payload);
+
+      setEndpoints((current) => {
+        if (editingEndpointID) {
+          return current.map((item) => (item.id === saved.id ? saved : item));
+        }
+        return [saved, ...current];
+      });
+      setSelectedEndpointID(saved.id);
+      setToolPreviewMap((current) => {
+        const next = { ...current };
+        delete next[saved.id];
+        return next;
+      });
+      setEndpointModalOpen(false);
+      resetEndpointForm();
+      setEndpointBusyMessage(editingEndpointID ? "接入点配置已更新。" : "新的 MCP 接入点已添加。");
+      void loadEndpoints({ silent: true });
+    } catch (error) {
+      setEndpointBusyMessage(parseErrorMessage(error));
+    } finally {
+      setSavingEndpoint(false);
+    }
+  }
+
+  async function deleteEndpoint(endpoint: MCPEndpoint) {
+    if (!props.token.trim()) {
+      setEndpointBusyMessage("请先登录学员账号，再删除接入点。");
+      return;
+    }
+    if (!window.confirm(`确认删除接入点“${endpoint.name}”吗？`)) {
+      return;
+    }
+
+    setEndpointBusyMessage("");
+    try {
+      await api.deleteLearnerMCPEndpoint(props.token, endpoint.id);
+      setEndpoints((current) => current.filter((item) => item.id !== endpoint.id));
+      setToolPreviewMap((current) => {
+        const next = { ...current };
+        delete next[endpoint.id];
+        return next;
+      });
+      if (selectedEndpointID === endpoint.id) {
+        setSelectedEndpointID(null);
+      }
+      setEndpointBusyMessage("接入点已删除。");
+    } catch (error) {
+      setEndpointBusyMessage(parseErrorMessage(error));
+    }
+  }
+
+  async function copyText(text: string, message: string) {
+    if (!text.trim()) {
+      return;
+    }
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.setAttribute("readonly", "true");
+        textarea.style.position = "absolute";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        textarea.remove();
+      }
+      setCopiedMessage(message);
+      setEndpointBusyMessage("");
     } catch {
-      setConnectionError("工具参数不是合法 JSON。");
-      return;
-    }
-
-    setConnectionError("");
-    setCallResultText("");
-
-    try {
-      const result = await new Promise<unknown>((resolve, reject) => {
-        callToolWaiterRef.current = { resolve, reject };
-        sendPayload({
-          jsonrpc: "2.0",
-          id: 3,
-          method: "tools/call",
-          params: {
-            name: selectedTool,
-            arguments: {
-              subject_key: props.subjectKey,
-              ...parsedArguments,
-            },
-          },
-        });
-      });
-
-      setCallResultText(JSON.stringify(result, null, 2));
-    } catch (error) {
-      const message = parseErrorMessage(error);
-      setConnectionError(message);
-      appendLog("error", message);
+      setCopiedMessage("复制失败，请手动复制。");
     }
   }
+
+  function openMCPInfoPage() {
+    const url = buildMCPInfoURL(props.subjectKey);
+    if (!url) {
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  const overallStatus = resolveOverallStatus(endpoints, props.token, endpointsLoading || refreshing);
+  const overallStatusClass = overallStatusToClassName(overallStatus);
+  const overallStatusLabel = overallStatusToLabel(overallStatus);
 
   return (
-    <section className="content-card profile-card">
-      <div className="section-header">
-        <div>
-          <p className="section-eyebrow">MCP / WSS</p>
-          <h2>前端实时连接 MCP websocket</h2>
-          <p className="helper-text">
-            这里就是前端真正发起 <code>ws://</code> / <code>wss://</code> 连接的入口。当前会复用已登录学员的 token，并按学科建立连接。
-          </p>
-        </div>
-        <span
-          className={
-            connectionState === "connected"
-              ? "pill pill-success"
-              : connectionState === "connecting"
-                ? "pill pill-warning"
-                : "pill pill-muted"
-          }
-        >
-          {connectionState === "connected"
-            ? "已连接"
-            : connectionState === "connecting"
-              ? "连接中"
-              : "未连接"}
-        </span>
-      </div>
-
-      <div className="mcp-console-grid">
-        <div className="mcp-console-panel">
-          <dl className="metric-list">
-            <div>
-              <dt>当前学员</dt>
-              <dd>{props.learnerName || "未登录"}</dd>
-            </div>
-            <div>
-              <dt>学科</dt>
-              <dd>{props.subjectKey || "-"}</dd>
-            </div>
-            <div>
-              <dt>连接地址</dt>
-              <dd className="mcp-inline-break">{resolvedSocketUrl || "-"}</dd>
-            </div>
-          </dl>
-
-          <div className="button-row">
-            <button className="primary-button" disabled={connectionState === "connecting"} onClick={connect} type="button">
-              {connectionState === "connected" ? "重新握手" : "连接 websocket"}
-            </button>
-            <button className="secondary-button" disabled={connectionState === "disconnected"} onClick={disconnect} type="button">
-              断开连接
-            </button>
-          </div>
-
-          {infoLoading ? <div className="feedback-banner">正在读取 MCP 信息...</div> : null}
-          {infoError ? <div className="feedback-banner feedback-error">{infoError}</div> : null}
-          {connectionError ? <div className="feedback-banner feedback-error">{connectionError}</div> : null}
-
-          {mcpInfo ? (
-            <div className="mcp-info-card">
-              <p className="helper-text">
-                服务端：<strong>{mcpInfo.name}</strong> {mcpInfo.version}，协议版本 {mcpInfo.protocolVersion}
-              </p>
-              <p className="helper-text">
-                方法：{mcpInfo.availableMethods.join(" / ")}
-              </p>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="mcp-console-panel">
-          <label className="form-field">
-            <span>选择工具</span>
-            <select
-              value={selectedTool}
-              onChange={(event) => {
-                setSelectedTool(event.target.value);
-              }}
-            >
-              {(tools.length > 0 ? tools : fallbackTools).map((tool) => (
-                <option key={tool.name} value={tool.name}>
-                  {tool.title || tool.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="form-field">
-            <span>工具参数 JSON</span>
-            <textarea
-              className="mcp-json-editor"
-              rows={10}
-              value={argumentsText}
-              onChange={(event) => {
-                setArgumentsText(event.target.value);
-              }}
-            />
-          </label>
-
-          <div className="button-row">
-            <button className="primary-button" disabled={connectionState !== "connected"} onClick={callSelectedTool} type="button">
-              调用 tools/call
-            </button>
-          </div>
-
-          {callResultText ? (
-            <div className="mcp-output-card">
-              <strong>调用结果</strong>
-              <pre>{callResultText}</pre>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="mcp-log-card">
+    <>
+      <section className="content-card profile-card mcp-hub-card" id="mcp">
         <div className="section-header">
           <div>
-            <p className="section-eyebrow">会话日志</p>
-            <h3>握手、收发包和错误都在这里</h3>
+            <p className="section-eyebrow">MCP Access</p>
+            <h2>MCP接入点</h2>
+            <p className="helper-text mcp-hero-note">
+              你只需要在这里维护远程 ws / wss 地址。真正的连接由 Brights 后端完成，远程服务连上后就能以当前学员身份调用全部
+              Brights MCP 工具，数据返回会自动按会员权限控制。
+            </p>
+          </div>
+          <div className="mcp-header-actions">
+            <span className={`pill ${overallStatusClass}`}>{overallStatusLabel}</span>
+            <button className="primary-button small-button" onClick={openCreateModal} type="button">
+              添加接入点
+            </button>
           </div>
         </div>
-        {logs.length === 0 ? (
-          <div className="feedback-banner">建立连接后，这里会显示 initialize、tools/list、tools/call 的收发记录。</div>
-        ) : (
-          <div className="mcp-log-list">
-            {logs.map((entry) => (
-              <article className={`mcp-log-entry mcp-log-entry-${entry.direction}`} key={entry.id}>
-                <div className="mcp-log-entry-meta">
-                  <span className="pill pill-muted">{entry.direction}</span>
-                  <span>{entry.timestamp}</span>
-                </div>
-                <pre>{entry.text}</pre>
+
+        <div className="mcp-hub-layout">
+          <div className="mcp-hub-main">
+            <div className="mcp-connection-hero">
+              <div className="mcp-connection-hero-copy">
+                <p className="section-eyebrow">Unified Endpoint</p>
+                <h3>一个连接点，对外暴露全部 Brights 工具</h3>
+                <p className="helper-text">
+                  当前学员 <strong>{props.learnerName || "未登录"}</strong>
+                  {" · "}
+                  当前学科 <strong>{props.subjectKey || "-"}</strong>
+                </p>
+              </div>
+
+              <div className="mcp-mode-pills">
+                <span className="mcp-mode-pill mcp-mode-pill-active">后端统一连接远程服务</span>
+                <span className="mcp-mode-pill">工具列表自动全部暴露</span>
+                <span className="mcp-mode-pill">返回结果按会员权限控制</span>
+              </div>
+            </div>
+
+            <div className="mcp-summary-grid">
+              <article className="mcp-summary-card">
+                <span>统一入口</span>
+                <strong>{mcpInfo?.websocketPath || "/mcp"}</strong>
               </article>
-            ))}
+              <article className="mcp-summary-card">
+                <span>全部工具</span>
+                <strong>{globalTools.length} 个工具</strong>
+              </article>
+              <article className="mcp-summary-card">
+                <span>已启用接入点</span>
+                <strong>{enabledEndpoints.length} 个</strong>
+              </article>
+              <article className="mcp-summary-card">
+                <span>当前在线</span>
+                <strong>{connectedEndpoints.length} 个</strong>
+              </article>
+            </div>
+
+            <section className="mcp-console-panel mcp-connect-panel">
+              <div className="section-header">
+                <div>
+                  <p className="section-eyebrow">Entry URL</p>
+                  <h3>Brights 统一 MCP 入口</h3>
+                </div>
+              </div>
+
+              <label className="form-field">
+                <span>当前可复制的连接地址</span>
+                <div className="mcp-address-preview">
+                  <code>{localSocketURL || "请先登录并选择学科后再复制"}</code>
+                </div>
+              </label>
+
+              <div className="button-row">
+                <button
+                  className="primary-button"
+                  disabled={!localSocketURL}
+                  onClick={() => {
+                    void copyText(localSocketURL, "统一 MCP 连接地址已复制。");
+                  }}
+                  type="button"
+                >
+                  复制入口
+                </button>
+                <button className="secondary-button" onClick={() => void refreshAllConnections()} type="button">
+                  {refreshing ? "正在刷新..." : "刷新连接"}
+                </button>
+                <button className="secondary-button" onClick={openMCPInfoPage} type="button">
+                  查看接入说明
+                </button>
+              </div>
+
+              {infoLoading ? <div className="feedback-banner">正在读取 MCP 接口信息...</div> : null}
+              {infoError ? <div className="feedback-banner feedback-error">{infoError}</div> : null}
+              {copiedMessage ? <div className="feedback-banner feedback-success">{copiedMessage}</div> : null}
+              {endpointBusyMessage ? <div className="feedback-banner">{endpointBusyMessage}</div> : null}
+              {endpointsError ? <div className="feedback-banner feedback-error">{endpointsError}</div> : null}
+
+              {mcpInfo ? (
+                <div className="mcp-service-strip">
+                  <strong>{mcpInfo.name}</strong>
+                  <span>{mcpInfo.version}</span>
+                  <span>协议 {mcpInfo.protocolVersion}</span>
+                  <span>支持 {mcpInfo.availableMethods.join(" / ")}</span>
+                </div>
+              ) : null}
+            </section>
+
+            <section className="mcp-console-panel">
+              <div className="section-header">
+                <div>
+                  <p className="section-eyebrow">Selected Endpoint</p>
+                  <h3>当前接入点状态</h3>
+                </div>
+                {selectedEndpoint ? (
+                  <div className="button-row">
+                    <button className="secondary-button small-button" onClick={() => void refreshSelectedEndpointStatus()} type="button">
+                      刷新状态
+                    </button>
+                    <button className="secondary-button small-button" onClick={() => openEditModal(selectedEndpoint)} type="button">
+                      编辑
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+
+              {!selectedEndpoint ? (
+                <div className="mcp-empty-state">
+                  <strong>还没有配置远程接入点</strong>
+                  <p className="helper-text">添加一个 ws / wss 地址后，Brights 后端就会尝试主动连接这个远程服务。</p>
+                </div>
+              ) : (
+                <>
+                  <dl className="detail-grid">
+                    <div>
+                      <dt>接入点名称</dt>
+                      <dd>{selectedEndpoint.name}</dd>
+                    </div>
+                    <div>
+                      <dt>连接状态</dt>
+                      <dd>
+                        <span className={`pill ${statusPillClass(selectedEndpoint.connection_status, selectedEndpoint.enabled)}`}>
+                          {statusLabel(selectedEndpoint.connection_status, selectedEndpoint.enabled)}
+                        </span>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>远程地址</dt>
+                      <dd className="mcp-inline-break">{selectedEndpoint.url}</dd>
+                    </div>
+                    <div>
+                      <dt>最近连接时间</dt>
+                      <dd>{formatDateTime(selectedEndpoint.connected_at)}</dd>
+                    </div>
+                  </dl>
+
+                  {selectedEndpoint.description ? <p className="helper-text">{selectedEndpoint.description}</p> : null}
+                  {selectedEndpoint.last_error ? (
+                    <div className="feedback-banner feedback-error">{selectedEndpoint.last_error}</div>
+                  ) : (
+                    <div className="feedback-banner">
+                      连接建立后，远程服务无需在网页端选择工具，直接通过这个接入点就能拿到全部 Brights MCP 工具。
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+
+            <section className="mcp-console-panel">
+              <div className="section-header">
+                <div>
+                  <p className="section-eyebrow">All Tools</p>
+                  <h3>连接成功后自动可用的全部工具</h3>
+                  <p className="helper-text">这里展示的是当前接入点会对外暴露的 Brights MCP 工具，不需要在网页端逐个勾选。</p>
+                </div>
+              </div>
+
+              {toolPreviewLoadingID === selectedEndpoint?.id ? (
+                <div className="feedback-banner">正在读取接入点工具清单...</div>
+              ) : toolPreviewError ? (
+                <div className="feedback-banner feedback-error">{toolPreviewError}</div>
+              ) : selectedEndpointTools.length === 0 ? (
+                <div className="feedback-banner">当前还没有可展示的工具，请先刷新连接状态。</div>
+              ) : (
+                <div className="mcp-tool-grid">
+                  {selectedEndpointTools.map((tool) => (
+                    <article className="mcp-tool-card" key={tool.name}>
+                      <div className="mcp-tool-card-head">
+                        <strong>{tool.title || tool.name}</strong>
+                        <span className="pill pill-muted">{tool.name}</span>
+                      </div>
+                      <p className="helper-text">{tool.description || "暂无描述"}</p>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
-        )}
-      </div>
-    </section>
+
+          <aside className="mcp-endpoint-sidebar">
+            <div className="mcp-sidebar-head">
+              <div>
+                <p className="section-eyebrow">Remote ws / wss</p>
+                <h3>远程接入点列表</h3>
+              </div>
+              <button className="secondary-button small-button" onClick={openCreateModal} type="button">
+                新增
+              </button>
+            </div>
+
+            <p className="helper-text">
+              这里保存的是你要连接的远程服务地址。浏览器不会直接连接这些地址，真正的连接动作由 Brights 后端统一完成。
+            </p>
+
+            {endpointsLoading ? <div className="feedback-banner">正在加载接入点列表...</div> : null}
+
+            <div className="mcp-endpoint-list">
+              {endpoints.length === 0 ? (
+                <div className="mcp-empty-state">
+                  <strong>还没有远程接入点</strong>
+                  <p className="helper-text">点击“新增”，手动填写一个远程 ws / wss 地址即可开始接入。</p>
+                </div>
+              ) : (
+                endpoints.map((endpoint) => {
+                  const endpointTools = toolPreviewMap[endpoint.id] ?? globalTools;
+                  const isSelected = endpoint.id === selectedEndpoint?.id;
+
+                  return (
+                    <article
+                      className={isSelected ? "mcp-endpoint-card mcp-endpoint-card-selected" : "mcp-endpoint-card"}
+                      key={endpoint.id}
+                    >
+                      <div
+                        onClick={() => {
+                          setSelectedEndpointID(endpoint.id);
+                          void loadEndpointToolPreview(endpoint);
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            setSelectedEndpointID(endpoint.id);
+                            void loadEndpointToolPreview(endpoint);
+                          }
+                        }}
+                      >
+                        <div className="mcp-endpoint-card-head">
+                          <div>
+                            <strong>{endpoint.name}</strong>
+                            <p className="helper-text mcp-inline-break">{endpoint.url}</p>
+                          </div>
+                          <span className={`pill ${statusPillClass(endpoint.connection_status, endpoint.enabled)}`}>
+                            {statusLabel(endpoint.connection_status, endpoint.enabled)}
+                          </span>
+                        </div>
+
+                        {endpoint.description ? <p className="helper-text">{endpoint.description}</p> : null}
+
+                        <div className="mcp-endpoint-tags">
+                          <span className="tag">{endpoint.enabled ? "自动连接已开启" : "已停用"}</span>
+                          <span className="tag">{endpointTools.length} 个工具</span>
+                          <span className="tag">{endpoint.is_connected ? "当前在线" : "等待连接"}</span>
+                        </div>
+
+                        {endpoint.last_error ? (
+                          <div className="feedback-banner feedback-error">{endpoint.last_error}</div>
+                        ) : null}
+
+                        <div className="mcp-endpoint-tool-list">
+                          {endpointTools.slice(0, 4).map((tool) => (
+                            <span className="tag" key={`${endpoint.id}-${tool.name}`}>
+                              {tool.title || tool.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="button-row">
+                        <button
+                          className="secondary-button small-button"
+                          disabled={toolPreviewLoadingID === endpoint.id}
+                          onClick={() => {
+                            setSelectedEndpointID(endpoint.id);
+                            void loadEndpointToolPreview(endpoint);
+                          }}
+                          type="button"
+                        >
+                          {toolPreviewLoadingID === endpoint.id ? "加载中..." : "查看工具"}
+                        </button>
+                        <button className="secondary-button small-button" onClick={() => openEditModal(endpoint)} type="button">
+                          编辑
+                        </button>
+                        <button className="secondary-button small-button" onClick={() => void deleteEndpoint(endpoint)} type="button">
+                          删除
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })
+              )}
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      {endpointModalOpen ? (
+        <div
+          className="mcp-endpoint-modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeEndpointModal();
+            }
+          }}
+        >
+          <section className="mcp-endpoint-modal">
+            <div className="section-header">
+              <div>
+                <p className="section-eyebrow">{editingEndpointID ? "Edit Endpoint" : "Add Endpoint"}</p>
+                <h3>{editingEndpointID ? "编辑 MCP 接入点" : "添加 MCP 接入点"}</h3>
+                <p className="helper-text">
+                  这里只需要填写远程 ws / wss 地址。保存后，Brights 后端会按当前学员身份主动连接这个远程服务。
+                </p>
+              </div>
+              <button className="secondary-button small-button" disabled={savingEndpoint} onClick={closeEndpointModal} type="button">
+                关闭
+              </button>
+            </div>
+
+            <div className="setup-form">
+              <div className="mcp-modal-preview">
+                <strong>当前接入身份</strong>
+                <code>
+                  学员：{props.learnerName || "未登录"}
+                  {"\n"}
+                  学科：{props.subjectKey || "-"}
+                </code>
+              </div>
+
+              <label className="form-field">
+                <span>接入点名称</span>
+                <input
+                  value={endpointForm.name}
+                  onChange={(event) => {
+                    setEndpointForm((current) => ({ ...current, name: event.target.value }));
+                  }}
+                  placeholder="例如：Xiaozhi 远程服务"
+                />
+              </label>
+
+              <label className="form-field">
+                <span>远程 ws / wss 地址</span>
+                <input
+                  value={endpointForm.url}
+                  onChange={(event) => {
+                    setEndpointForm((current) => ({ ...current, url: event.target.value }));
+                  }}
+                  placeholder="wss://example.com/mcp"
+                />
+              </label>
+
+              <label className="form-field">
+                <span>备注说明</span>
+                <textarea
+                  rows={4}
+                  value={endpointForm.description}
+                  onChange={(event) => {
+                    setEndpointForm((current) => ({ ...current, description: event.target.value }));
+                  }}
+                  placeholder="写清楚这个远程服务的用途，方便后续维护。"
+                />
+              </label>
+
+              <label className="checkbox-field">
+                <input
+                  checked={endpointForm.enabled}
+                  onChange={(event) => {
+                    setEndpointForm((current) => ({ ...current, enabled: event.target.checked }));
+                  }}
+                  type="checkbox"
+                />
+                <span>保存后立即启用，并由 Brights 后端自动建立远程连接。</span>
+              </label>
+
+              {endpointBusyMessage ? <div className="feedback-banner feedback-error">{endpointBusyMessage}</div> : null}
+
+              <div className="button-row">
+                <button className="primary-button" disabled={savingEndpoint} onClick={() => void saveEndpoint()} type="button">
+                  {savingEndpoint ? "正在保存..." : editingEndpointID ? "保存修改" : "添加接入点"}
+                </button>
+                <button className="secondary-button" disabled={savingEndpoint} onClick={closeEndpointModal} type="button">
+                  取消
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </>
   );
 }
 
-const fallbackTools: MCPInfoTool[] = [
-  {
-    name: "search_words",
-    title: "Search Words",
-    description: "Search Brights words.",
-    inputSchema: {},
-  },
-];
+function parseErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+function resolveOverallStatus(endpoints: MCPEndpoint[], token: string, loading: boolean) {
+  if (!token.trim()) {
+    return "disconnected";
+  }
+  if (loading || endpoints.some((item) => item.connection_status === "connecting")) {
+    return "connecting";
+  }
+  if (endpoints.some((item) => item.is_connected)) {
+    return "connected";
+  }
+  if (endpoints.some((item) => item.connection_status === "error")) {
+    return "error";
+  }
+  return "disconnected";
+}
+
+function overallStatusToClassName(status: string) {
+  switch (status) {
+    case "connected":
+      return "pill-success";
+    case "connecting":
+      return "pill-warning";
+    case "error":
+      return "pill-danger";
+    default:
+      return "pill-muted";
+  }
+}
+
+function overallStatusToLabel(status: string) {
+  switch (status) {
+    case "connected":
+      return "已有远程服务在线";
+    case "connecting":
+      return "连接中";
+    case "error":
+      return "连接异常";
+    default:
+      return "未连接";
+  }
+}
+
+function statusPillClass(status?: string, enabled?: boolean) {
+  if (!enabled) {
+    return "pill-muted";
+  }
+  switch (status) {
+    case "connected":
+      return "pill-success";
+    case "connecting":
+      return "pill-warning";
+    case "error":
+      return "pill-danger";
+    default:
+      return "pill-muted";
+  }
+}
+
+function statusLabel(status?: string, enabled?: boolean) {
+  if (!enabled) {
+    return "已停用";
+  }
+  switch (status) {
+    case "connected":
+      return "在线";
+    case "connecting":
+      return "连接中";
+    case "error":
+      return "异常";
+    default:
+      return "未连接";
+  }
+}
+
+function formatDateTime(value?: string) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString("zh-CN");
+}
+
+function buildMCPInfoURL(subjectKey: string) {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const url = new URL("/mcp/info", window.location.origin);
+  if (subjectKey.trim()) {
+    url.searchParams.set("subject", subjectKey.trim());
+  }
+  return url.toString();
+}

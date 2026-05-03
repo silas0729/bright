@@ -213,6 +213,97 @@ func TestGetLearnerByIDWithMembership(t *testing.T) {
 	}
 }
 
+func TestLearnerMCPEndpointCRUD(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	user, err := svc.RegisterLearner(ctx, domain.LearnerRegisterInput{
+		Username:    "endpoint-user",
+		Password:    "ChangeMe1",
+		DisplayName: "Endpoint User",
+	})
+	if err != nil {
+		t.Fatalf("register learner: %v", err)
+	}
+
+	created, err := svc.CreateLearnerMCPEndpoint(ctx, user.ID, domain.CreateMCPEndpointInput{
+		Name:              "Remote MCP",
+		URL:               "wss://mcp.example.com/ws?client=web",
+		Description:       "Primary remote endpoint",
+		Enabled:           true,
+		TokenQueryParam:   "token",
+		SubjectQueryParam: "subject",
+	})
+	if err != nil {
+		t.Fatalf("create endpoint: %v", err)
+	}
+	if created.ID == 0 {
+		t.Fatal("expected created endpoint id")
+	}
+	if created.URL != "wss://mcp.example.com/ws?client=web" {
+		t.Fatalf("unexpected endpoint url: %q", created.URL)
+	}
+
+	items, err := svc.ListLearnerMCPEndpoints(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("list endpoints: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 endpoint, got %d", len(items))
+	}
+
+	updated, err := svc.UpdateLearnerMCPEndpoint(ctx, user.ID, created.ID, domain.UpdateMCPEndpointInput{
+		Name:              "Remote MCP 2",
+		URL:               "ws://127.0.0.1:8090/mcp",
+		Description:       "Updated endpoint",
+		Enabled:           false,
+		TokenQueryParam:   "access_token",
+		SubjectQueryParam: "subject_key",
+	})
+	if err != nil {
+		t.Fatalf("update endpoint: %v", err)
+	}
+	if updated.Name != "Remote MCP 2" {
+		t.Fatalf("expected updated name, got %q", updated.Name)
+	}
+	if updated.Enabled {
+		t.Fatal("expected endpoint to be disabled")
+	}
+
+	if err := svc.DeleteLearnerMCPEndpoint(ctx, user.ID, created.ID); err != nil {
+		t.Fatalf("delete endpoint: %v", err)
+	}
+	items, err = svc.ListLearnerMCPEndpoints(ctx, user.ID)
+	if err != nil {
+		t.Fatalf("list endpoints after delete: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("expected 0 endpoints after delete, got %d", len(items))
+	}
+}
+
+func TestCreateLearnerMCPEndpointRejectsInvalidURL(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	user, err := svc.RegisterLearner(ctx, domain.LearnerRegisterInput{
+		Username:    "endpoint-invalid",
+		Password:    "ChangeMe1",
+		DisplayName: "Endpoint Invalid",
+	})
+	if err != nil {
+		t.Fatalf("register learner: %v", err)
+	}
+
+	_, err = svc.CreateLearnerMCPEndpoint(ctx, user.ID, domain.CreateMCPEndpointInput{
+		Name: "Broken",
+		URL:  "https://example.com/mcp",
+	})
+	if err == nil {
+		t.Fatal("expected invalid ws url error")
+	}
+}
+
 func TestListWordsAndClassificationsHideVIP(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()

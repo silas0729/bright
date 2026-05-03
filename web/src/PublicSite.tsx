@@ -180,7 +180,7 @@ export default function PublicSite() {
   useEffect(() => {
     const targetId = currentHash.replace(/^#/, "");
     window.requestAnimationFrame(() => {
-      if (!targetId || targetId === "home" || targetId === "profile" || targetId === "account") {
+      if (!targetId || targetId === "home" || targetId === "profile" || targetId === "account" || targetId === "mcp") {
         window.scrollTo({ top: 0, left: 0, behavior: "auto" });
         return;
       }
@@ -901,6 +901,7 @@ export default function PublicSite() {
         <nav className="site-topnav">
           <a href="#catalog">词库学习</a>
           <a href="#plans">会员方案</a>
+          <a href="#mcp">MCP连接</a>
         </nav>
         <div className="site-header-actions">
           {currentUser ? (
@@ -976,6 +977,16 @@ export default function PublicSite() {
                       role="menuitem"
                     >
                       开通 / 续费会员
+                    </a>
+                    <a
+                      className="site-account-dropdown-link"
+                      href="#mcp"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                      }}
+                      role="menuitem"
+                    >
+                      MCP 连接中心
                     </a>
                     <button
                       className="site-account-dropdown-link site-account-dropdown-link-danger"
@@ -1888,7 +1899,7 @@ function getCurrentHash() {
 }
 
 function resolvePublicView(hash: string): PublicView {
-  if (hash === "#profile" || hash === "#account" || hash === "#plans") {
+  if (hash === "#profile" || hash === "#account" || hash === "#plans" || hash === "#mcp") {
     return "profile";
   }
   return "home";

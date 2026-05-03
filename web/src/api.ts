@@ -517,6 +517,44 @@ export interface MCPInfo {
   examples?: Record<string, unknown>;
 }
 
+export interface MCPEndpoint {
+  id: number;
+  learner_user_id?: number;
+  name: string;
+  url: string;
+  description: string;
+  enabled: boolean;
+  token_query_param: string;
+  subject_query_param: string;
+  connection_status?: string;
+  is_connected?: boolean;
+  last_error?: string;
+  connected_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SaveMCPEndpointInput {
+  name: string;
+  url: string;
+  description: string;
+  enabled: boolean;
+  token_query_param: string;
+  subject_query_param: string;
+}
+
+export interface MCPEndpointToolsResponse {
+  endpoint_id: number;
+  endpoint_name: string;
+  tool_count: number;
+  tools: MCPInfoTool[];
+}
+
+export interface RefreshLearnerMCPConnectionsResponse {
+  success: boolean;
+  endpoints: MCPEndpoint[];
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${baseUrl}${path}`, init);
   if (!response.ok) {
@@ -565,6 +603,48 @@ export function buildMCPWebSocketUrl(subjectKey: string) {
   const trimmedSubject = subjectKey.trim();
   if (trimmedSubject) {
     url.searchParams.set("subject", trimmedSubject);
+  }
+
+  return url.toString();
+}
+
+export function buildMCPWebSocketUrlWithToken(subjectKey: string, token: string) {
+  const urlString = buildMCPWebSocketUrl(subjectKey);
+  if (!urlString) {
+    return "";
+  }
+
+  const url = new URL(urlString);
+  if (token.trim()) {
+    url.searchParams.set("token", token.trim());
+  }
+  return url.toString();
+}
+
+export function buildRemoteMCPWebSocketUrl(
+  endpoint: Pick<MCPEndpoint, "url" | "token_query_param" | "subject_query_param">,
+  options: {
+    token?: string;
+    subjectKey?: string;
+  },
+) {
+  const rawURL = endpoint.url.trim();
+  if (!rawURL) {
+    return "";
+  }
+
+  let url: URL;
+  try {
+    url = new URL(rawURL);
+  } catch {
+    return rawURL;
+  }
+
+  if (options.token?.trim() && endpoint.token_query_param.trim()) {
+    url.searchParams.set(endpoint.token_query_param.trim(), options.token.trim());
+  }
+  if (options.subjectKey?.trim() && endpoint.subject_query_param.trim()) {
+    url.searchParams.set(endpoint.subject_query_param.trim(), options.subjectKey.trim());
   }
 
   return url.toString();
@@ -638,6 +718,47 @@ export const api = {
     }
     const query = search.toString();
     return request<MCPInfo>(query ? `/mcp/info?${query}` : "/mcp/info");
+  },
+  listLearnerMCPEndpoints(token: string) {
+    return request<MCPEndpoint[]>("/api/v1/auth/mcp/endpoints", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  createLearnerMCPEndpoint(token: string, payload: SaveMCPEndpointInput) {
+    return request<MCPEndpoint>("/api/v1/auth/mcp/endpoints", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  updateLearnerMCPEndpoint(token: string, id: number, payload: SaveMCPEndpointInput) {
+    return request<MCPEndpoint>(`/api/v1/auth/mcp/endpoints/${id}`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  getLearnerMCPEndpointTools(token: string, id: number) {
+    return request<MCPEndpointToolsResponse>(`/api/v1/auth/mcp/endpoints/${id}/tools`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  getLearnerMCPEndpointStatus(token: string, id: number) {
+    return request<MCPEndpoint>(`/api/v1/auth/mcp/endpoints/${id}/status`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  refreshLearnerMCPConnections(token: string) {
+    return request<RefreshLearnerMCPConnectionsResponse>("/api/v1/auth/mcp/refresh", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  deleteLearnerMCPEndpoint(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/auth/mcp/endpoints/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
   },
   getSiteSettings() {
     return request<SiteSetting>("/api/v1/site/settings");

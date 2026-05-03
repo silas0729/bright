@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"brights/api/internal/domain"
@@ -46,6 +47,7 @@ type Server struct {
 	service  *service.Service
 	userAuth *userauth.Manager
 	upgrader websocket.Upgrader
+	writeMu   sync.Mutex
 }
 
 // NewServer creates an MCP server instance.
@@ -66,24 +68,6 @@ func (s *Server) HandleWebSocket(c *gin.Context) {
 	session, err := s.authenticateRequest(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	if strings.TrimSpace(session.SubjectKey) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "subject is required"})
-		return
-	}
-
-	hasMembership, err := s.service.LearnerHasActiveMembership(c.Request.Context(), session.Username, session.SubjectKey)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !hasMembership {
-		c.JSON(http.StatusPaymentRequired, gin.H{
-			"error":       "active membership required",
-			"subject_key": session.SubjectKey,
-		})
 		return
 	}
 
@@ -206,8 +190,7 @@ func (s *Server) keepAlive(conn *websocket.Conn, done <-chan struct{}) {
 		case <-done:
 			return
 		case <-ticker.C:
-			_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			if err := s.writeMessage(conn, websocket.PingMessage, nil); err != nil {
 				return
 			}
 		}
@@ -243,17 +226,6 @@ func (s *Server) handleRequest(ctx context.Context, session Session, req Request
 			Result:  map[string]interface{}{},
 		}
 	case "tools/list":
-		if err := s.ensureMembershipAccess(ctx, session); err != nil {
-			return Response{
-				JSONRPC: "2.0",
-				ID:      req.ID,
-				Error: &Error{
-					Code:    -32001,
-					Message: "membership required",
-					Data:    err.Error(),
-				},
-			}
-		}
 		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
@@ -267,17 +239,6 @@ func (s *Server) handleRequest(ctx context.Context, session Session, req Request
 			return s.invalidParams(req.ID, err)
 		}
 		effectiveSession := sessionForToolCall(session, params)
-		if err := s.ensureMembershipAccess(ctx, effectiveSession); err != nil {
-			return Response{
-				JSONRPC: "2.0",
-				ID:      req.ID,
-				Error: &Error{
-					Code:    -32001,
-					Message: "membership required",
-					Data:    err.Error(),
-				},
-			}
-		}
 		result, err := s.callTool(ctx, effectiveSession, params)
 		if err != nil {
 			if isUnknownToolError(err) {
@@ -348,21 +309,6 @@ func (s *Server) authenticateRequest(c *gin.Context) (Session, error) {
 	}, nil
 }
 
-func (s *Server) ensureMembershipAccess(ctx context.Context, session Session) error {
-	if strings.TrimSpace(session.Username) == "" || strings.TrimSpace(session.SubjectKey) == "" {
-		return errors.New("subject and learner session are required")
-	}
-
-	hasMembership, err := s.service.LearnerHasActiveMembership(ctx, session.Username, session.SubjectKey)
-	if err != nil {
-		return err
-	}
-	if !hasMembership {
-		return fmt.Errorf("active membership is required for subject %s", session.SubjectKey)
-	}
-	return nil
-}
-
 func sessionForToolCall(session Session, req CallToolRequest) Session {
 	if req.Arguments == nil {
 		return session
@@ -406,8 +352,17 @@ func (s *Server) invalidParams(id interface{}, err error) Response {
 }
 
 func (s *Server) writeResponse(conn *websocket.Conn, resp Response) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
 	_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
 	return conn.WriteJSON(resp)
+}
+
+func (s *Server) writeMessage(conn *websocket.Conn, messageType int, data []byte) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
+	return conn.WriteMessage(messageType, data)
 }
 
 func decodeCallToolRequest(params interface{}) (CallToolRequest, error) {
@@ -521,6 +476,10 @@ func objectSchema(properties map[string]interface{}) map[string]interface{} {
 
 func (s *Server) callTool(ctx context.Context, session Session, req CallToolRequest) (CallToolResult, error) {
 	canonicalName := canonicalToolName(req.Name)
+	hasMembership, err := s.subjectMembershipAccess(ctx, session)
+	if err != nil {
+		return CallToolResult{}, err
+	}
 	switch canonicalName {
 	case "list_subjects":
 		data, err := s.service.ListSubjects(ctx)
@@ -543,7 +502,7 @@ func (s *Server) callTool(ctx context.Context, session Session, req CallToolRequ
 			Query:          firstNonEmpty(stringArg(req.Arguments, "query", ""), stringArg(req.Arguments, "q", "")),
 			Page:           intArg(req.Arguments, "page", 1),
 			PageSize:       intArg(req.Arguments, "page_size", 20),
-			HideVIP:        false,
+			HideVIP:        !hasMembership,
 		})
 		return newToolResult(canonicalName, data, err)
 	case "list_classification_stats":
@@ -551,7 +510,7 @@ func (s *Server) callTool(ctx context.Context, session Session, req CallToolRequ
 			SubjectKey: stringArg(req.Arguments, "subject_key", session.SubjectKey),
 			Page:       intArg(req.Arguments, "page", 1),
 			PageSize:   intArg(req.Arguments, "page_size", 8),
-			HideVIP:    false,
+			HideVIP:    !hasMembership,
 		})
 		return newToolResult(canonicalName, data, err)
 	case "list_membership_plans":
@@ -563,6 +522,13 @@ func (s *Server) callTool(ctx context.Context, session Session, req CallToolRequ
 	default:
 		return CallToolResult{}, fmt.Errorf("unknown tool: %s", req.Name)
 	}
+}
+
+func (s *Server) subjectMembershipAccess(ctx context.Context, session Session) (bool, error) {
+	if strings.TrimSpace(session.Username) == "" || strings.TrimSpace(session.SubjectKey) == "" {
+		return false, nil
+	}
+	return s.service.LearnerHasActiveMembership(ctx, session.Username, session.SubjectKey)
 }
 
 func newToolResult(toolName string, data interface{}, err error) (CallToolResult, error) {

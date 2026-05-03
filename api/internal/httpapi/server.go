@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,13 +19,32 @@ import (
 )
 
 type Server struct {
-	service  *service.Service
-	auth     *adminauth.Manager
-	userAuth *userauth.Manager
+	service         *service.Service
+	auth            *adminauth.Manager
+	userAuth        *userauth.Manager
+	mcpServer       *mcp.Server
+	endpointManager *mcp.EndpointConnectionManager
 }
 
 func NewServer(service *service.Service, auth *adminauth.Manager, userAuth *userauth.Manager) *Server {
-	return &Server{service: service, auth: auth, userAuth: userAuth}
+	mcpServer := mcp.NewServer(service, userAuth)
+	server := &Server{
+		service:         service,
+		auth:            auth,
+		userAuth:        userAuth,
+		mcpServer:       mcpServer,
+		endpointManager: mcp.NewEndpointConnectionManager(service, mcpServer),
+	}
+
+	if server.endpointManager != nil {
+		go func() {
+			if err := server.endpointManager.RestoreAllEnabledEndpoints(context.Background()); err != nil {
+				// Best effort restore on boot; requests can still refresh later.
+			}
+		}()
+	}
+
+	return server
 }
 
 func (s *Server) Routes() http.Handler {
@@ -34,10 +54,9 @@ func (s *Server) Routes() http.Handler {
 
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery(), corsMiddleware())
-	mcpServer := mcp.NewServer(s.service, s.userAuth)
 
-	router.GET("/mcp", mcpServer.HandleWebSocket)
-	router.GET("/mcp/info", mcpServer.HandleInfo)
+	router.GET("/mcp", s.mcpServer.HandleWebSocket)
+	router.GET("/mcp/info", s.mcpServer.HandleInfo)
 
 	v1 := router.Group("/api/v1")
 	v1.GET("/health", s.handleHealth)
@@ -62,6 +81,13 @@ func (s *Server) Routes() http.Handler {
 	userProtected.Use(s.userRequired())
 	userProtected.GET("/me", s.handleLearnerMe)
 	userProtected.POST("/logout", s.handleLearnerLogout)
+	userProtected.GET("/mcp/endpoints", s.handleLearnerMCPEndpoints)
+	userProtected.POST("/mcp/endpoints", s.handleCreateLearnerMCPEndpoint)
+	userProtected.GET("/mcp/endpoints/:id/tools", s.handleLearnerMCPEndpointTools)
+	userProtected.GET("/mcp/endpoints/:id/status", s.handleLearnerMCPEndpointStatus)
+	userProtected.PUT("/mcp/endpoints/:id", s.handleUpdateLearnerMCPEndpoint)
+	userProtected.DELETE("/mcp/endpoints/:id", s.handleDeleteLearnerMCPEndpoint)
+	userProtected.POST("/mcp/refresh", s.handleRefreshLearnerMCPConnections)
 
 	adminAuth := v1.Group("/admin/auth")
 	adminAuth.GET("/captcha", s.handleAdminCaptcha)
