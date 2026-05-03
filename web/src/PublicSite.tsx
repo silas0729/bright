@@ -6,9 +6,14 @@ import {
   type CaptchaChallenge,
   type CatalogStats,
   type ClassificationStat,
+  type InviteSummary,
+  type KnowledgeBaseDocument,
   type LearnerSession,
   type LearnerUser,
   type PagedClassificationStats,
+  type PagedKnowledgeBaseDocuments,
+  type PagedPaymentOrders,
+  type PagedSubscriptions,
   type PagedWords,
   type PaymentOrderStatus,
   type Plan,
@@ -21,6 +26,7 @@ import MCPConsole from "./MCPConsole";
 
 const publicPageSize = 18;
 const publicClassificationPageSize = 8;
+const profilePageSize = 5;
 const publicUIStateStorageKey = "brights_public_ui_state";
 const publicSessionStorageKey = "brights_public_session";
 
@@ -69,6 +75,7 @@ export default function PublicSite() {
   const [authForm, setAuthForm] = useState({
     username: "",
     displayName: "",
+    inviteCode: "",
     password: "",
     confirmPassword: "",
   });
@@ -107,8 +114,26 @@ export default function PublicSite() {
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
   const [noticeDialog, setNoticeDialog] = useState<NoticeDialogState | null>(null);
+  const [inviteSummary, setInviteSummary] = useState<InviteSummary | null>(null);
+  const [paymentOrders, setPaymentOrders] = useState<PagedPaymentOrders | null>(null);
+  const [membershipHistory, setMembershipHistory] = useState<PagedSubscriptions | null>(null);
+  const [knowledgeBaseDocuments, setKnowledgeBaseDocuments] = useState<PagedKnowledgeBaseDocuments | null>(null);
+  const [profileBusyAction, setProfileBusyAction] = useState("");
+  const [profileError, setProfileError] = useState("");
+  const [profileNotice, setProfileNotice] = useState("");
+  const [profileReloadKey, setProfileReloadKey] = useState(0);
+  const [orderHistoryPage, setOrderHistoryPage] = useState(1);
+  const [membershipHistoryPage, setMembershipHistoryPage] = useState(1);
+  const [knowledgeBasePage, setKnowledgeBasePage] = useState(1);
+  const [knowledgeBaseQuery, setKnowledgeBaseQuery] = useState("");
+  const [knowledgeBaseForm, setKnowledgeBaseForm] = useState({
+    file: null as File | null,
+    fileName: "",
+    title: "",
+  });
 
   const deferredQuery = useDeferredValue(query);
+  const deferredKnowledgeBaseQuery = useDeferredValue(knowledgeBaseQuery);
   const activeCheckoutOrder = checkoutStatus?.order ?? checkoutOrder;
   const currentSettings = siteSettings ?? fallbackSiteSettings;
   const learnerName = currentUser?.display_name || currentUser?.username || "";
@@ -263,6 +288,70 @@ export default function PublicSite() {
       active = false;
     };
   }, [session, subjectKey]);
+
+  useEffect(() => {
+    if (!session?.access_token) {
+      setInviteSummary(null);
+      setPaymentOrders(null);
+      setMembershipHistory(null);
+      setKnowledgeBaseDocuments(null);
+      return;
+    }
+
+    let active = true;
+    Promise.all([
+      api.learnerInviteSummary(session.access_token),
+      api.learnerPaymentOrders(session.access_token, {
+        page: orderHistoryPage,
+        pageSize: profilePageSize,
+        subject: subjectKey,
+      }),
+      api.learnerMemberships(session.access_token, {
+        page: membershipHistoryPage,
+        pageSize: profilePageSize,
+        subject: subjectKey,
+      }),
+      api.learnerKnowledgeBaseDocuments(session.access_token, {
+        page: knowledgeBasePage,
+        pageSize: profilePageSize,
+        query: deferredKnowledgeBaseQuery,
+        subjectKey,
+      }),
+    ])
+      .then(([inviteData, orderData, membershipData, knowledgeBaseData]) => {
+        if (!active) {
+          return;
+        }
+        setInviteSummary(inviteData);
+        setPaymentOrders(orderData);
+        setMembershipHistory(membershipData);
+        setKnowledgeBaseDocuments(knowledgeBaseData);
+      })
+      .catch((err: Error) => {
+        if (!active) {
+          return;
+        }
+        setProfileError(err.message);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    deferredKnowledgeBaseQuery,
+    knowledgeBasePage,
+    membershipHistoryPage,
+    orderHistoryPage,
+    profileReloadKey,
+    session?.access_token,
+    subjectKey,
+  ]);
+
+  useEffect(() => {
+    setOrderHistoryPage(1);
+    setMembershipHistoryPage(1);
+    setKnowledgeBasePage(1);
+  }, [subjectKey]);
 
   useEffect(() => {
     if (currentUser) {
@@ -474,6 +563,18 @@ export default function PublicSite() {
   }, [authNotice]);
 
   useEffect(() => {
+    if (!profileNotice) {
+      return;
+    }
+    openNoticeDialog({
+      tone: "success",
+      title: "操作已完成",
+      message: profileNotice,
+    });
+    setProfileNotice("");
+  }, [profileNotice]);
+
+  useEffect(() => {
     if (!authError) {
       return;
     }
@@ -484,6 +585,18 @@ export default function PublicSite() {
     });
     setAuthError("");
   }, [authError]);
+
+  useEffect(() => {
+    if (!profileError) {
+      return;
+    }
+    openNoticeDialog({
+      tone: "error",
+      title: "个人中心操作未完成",
+      message: profileError,
+    });
+    setProfileError("");
+  }, [profileError]);
 
   useEffect(() => {
     if (!classificationError) {
@@ -540,6 +653,8 @@ export default function PublicSite() {
         ? `会员已生效，有效期至 ${formatDateTime(checkoutStatus.subscription.current_period_end)}。`
         : "会员已生效，当前为长期有效。"
       : "支付已成功，我们正在同步你的会员权益。";
+
+    setProfileReloadKey((current) => current + 1);
 
     openNoticeDialog({
       tone: "success",
@@ -723,6 +838,7 @@ export default function PublicSite() {
           username: authForm.username,
           password: authForm.password,
           display_name: authForm.displayName,
+          invite_code: authForm.inviteCode.trim() || undefined,
           captcha_id: authCaptcha.captcha_id,
           captcha_answer: authCaptchaAnswer,
         });
@@ -744,6 +860,7 @@ export default function PublicSite() {
       setAuthForm({
         username: "",
         displayName: "",
+        inviteCode: "",
         password: "",
         confirmPassword: "",
       });
@@ -771,7 +888,96 @@ export default function PublicSite() {
       setCurrentUser(null);
       setAuthNotice("你已退出登录。");
       setCheckoutCustomerRef("");
+      setKnowledgeBaseForm({
+        file: null,
+        fileName: "",
+        title: "",
+      });
       void refreshAuthCaptcha(authMode);
+    }
+  }
+
+  async function handleCopyInviteCode() {
+    const code = inviteSummary?.invite_code?.trim() ?? "";
+    if (!code) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(code);
+      setProfileNotice(`邀请码 ${code} 已复制。`);
+    } catch {
+      setProfileError("复制邀请码失败，请手动复制。");
+    }
+  }
+
+  async function handleSubmitKnowledgeBase(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session?.access_token) {
+      return;
+    }
+    if (!knowledgeBaseForm.file) {
+      setProfileError("请先选择要上传的知识库文件。");
+      return;
+    }
+
+    setProfileBusyAction("knowledge-base-upload");
+    try {
+      const result = await api.learnerImportKnowledgeBase(session.access_token, {
+        file: knowledgeBaseForm.file,
+        subject_key: subjectKey,
+        title: knowledgeBaseForm.title.trim(),
+      });
+      setKnowledgeBaseForm({
+        file: null,
+        fileName: "",
+        title: "",
+      });
+      setKnowledgeBasePage(1);
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice(`知识库文档《${result.document.title || result.document.source_file_name}》已上传。`);
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleToggleKnowledgeBaseDocument(item: KnowledgeBaseDocument) {
+    if (!session?.access_token) {
+      return;
+    }
+
+    const nextStatus = item.status === "active" ? "disabled" : "active";
+    setProfileBusyAction(`knowledge-base-status-${item.id}`);
+    try {
+      await api.learnerUpdateKnowledgeBaseDocumentStatus(session.access_token, item.id, nextStatus);
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice(nextStatus === "active" ? "文档已启用。" : "文档已停用。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleDeleteKnowledgeBaseDocument(item: KnowledgeBaseDocument) {
+    if (!session?.access_token) {
+      return;
+    }
+    const confirmed = window.confirm(`确认删除知识库文档“${item.title || item.source_file_name}”吗？删除后对应检索片段也会移除。`);
+    if (!confirmed) {
+      return;
+    }
+
+    setProfileBusyAction(`knowledge-base-delete-${item.id}`);
+    try {
+      await api.learnerDeleteKnowledgeBaseDocument(session.access_token, item.id);
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice("知识库文档已删除。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
     }
   }
 
@@ -901,6 +1107,10 @@ export default function PublicSite() {
         <nav className="site-topnav">
           <a href="#catalog">词库学习</a>
           <a href="#plans">会员方案</a>
+          <a href="#profile">个人中心</a>
+          {currentUser ? <a href="#profile-knowledge-base">我的知识库</a> : null}
+          {currentUser ? <a href="#profile-invite">邀请好友</a> : null}
+          {currentUser ? <a href="#profile-orders">购买记录</a> : null}
           <a href="#mcp">MCP连接</a>
         </nav>
         <div className="site-header-actions">
@@ -957,6 +1167,36 @@ export default function PublicSite() {
                       role="menuitem"
                     >
                       进入个人中心
+                    </a>
+                    <a
+                      className="site-account-dropdown-link"
+                      href="#profile-knowledge-base"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                      }}
+                      role="menuitem"
+                    >
+                      我的知识库
+                    </a>
+                    <a
+                      className="site-account-dropdown-link"
+                      href="#profile-invite"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                      }}
+                      role="menuitem"
+                    >
+                      邀请好友
+                    </a>
+                    <a
+                      className="site-account-dropdown-link"
+                      href="#profile-orders"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                      }}
+                      role="menuitem"
+                    >
+                      购买记录
                     </a>
                     <a
                       className="site-account-dropdown-link"
@@ -1183,6 +1423,18 @@ export default function PublicSite() {
                         />
                       </label>
                     ) : null}
+                    {authMode === "register" ? (
+                      <label className="form-field">
+                        <span>邀请码</span>
+                        <input
+                          value={authForm.inviteCode}
+                          onChange={(event) => {
+                            setAuthForm((current) => ({ ...current, inviteCode: event.target.value }));
+                          }}
+                          placeholder="有邀请码可填写，没有可留空"
+                        />
+                      </label>
+                    ) : null}
                     <label className="form-field">
                       <span>登录密码</span>
                       <input
@@ -1284,6 +1536,344 @@ export default function PublicSite() {
                 )}
               </section>
             </div>
+
+            <div className="profile-grid">
+              <section className="content-card profile-card" id="profile-memberships">
+                <div className="section-header">
+                  <div>
+                    <p className="section-eyebrow">会员记录</p>
+                    <h2>按月会员到期时间和历史权益都在这里</h2>
+                  </div>
+                </div>
+                {currentUser ? (
+                  <>
+                    <div className="feedback-banner">
+                      当前学科：<strong>{selectedSubjectLabel}</strong>
+                      {membershipExpiryText ? `，${membershipExpiryText}` : "，当前没有生效中的到期时间。"}
+                    </div>
+                    <div className="table-wrap">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>方案</th>
+                            <th>状态</th>
+                            <th>学科</th>
+                            <th>有效期至</th>
+                            <th>开通时间</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(membershipHistory?.items ?? []).map((item) => (
+                            <tr key={item.id}>
+                              <td>{item.plan_key || "-"}</td>
+                              <td>
+                                <span className={`pill ${subscriptionStatusClass(item.status)}`}>
+                                  {subscriptionStatusLabel(item.status)}
+                                </span>
+                              </td>
+                              <td>{formatSubjectLabel(item.subject_key)}</td>
+                              <td>{item.current_period_end ? formatDateTime(item.current_period_end) : "长期有效"}</td>
+                              <td>{item.started_at ? formatDateTime(item.started_at) : "-"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {(membershipHistory?.items ?? []).length === 0 ? (
+                      <div className="feedback-banner">当前还没有会员记录，购买后会自动同步到这里。</div>
+                    ) : null}
+                    <PagerControls
+                      onChange={setMembershipHistoryPage}
+                      page={membershipHistory?.page ?? membershipHistoryPage}
+                      pageSize={membershipHistory?.page_size ?? profilePageSize}
+                      total={membershipHistory?.total ?? 0}
+                    />
+                  </>
+                ) : (
+                  <div className="feedback-banner">登录后可查看会员开通状态、按月到期时间和历史权益记录。</div>
+                )}
+              </section>
+
+              <section className="content-card profile-card" id="profile-orders">
+                <div className="section-header">
+                  <div>
+                    <p className="section-eyebrow">购买记录</p>
+                    <h2>充值、下单和支付结果一目了然</h2>
+                  </div>
+                </div>
+                {currentUser ? (
+                  <>
+                    <div className="table-wrap">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>订单号</th>
+                            <th>方案</th>
+                            <th>金额</th>
+                            <th>状态</th>
+                            <th>支付时间</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(paymentOrders?.items ?? []).map((item) => (
+                            <tr key={item.order_no}>
+                              <td>{item.order_no}</td>
+                              <td>{item.description || item.plan_key}</td>
+                              <td>{formatPrice(item.amount_cents)}</td>
+                              <td>
+                                <span className={`pill ${paymentStatusClass(item.status)}`}>{paymentStatusLabel(item.status)}</span>
+                              </td>
+                              <td>{item.paid_at ? formatDateTime(item.paid_at) : item.created_at ? formatDateTime(item.created_at) : "-"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {(paymentOrders?.items ?? []).length === 0 ? (
+                      <div className="feedback-banner">当前还没有购买记录，支付成功后会自动显示在这里。</div>
+                    ) : null}
+                    <PagerControls
+                      onChange={setOrderHistoryPage}
+                      page={paymentOrders?.page ?? orderHistoryPage}
+                      pageSize={paymentOrders?.page_size ?? profilePageSize}
+                      total={paymentOrders?.total ?? 0}
+                    />
+                  </>
+                ) : (
+                  <div className="feedback-banner">登录后可查看充值和会员购买记录。</div>
+                )}
+              </section>
+            </div>
+
+            <section className="content-card profile-card" id="profile-invite">
+              <div className="section-header">
+                <div>
+                  <p className="section-eyebrow">邀请好友</p>
+                  <h2>邀请码、邀请统计和转化记录集中查看</h2>
+                </div>
+                {currentUser ? (
+                  <div className="button-row">
+                    <button className="secondary-button small-button" onClick={() => void handleCopyInviteCode()} type="button">
+                      复制邀请码
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              {currentUser ? (
+                <>
+                  <div className="profile-overview">
+                    <div>
+                      <strong>{inviteSummary?.invite_code || currentUser.invite_code || "-"}</strong>
+                      <span>我的邀请码</span>
+                    </div>
+                    <div>
+                      <strong>{formatCount(Number(inviteSummary?.invited_count ?? 0))}</strong>
+                      <span>已邀请人数</span>
+                    </div>
+                    <div>
+                      <strong>{formatCount(Number(inviteSummary?.paid_invite_count ?? 0))}</strong>
+                      <span>已付费人数</span>
+                    </div>
+                    <div>
+                      <strong>{formatPrice(inviteSummary?.total_recharge_cents ?? 0)}</strong>
+                      <span>累计邀请充值</span>
+                    </div>
+                  </div>
+                  <div className="table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>好友账号</th>
+                          <th>显示名称</th>
+                          <th>注册时间</th>
+                          <th>付费次数</th>
+                          <th>累计充值</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(inviteSummary?.items ?? []).map((item) => (
+                          <tr key={item.user_id}>
+                            <td>{item.username}</td>
+                            <td>{item.display_name || "-"}</td>
+                            <td>{formatDateTime(item.created_at)}</td>
+                            <td>{formatCount(item.paid_order_count)}</td>
+                            <td>{formatPrice(item.total_recharge_cents)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {(inviteSummary?.items ?? []).length === 0 ? (
+                    <div className="feedback-banner">分享邀请码后，你邀请注册的用户和他们的付费记录会显示在这里。</div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="feedback-banner">登录后可查看邀请码、邀请人数和累计充值统计。</div>
+              )}
+            </section>
+
+            <section className="content-card profile-card" id="profile-knowledge-base">
+              <div className="section-header">
+                <div>
+                  <p className="section-eyebrow">我的知识库</p>
+                  <h2>上传文本、Markdown、CSV、Excel 作为你自己的 MCP 私有知识库</h2>
+                </div>
+              </div>
+              {currentUser ? (
+                <>
+                  <div className="profile-grid">
+                    <form className="setup-form" onSubmit={handleSubmitKnowledgeBase}>
+                      <label className="form-field">
+                        <span>选择知识库文件</span>
+                        <label className={`upload-picker ${knowledgeBaseForm.file ? "upload-picker-ready" : ""}`}>
+                          <input
+                            accept=".txt,.md,.csv,.xlsx"
+                            className="upload-picker-input"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0] ?? null;
+                              setKnowledgeBaseForm((current) => ({
+                                ...current,
+                                file,
+                                fileName: file?.name ?? "",
+                                title: current.title || (file?.name ? file.name.replace(/\.[^.]+$/, "") : ""),
+                              }));
+                            }}
+                            type="file"
+                          />
+                          <div className="upload-picker-main">
+                            <div className="upload-picker-meta">
+                              <strong>{knowledgeBaseForm.fileName || "点击选择要上传的知识库文件"}</strong>
+                              <span>
+                                {knowledgeBaseForm.file
+                                  ? `文件大小 ${formatFileSize(knowledgeBaseForm.file.size)}，上传后仅当前账号和对应 MCP 检索可见`
+                                  : "支持 TXT、Markdown、CSV、Excel，上传后会自动切片用于检索"}
+                              </span>
+                            </div>
+                            <span className="upload-picker-action">{knowledgeBaseForm.file ? "重新选择" : "选择文件"}</span>
+                          </div>
+                        </label>
+                      </label>
+                      <div className="upload-hint-list">
+                        <span className="tag">私有知识库</span>
+                        <span className="tag">支持 TXT / Markdown</span>
+                        <span className="tag">支持 CSV / Excel</span>
+                        <span className="tag">支持 MCP 检索</span>
+                      </div>
+                      <label className="form-field">
+                        <span>文档标题</span>
+                        <input
+                          value={knowledgeBaseForm.title}
+                          onChange={(event) => {
+                            setKnowledgeBaseForm((current) => ({ ...current, title: event.target.value }));
+                          }}
+                          placeholder="例如：我的产品知识库"
+                        />
+                      </label>
+                      <div className="feedback-banner">
+                        当前将上传到 <strong>{selectedSubjectLabel}</strong> 学科下，管理员也能在后台区分公共知识库和你的私有知识库。
+                      </div>
+                      <button className="primary-button" disabled={profileBusyAction === "knowledge-base-upload"} type="submit">
+                        {profileBusyAction === "knowledge-base-upload" ? "上传处理中..." : "上传到我的知识库"}
+                      </button>
+                    </form>
+
+                    <div className="profile-card-body">
+                      <div className="feedback-banner feedback-success">
+                        你的个人知识库上传后，会自动参与开放接口与 MCP 工具的检索，但不会暴露给其他普通用户。
+                      </div>
+                      <ul className="detail-list">
+                        <li>支持上传管理员公共知识库之外的个人资料，适合整理自己的文档、表格和说明。</li>
+                        <li>停用后不会参与检索；删除后文档和切片都会一起移除。</li>
+                        <li>知识库检索结果会返回命中片段和文档来源，方便定位答案来自哪份文档。</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="section-toolbar">
+                    <div>
+                      <h2>我的知识库文档</h2>
+                      <p className="helper-text">这里只展示当前账号上传的私有知识库文档。</p>
+                    </div>
+                    <input
+                      className="toolbar-search"
+                      onChange={(event) => {
+                        setKnowledgeBaseQuery(event.target.value);
+                        setKnowledgeBasePage(1);
+                      }}
+                      placeholder="搜索标题或文件名"
+                      value={knowledgeBaseQuery}
+                    />
+                  </div>
+
+                  <div className="table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>标题</th>
+                          <th>文件名</th>
+                          <th>格式</th>
+                          <th>状态</th>
+                          <th>片段数</th>
+                          <th>更新时间</th>
+                          <th>操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(knowledgeBaseDocuments?.items ?? []).map((item) => {
+                          const statusBusy = profileBusyAction === `knowledge-base-status-${item.id}`;
+                          const deleteBusy = profileBusyAction === `knowledge-base-delete-${item.id}`;
+                          return (
+                            <tr key={item.id}>
+                              <td>{item.title}</td>
+                              <td>{item.source_file_name}</td>
+                              <td>{item.source_type}</td>
+                              <td>
+                                <span className={item.status === "active" ? "pill pill-success" : "pill pill-muted"}>
+                                  {item.status === "active" ? "启用中" : "已停用"}
+                                </span>
+                              </td>
+                              <td>{formatCount(item.chunk_count)}</td>
+                              <td>{formatDateTime(item.updated_at)}</td>
+                              <td>
+                                <div className="button-row">
+                                  <button
+                                    className="secondary-button small-button"
+                                    disabled={statusBusy || deleteBusy}
+                                    onClick={() => void handleToggleKnowledgeBaseDocument(item)}
+                                    type="button"
+                                  >
+                                    {statusBusy ? "处理中..." : item.status === "active" ? "停用" : "启用"}
+                                  </button>
+                                  <button
+                                    className="secondary-button small-button"
+                                    disabled={statusBusy || deleteBusy}
+                                    onClick={() => void handleDeleteKnowledgeBaseDocument(item)}
+                                    type="button"
+                                  >
+                                    {deleteBusy ? "删除中..." : "删除"}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {(knowledgeBaseDocuments?.items ?? []).length === 0 ? (
+                    <div className="feedback-banner">当前还没有上传个人知识库文件，先上传一份文本或表格试试。</div>
+                  ) : null}
+                  <PagerControls
+                    onChange={setKnowledgeBasePage}
+                    page={knowledgeBaseDocuments?.page ?? knowledgeBasePage}
+                    pageSize={knowledgeBaseDocuments?.page_size ?? profilePageSize}
+                    total={knowledgeBaseDocuments?.total ?? 0}
+                  />
+                </>
+              ) : (
+                <div className="feedback-banner">登录后可上传你自己的知识库文件，并在 MCP 工具中按会员权限调用。</div>
+              )}
+            </section>
 
             <section className="content-card profile-card">
               <div className="section-header">
@@ -1926,6 +2516,19 @@ function formatPrice(value: number) {
   return `${(value / 100).toFixed(2)} 元`;
 }
 
+function formatFileSize(value: number) {
+  if (value <= 0) {
+    return "0 B";
+  }
+  if (value < 1024) {
+    return `${value} B`;
+  }
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
+  }
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function formatDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -1952,7 +2555,7 @@ function resolvePublicView(hash: string): PublicView {
   if (hash === "#mcp") {
     return "mcp";
   }
-  if (hash === "#profile" || hash === "#account" || hash === "#plans") {
+  if (hash === "#profile" || hash === "#account" || hash === "#plans" || hash.startsWith("#profile-")) {
     return "profile";
   }
   return "home";
@@ -2031,6 +2634,21 @@ function subscriptionStatusLabel(status?: string) {
       return "已取消";
     default:
       return status || "-";
+  }
+}
+
+function subscriptionStatusClass(status?: string) {
+  switch (status) {
+    case "active":
+      return "pill-success";
+    case "expired":
+      return "pill-muted";
+    case "pending":
+      return "pill-warning";
+    case "cancelled":
+      return "pill-danger";
+    default:
+      return "pill-muted";
   }
 }
 

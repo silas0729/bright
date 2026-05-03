@@ -34,6 +34,143 @@ const adminPageSize = 10;
 const adminSessionStorageKey = "brights_admin_session";
 const adminUIStateStorageKey = "brights_admin_ui_state";
 const unclassifiedCategoryValue = "__unclassified__";
+const defaultRolePermissionsValue = "admin.read\ncatalog.read\npayment.read\nplan.read";
+
+const rolePermissionGroups = [
+  {
+    title: "最高权限",
+    helper: "谨慎授权，一般只给负责人",
+    options: [
+      {
+        code: "*",
+        label: "全部后台能力",
+        description: "可查看并处理所有后台页面和操作，通常只给站点负责人。",
+      },
+    ],
+  },
+  {
+    title: "团队与角色",
+    helper: "管理后台成员和岗位模板",
+    options: [
+      {
+        code: "admin.read",
+        label: "查看团队账号",
+        description: "可以查看后台账号、岗位模板和团队权限列表。",
+      },
+      {
+        code: "admin.write",
+        label: "管理团队账号",
+        description: "可以新增、调整后台账号和岗位权限模板。",
+      },
+    ],
+  },
+  {
+    title: "内容运营",
+    helper: "管理词库、科目、阶段与内容分组",
+    options: [
+      {
+        code: "catalog.read",
+        label: "查看内容整理",
+        description: "可以查看词库内容、内容分组和学习阶段等数据。",
+      },
+      {
+        code: "catalog.write",
+        label: "管理内容整理",
+        description: "可以新增、编辑词条，并批量调整内容分组和会员权限。",
+      },
+      {
+        code: "subject.read",
+        label: "查看学习科目",
+        description: "可以查看科目配置和导入归属信息。",
+      },
+      {
+        code: "subject.write",
+        label: "管理学习科目",
+        description: "可以新增、修改科目和对应的展示配置。",
+      },
+      {
+        code: "grade.read",
+        label: "查看学习阶段",
+        description: "可以查看学习阶段配置和内容归属。",
+      },
+      {
+        code: "grade.write",
+        label: "管理学习阶段",
+        description: "可以新增、修改学习阶段和相关配置。",
+      },
+    ],
+  },
+  {
+    title: "站点与收费",
+    helper: "管理前台展示、方案与支付",
+    options: [
+      {
+        code: "site.read",
+        label: "查看站点展示",
+        description: "可以查看前台文案、SEO 和品牌展示配置。",
+      },
+      {
+        code: "site.write",
+        label: "管理站点展示",
+        description: "可以修改首页文案、SEO、图标和品牌展示内容。",
+      },
+      {
+        code: "plan.read",
+        label: "查看收费方案",
+        description: "可以查看会员方案、价格和支付渠道配置。",
+      },
+      {
+        code: "plan.write",
+        label: "管理收费方案",
+        description: "可以新增、编辑和删除会员方案。",
+      },
+      {
+        code: "payment.read",
+        label: "查看支付订单",
+        description: "可以查看订单、支付状态和收款配置。",
+      },
+      {
+        code: "payment.write",
+        label: "处理支付与会员",
+        description: "可以处理订单、修改会员状态并维护收款配置。",
+      },
+    ],
+  },
+  {
+    title: "学员与接入",
+    helper: "管理学员账号和外部服务接入",
+    options: [
+      {
+        code: "learner.read",
+        label: "查看学员账号",
+        description: "可以查看学员资料、会员状态和使用记录。",
+      },
+      {
+        code: "learner.write",
+        label: "管理学员账号",
+        description: "可以调整学员资料、账号状态和相关服务信息。",
+      },
+      {
+        code: "mcp.read",
+        label: "查看 MCP 接入",
+        description: "可以查看 MCP、WSS 和工具接入配置。",
+      },
+      {
+        code: "mcp.write",
+        label: "管理 MCP 接入",
+        description: "可以修改 MCP、WSS 和工具接入配置。",
+      },
+      {
+        code: "invite.read",
+        label: "查看邀请统计",
+        description: "可以查看邀请效果、来源和相关统计数据。",
+      },
+    ],
+  },
+] as const;
+
+const rolePermissionCodeOrder = rolePermissionGroups.flatMap((group) => group.options.map((option) => option.code));
+const rolePermissionCodeSet = new Set<string>(rolePermissionCodeOrder);
 
 type AdminSection = "dashboard" | "import" | "catalog" | "site" | "payments" | "memberships" | "learners" | "mcp" | "admins";
 type ImportWorkspaceTab = "catalog-upload" | "knowledge-base-upload" | "knowledge-base-docs" | "subjects" | "categories" | "grades";
@@ -106,8 +243,8 @@ export default function AdminPortal() {
   const [categories, setCategories] = useState<PagedCategories | null>(null);
   const [grades, setGrades] = useState<PagedGrades | null>(null);
   const [knowledgeBaseDocuments, setKnowledgeBaseDocuments] = useState<PagedKnowledgeBaseDocuments | null>(null);
-  const [, setMcpToolConfigs] = useState<MCPToolConfig[]>([]);
-  const [, setInviteStats] = useState<PagedAdminInviteStats | null>(null);
+  const [mcpToolConfigs, setMcpToolConfigs] = useState<MCPToolConfig[]>([]);
+  const [inviteStats, setInviteStats] = useState<PagedAdminInviteStats | null>(null);
   const [wordFilterCategories, setWordFilterCategories] = useState<Category[]>([]);
   const [wordEditorCategories, setWordEditorCategories] = useState<Category[]>([]);
   const [stats, setStats] = useState<CatalogStats | null>(null);
@@ -222,7 +359,7 @@ export default function AdminPortal() {
     key: "",
     name: "",
     description: "",
-    permissions: "admin.read\ncatalog.read\npayment.read\nplan.read",
+    permissions: defaultRolePermissionsValue,
     sort: "0",
   });
   const [wechatPayForm, setWechatPayForm] = useState({
@@ -279,8 +416,8 @@ export default function AdminPortal() {
   const [categoryQuery, setCategoryQuery] = useState(persistedUIState.categoryQuery ?? "");
   const [gradeQuery, setGradeQuery] = useState(persistedUIState.gradeQuery ?? "");
   const [knowledgeBaseQuery, setKnowledgeBaseQuery] = useState("");
-  const [inviteStatPage] = useState(1);
-  const [inviteStatQuery] = useState("");
+  const [inviteStatPage, setInviteStatPage] = useState(1);
+  const [inviteStatQuery, setInviteStatQuery] = useState("");
   const [paymentQuery, setPaymentQuery] = useState(persistedUIState.paymentQuery ?? "");
   const [subscriptionQuery, setSubscriptionQuery] = useState(persistedUIState.subscriptionQuery ?? "");
   const [learnerStatusFilter, setLearnerStatusFilter] = useState(persistedUIState.learnerStatusFilter ?? "");
@@ -298,6 +435,10 @@ export default function AdminPortal() {
   const deferredInviteStatQuery = useDeferredValue(inviteStatQuery);
   const deferredPaymentQuery = useDeferredValue(paymentQuery);
   const deferredSubscriptionQuery = useDeferredValue(subscriptionQuery);
+  const rolePermissionSelections = parsePermissionInput(roleEditor.permissions);
+  const selectedRolePermissionSet = new Set(rolePermissionSelections);
+  const roleHasFullPermission = selectedRolePermissionSet.has("*");
+  const roleUnknownPermissions = rolePermissionSelections.filter((permission) => !rolePermissionCodeSet.has(permission));
 
   const currentRole = roles.find((role) => role.key === currentAdmin?.role) ?? null;
   const permissionSet = new Set(currentRole?.permissions ?? []);
@@ -337,6 +478,8 @@ export default function AdminPortal() {
     permissionSet.has("*") ||
     permissionSet.has("mcp.read") ||
     permissionSet.has("mcp.write");
+  const canManageMCPTools =
+    currentAdmin?.is_super === true || permissionSet.has("*") || permissionSet.has("mcp.write");
   const canViewInviteStats =
     currentAdmin?.is_super === true ||
     permissionSet.has("*") ||
@@ -664,6 +807,8 @@ export default function AdminPortal() {
   }, [
     adminUserPage,
     canViewLearners,
+    canViewInviteStats,
+    canViewMCPTools,
     canViewPayments,
     canViewSiteSettings,
     categoryPage,
@@ -671,12 +816,14 @@ export default function AdminPortal() {
     deferredAdminUserQuery,
     deferredCategoryQuery,
     deferredGradeQuery,
+    deferredInviteStatQuery,
     deferredKnowledgeBaseQuery,
     deferredLearnerQuery,
     deferredPaymentQuery,
     deferredSubscriptionQuery,
     deferredWordQuery,
     gradePage,
+    inviteStatPage,
     knowledgeBasePage,
     learnerPage,
     learnerStatusFilter,
@@ -1736,6 +1883,33 @@ async function startEditSubscription(item: SubscriptionStatus) {
     }
   }
 
+  function toggleRolePermission(permission: string, checked: boolean) {
+    setRoleEditor((current) => {
+      const currentPermissions = parsePermissionInput(current.permissions);
+      const unknownPermissions = currentPermissions.filter((item) => !rolePermissionCodeSet.has(item));
+
+      if (permission === "*") {
+        return {
+          ...current,
+          permissions: checked ? stringifyPermissionSelection(["*", ...unknownPermissions]) : stringifyPermissionSelection(unknownPermissions),
+        };
+      }
+
+      const nextKnownPermissions = currentPermissions.filter(
+        (item) => rolePermissionCodeSet.has(item) && item !== "*" && item !== permission,
+      );
+
+      if (checked) {
+        nextKnownPermissions.push(permission);
+      }
+
+      return {
+        ...current,
+        permissions: stringifyPermissionSelection([...unknownPermissions, ...nextKnownPermissions]),
+      };
+    });
+  }
+
 function startEditPlan(plan: Plan) {
     setPlanEditor({
       id: plan.id ?? 0,
@@ -1959,12 +2133,14 @@ function startEditLearner(item: AdminLearnerUser) {
       isSuper: item.is_super,
     });
     setActiveSection("admins");
+    setActiveAdminTab("admins");
     setPanelEditModal("admin");
   }
 
   function openCreateAdminUserModal() {
     resetAdminEditor();
     setActiveSection("admins");
+    setActiveAdminTab("admins");
     setPanelEditModal("admin");
   }
 
@@ -1978,16 +2154,18 @@ function startEditLearner(item: AdminLearnerUser) {
       key: role.key,
       name: role.name,
       description: role.description,
-      permissions: role.permissions.join("\n"),
+      permissions: stringifyPermissionSelection(role.permissions),
       sort: String(role.sort),
     });
     setActiveSection("admins");
+    setActiveAdminTab("roles");
     setPanelEditModal("role");
   }
 
   function openCreateRoleModal() {
     resetRoleEditor();
     setActiveSection("admins");
+    setActiveAdminTab("roles");
     setPanelEditModal("role");
   }
 
@@ -2099,7 +2277,7 @@ function startEditLearner(item: AdminLearnerUser) {
       key: "",
       name: "",
       description: "",
-      permissions: "admin.read\ncatalog.read\npayment.read\nplan.read",
+      permissions: defaultRolePermissionsValue,
       sort: "0",
     });
   }
@@ -2273,6 +2451,7 @@ function startEditLearner(item: AdminLearnerUser) {
     { key: "memberships", label: "会员服务", hidden: !canViewPayments },
     { key: "learners", label: "学员账号", hidden: !canViewLearners },
     { key: "admins", label: "团队与权限" },
+    { key: "mcp", label: "MCP 工具", hidden: !canViewMCPTools && !canViewInviteStats },
   ];
 
   const importTabItems: Array<{ key: ImportWorkspaceTab; label: string; helper: string; count?: number }> = [
@@ -2637,6 +2816,66 @@ function startEditLearner(item: AdminLearnerUser) {
                         ])}
                         emptyText="当前还没有知识库文档，先上传一份文本或表格文件试试。"
                       />
+                      {canManageCatalog ? (
+                        <div className="table-wrap">
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th>归属</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(knowledgeBaseDocuments?.items ?? []).map((item) => {
+                                const statusActionBusy = busyAction === `kb-status-${item.id}`;
+                                const deleteActionBusy = busyAction === `kb-delete-${item.id}`;
+                                return (
+                                  <tr key={`kb-manage-${item.id}`}>
+                                    <td>
+                                      {item.visibility === "private"
+                                        ? `学员私有${item.owner_username ? ` · ${item.owner_username}` : ""}`
+                                        : "公共知识库"}
+                                    </td>
+                                    <td>
+                                      <span className={item.status === "active" ? "pill pill-success" : "pill pill-muted"}>
+                                        {item.status === "active" ? "启用中" : "已停用"}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <div className="button-row">
+                                        <button
+                                          className="secondary-button small-button"
+                                          disabled={statusActionBusy || deleteActionBusy}
+                                          onClick={() => {
+                                            void handleUpdateKnowledgeBaseDocumentStatus(
+                                              item.id,
+                                              item.status === "active" ? "disabled" : "active",
+                                            );
+                                          }}
+                                          type="button"
+                                        >
+                                          {statusActionBusy ? "处理中..." : item.status === "active" ? "停用" : "启用"}
+                                        </button>
+                                        <button
+                                          className="secondary-button small-button"
+                                          disabled={statusActionBusy || deleteActionBusy}
+                                          onClick={() => {
+                                            void handleDeleteKnowledgeBaseDocument(item.id, item.title);
+                                          }}
+                                          type="button"
+                                        >
+                                          {deleteActionBusy ? "删除中..." : "删除"}
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : null}
                       <PagerControls
                         disabled={dataLoading}
                         onChange={setKnowledgeBasePage}
@@ -4127,6 +4366,116 @@ function startEditLearner(item: AdminLearnerUser) {
             </section>
           ) : null}
 
+          {activeSection === "mcp" ? (
+            <section className="admin-section">
+              <div className="section-header">
+                <div>
+                  <p className="section-eyebrow">MCP 宸ュ叿</p>
+                  <h1>MCP 工具权限、会员门槛与邀请统计</h1>
+                </div>
+              </div>
+
+              {canViewMCPTools ? (
+                <article className="content-card">
+                  <div className="section-toolbar">
+                    <div>
+                      <h2>MCP 工具配置</h2>
+                      <p className="helper-text">管理员可以决定哪些工具开放、哪些工具需要会员才能调用。</p>
+                    </div>
+                  </div>
+                  <DataTable
+                    columns={canManageMCPTools ? ["工具", "分类", "来源", "说明", "开关", "会员"] : ["工具", "分类", "来源", "说明", "开关", "会员"]}
+                    rows={mcpToolConfigs.map((item) => [
+                      <div className="mcp-cell-stack">
+                        <strong>{item.title || item.tool_name}</strong>
+                        <span className="mcp-table-muted">{item.tool_name}</span>
+                      </div>,
+                      item.category || "-",
+                      item.source_type || "-",
+                      item.description || "-",
+                      canManageMCPTools ? (
+                        <button
+                          className="secondary-button small-button"
+                          disabled={busyAction === `mcp-tool-${item.tool_name}`}
+                          onClick={() => {
+                            void handleUpdateMCPToolRequirement(item.tool_name, { is_enabled: !item.is_enabled });
+                          }}
+                          type="button"
+                        >
+                          {busyAction === `mcp-tool-${item.tool_name}` ? "处理中..." : item.is_enabled ? "已启用" : "已停用"}
+                        </button>
+                      ) : (
+                        <span className={item.is_enabled ? "pill pill-success" : "pill pill-muted"}>{item.is_enabled ? "启用中" : "已停用"}</span>
+                      ),
+                      canManageMCPTools ? (
+                        <button
+                          className="secondary-button small-button"
+                          disabled={busyAction === `mcp-tool-${item.tool_name}`}
+                          onClick={() => {
+                            void handleUpdateMCPToolRequirement(item.tool_name, {
+                              requires_membership: !item.requires_membership,
+                            });
+                          }}
+                          type="button"
+                        >
+                          {busyAction === `mcp-tool-${item.tool_name}` ? "处理中..." : item.requires_membership ? "需要会员" : "公开可用"}
+                        </button>
+                      ) : (
+                        <span className={item.requires_membership ? "pill pill-warning" : "pill pill-muted"}>
+                          {item.requires_membership ? "需要会员" : "公开可用"}
+                        </span>
+                      ),
+                    ])}
+                    emptyText="当前还没有可管理的 MCP 工具。"
+                  />
+                </article>
+              ) : null}
+
+              {canViewInviteStats ? (
+                <article className="content-card">
+                  <div className="section-toolbar">
+                    <div>
+                      <h2>邀请统计</h2>
+                      <p className="helper-text">查看哪些学员带来了更多邀请与充值转化。</p>
+                    </div>
+                    <input
+                      className="toolbar-search"
+                      value={inviteStatQuery}
+                      onChange={(event) => {
+                        setInviteStatQuery(event.target.value);
+                        setInviteStatPage(1);
+                      }}
+                      placeholder="搜索邀请人账号、昵称或邀请码"
+                    />
+                  </div>
+                  <DataTable
+                    columns={["邀请人", "邀请码", "邀请人数", "付费人数", "累计充值", "最近邀请", "最近付费"]}
+                    rows={(inviteStats?.items ?? []).map((item) => [
+                      <div className="mcp-cell-stack">
+                        <strong>{item.inviter_display_name || item.inviter_username}</strong>
+                        <span className="mcp-table-muted">{item.inviter_username}</span>
+                      </div>,
+                      item.invite_code || "-",
+                      formatCount(item.invited_count),
+                      formatCount(item.paid_invite_count),
+                      formatPrice(item.total_recharge_cents),
+                      item.last_invite_at ? formatDateTime(item.last_invite_at) : "-",
+                      item.last_paid_at ? formatDateTime(item.last_paid_at) : "-",
+                    ])}
+                    emptyText="当前还没有邀请统计数据。"
+                  />
+                  <PagerControls
+                    disabled={dataLoading}
+                    onChange={setInviteStatPage}
+                    page={inviteStats?.page ?? inviteStatPage}
+                    pageSize={inviteStats?.page_size ?? adminPageSize}
+                    total={inviteStats?.total ?? 0}
+                  />
+                </article>
+              ) : null}
+            </section>
+          ) : null}
+
           {activeSection === "learners" && canViewLearners ? (
             <section className="admin-section">
               <div className="section-header">
@@ -4843,18 +5192,84 @@ function startEditLearner(item: AdminLearnerUser) {
                         placeholder="0"
                       />
                     </label>
-                    <label className="form-field">
-                      <span>系统权限编码</span>
-                      <textarea
-                        rows={5}
-                        value={roleEditor.permissions}
-                        onChange={(event) => {
-                          setRoleEditor((current) => ({ ...current, permissions: event.target.value }));
-                        }}
-                        placeholder={"admin.read\ncatalog.read\npayment.read\nplan.read"}
-                      />
-                    </label>
-                    <p className="helper-text">每行填写一个系统权限编码，也可以用英文逗号分隔，用来定义这个岗位能查看和能处理的范围。</p>
+                    <div className="form-field">
+                      <span>岗位能力范围</span>
+                      <div className="permission-builder">
+                        <div className="permission-builder-summary">
+                          <strong>{roleHasFullPermission ? "已授予全部后台能力" : `已选择 ${rolePermissionSelections.length} 项能力`}</strong>
+                          <p>直接勾选业务能力即可，系统会自动保存权限配置，不需要手动填写技术编码。</p>
+                        </div>
+
+                        {rolePermissionSelections.length > 0 ? (
+                          <div className="tag-list">
+                            {rolePermissionSelections.map((permission) => (
+                              <span className="tag" key={permission}>
+                                {permissionLabel(permission)}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="helper-text">如果这个岗位暂时没有任何操作能力，可以先不勾选。</p>
+                        )}
+
+                        {roleUnknownPermissions.length > 0 ? (
+                          <div className="feedback-banner">
+                            当前岗位还包含少量高级权限，暂时没有可视化说明，保存时会自动保留：
+                            <div className="tag-list">
+                              {roleUnknownPermissions.map((permission) => (
+                                <span className="tag" key={permission}>
+                                  {permissionLabel(permission)}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        <div className="permission-group-grid">
+                          {rolePermissionGroups.map((group) => (
+                            <section className="permission-group-card" key={group.title}>
+                              <div className="permission-group-header">
+                                <strong>{group.title}</strong>
+                                <span>{group.helper}</span>
+                              </div>
+                              <div className="permission-option-list">
+                                {group.options.map((option) => {
+                                  const checked = selectedRolePermissionSet.has(option.code);
+                                  const disabled = roleHasFullPermission && option.code !== "*";
+
+                                  return (
+                                    <label
+                                      className={
+                                        checked
+                                          ? "permission-option permission-option-selected"
+                                          : disabled
+                                            ? "permission-option permission-option-disabled"
+                                            : "permission-option"
+                                      }
+                                      key={option.code}
+                                    >
+                                      <input
+                                        checked={checked}
+                                        className="permission-option-input"
+                                        disabled={disabled}
+                                        onChange={(event) => {
+                                          toggleRolePermission(option.code, event.target.checked);
+                                        }}
+                                        type="checkbox"
+                                      />
+                                      <div className="permission-option-body">
+                                        <strong>{option.label}</strong>
+                                        <span>{option.description}</span>
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </section>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                     <div className="button-row">
                       <button className="primary-button" disabled={busyAction === "admin-role"} type="submit">
                         {roleEditor.id > 0 ? "保存岗位模板" : "新增岗位模板"}
@@ -5378,6 +5793,14 @@ function parsePermissionInput(value: string) {
   return result;
 }
 
+function stringifyPermissionSelection(values: string[]) {
+  const normalized = parsePermissionInput(values.join("\n"));
+  const normalizedSet = new Set(normalized);
+  const orderedKnownPermissions = rolePermissionCodeOrder.filter((permission) => normalizedSet.has(permission));
+  const customPermissions = normalized.filter((permission) => !rolePermissionCodeSet.has(permission));
+  return [...orderedKnownPermissions, ...customPermissions].join("\n");
+}
+
 function parseLineList(value: string) {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -5607,31 +6030,45 @@ function formatPaymentProviderLabel(provider?: string) {
 function permissionLabel(permission: string) {
   switch (permission) {
     case "*":
-      return "全部操作范围";
+      return "全部后台能力";
     case "admin.read":
-      return "查看后台账号";
+      return "查看团队账号";
     case "admin.write":
-      return "管理后台账号";
+      return "管理团队账号";
     case "catalog.read":
-      return "查看学习内容";
+      return "查看内容整理";
     case "catalog.write":
-      return "管理学习内容";
+      return "管理内容整理";
+    case "subject.read":
+      return "查看学习科目";
+    case "subject.write":
+      return "管理学习科目";
+    case "grade.read":
+      return "查看学习阶段";
+    case "grade.write":
+      return "管理学习阶段";
     case "site.read":
       return "查看站点展示";
     case "site.write":
-      return "修改站点展示";
+      return "管理站点展示";
     case "payment.read":
-      return "查看订单与收款";
+      return "查看支付订单";
     case "payment.write":
       return "处理订单与会员";
     case "plan.read":
-      return "查看会员方案";
+      return "查看收费方案";
     case "plan.write":
-      return "管理会员方案";
+      return "管理收费方案";
     case "learner.read":
       return "查看学员账号";
     case "learner.write":
       return "管理学员账号";
+    case "mcp.read":
+      return "查看 MCP 接入";
+    case "mcp.write":
+      return "管理 MCP 接入";
+    case "invite.read":
+      return "查看邀请统计";
     default:
       return permission;
   }

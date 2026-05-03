@@ -224,6 +224,127 @@ textarea {
   font-size: 0.92rem;
 }
 
+.permission-builder {
+  display: grid;
+  gap: 16px;
+}
+
+.permission-builder-summary {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid #d8e2ed;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
+}
+
+.permission-builder-summary strong {
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+
+.permission-builder-summary p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+  font-size: 0.9rem;
+}
+
+.permission-group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.permission-group-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #dde6ef;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.permission-group-header {
+  display: grid;
+  gap: 6px;
+}
+
+.permission-group-header strong {
+  font-size: 0.96rem;
+  font-weight: 800;
+}
+
+.permission-group-header span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.permission-option-list {
+  display: grid;
+  gap: 10px;
+}
+
+.permission-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid #dbe4ee;
+  border-radius: 16px;
+  background: #f8fbfd;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.permission-option:hover {
+  transform: translateY(-1px);
+  border-color: #c7d7e7;
+  background: #ffffff;
+}
+
+.permission-option-selected {
+  border-color: #183650;
+  background: linear-gradient(180deg, #f7fbff 0%, #eef5fb 100%);
+  box-shadow: 0 10px 22px rgba(24, 54, 80, 0.08);
+}
+
+.permission-option-disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+  background: #f3f6f8;
+}
+
+.permission-option-input {
+  width: 16px;
+  height: 16px;
+  margin: 3px 0 0;
+  flex-shrink: 0;
+}
+
+.permission-option-body {
+  display: grid;
+  gap: 6px;
+}
+
+.permission-option-body strong {
+  font-size: 0.93rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.permission-option-body span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.7;
+}
+
 .feedback-banner {
   padding: 14px 16px;
   border: 1px solid var(--line);
