@@ -1064,6 +1064,101 @@ func (s *Service) UpdateSubject(ctx context.Context, id uint, input domain.Updat
 	return toSubject(model), nil
 }
 
+func (s *Service) DeleteSubject(ctx context.Context, id uint) error {
+	if id == 0 {
+		return errors.New("subject id is required")
+	}
+
+	var subject storage.Subject
+	if err := s.db.WithContext(ctx).Where("id = ?", id).First(&subject).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("subject does not exist")
+		}
+		return err
+	}
+
+	var wordCount int64
+	if err := s.db.WithContext(ctx).Model(&storage.Word{}).Where("subject_id = ?", subject.ID).Count(&wordCount).Error; err != nil {
+		return err
+	}
+	if wordCount > 0 {
+		return errors.New("当前科目下还有词条数据，无法删除")
+	}
+
+	var categoryCount int64
+	if err := s.db.WithContext(ctx).Model(&storage.Category{}).Where("subject_id = ?", subject.ID).Count(&categoryCount).Error; err != nil {
+		return err
+	}
+	if categoryCount > 0 {
+		return errors.New("当前科目下还有内容分组，无法删除")
+	}
+
+	var importJobCount int64
+	if err := s.db.WithContext(ctx).Model(&storage.ImportJob{}).Where("subject_id = ?", subject.ID).Count(&importJobCount).Error; err != nil {
+		return err
+	}
+	if importJobCount > 0 {
+		return errors.New("当前科目已有导入记录，无法删除")
+	}
+
+	var paymentOrderCount int64
+	if err := s.db.WithContext(ctx).Model(&storage.PaymentOrder{}).Where("subject_key = ?", subject.Key).Count(&paymentOrderCount).Error; err != nil {
+		return err
+	}
+	if paymentOrderCount > 0 {
+		return errors.New("当前科目已关联支付订单，无法删除")
+	}
+
+	var subscriptionCount int64
+	if err := s.db.WithContext(ctx).Model(&storage.MemberSubscription{}).Where("subject_key = ?", subject.Key).Count(&subscriptionCount).Error; err != nil {
+		return err
+	}
+	if subscriptionCount > 0 {
+		return errors.New("当前科目已关联会员记录，无法删除")
+	}
+
+	var knowledgeBaseCount int64
+	if err := s.db.WithContext(ctx).Model(&storage.KnowledgeBaseDocument{}).Where("subject_key = ?", subject.Key).Count(&knowledgeBaseCount).Error; err != nil {
+		return err
+	}
+	if knowledgeBaseCount > 0 {
+		return errors.New("当前科目已关联知识库文档，无法删除")
+	}
+
+	var learnerProgressCount int64
+	if err := s.db.WithContext(ctx).Model(&storage.LearnerWordProgress{}).Where("subject_key = ?", subject.Key).Count(&learnerProgressCount).Error; err != nil {
+		return err
+	}
+	if learnerProgressCount > 0 {
+		return errors.New("当前科目已关联学习进度，无法删除")
+	}
+
+	var learnerReviewCount int64
+	if err := s.db.WithContext(ctx).Model(&storage.LearnerWordReviewLog{}).Where("subject_key = ?", subject.Key).Count(&learnerReviewCount).Error; err != nil {
+		return err
+	}
+	if learnerReviewCount > 0 {
+		return errors.New("当前科目已关联学习复习记录，无法删除")
+	}
+
+	var classificationSummaryCount int64
+	if err := s.db.WithContext(ctx).Model(&storage.ClassificationSummary{}).Where("subject_id = ?", subject.ID).Count(&classificationSummaryCount).Error; err != nil {
+		return err
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if classificationSummaryCount > 0 {
+			if err := tx.Where("subject_id = ?", subject.ID).Delete(&storage.ClassificationSummary{}).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Delete(&subject).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
 func (s *Service) CreateCategory(ctx context.Context, input domain.CreateCategoryInput) (domain.Category, error) {
 	subject, err := s.resolveSubject(ctx, input.SubjectID, input.SubjectKey)
 	if err != nil {
@@ -1099,6 +1194,38 @@ func (s *Service) CreateCategory(ctx context.Context, input domain.CreateCategor
 		return domain.Category{}, err
 	}
 	return toCategory(model, subject.Key), nil
+}
+
+func (s *Service) DeleteCategory(ctx context.Context, id uint) error {
+	if id == 0 {
+		return errors.New("category id is required")
+	}
+
+	var category storage.Category
+	if err := s.db.WithContext(ctx).Where("id = ?", id).First(&category).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("category does not exist")
+		}
+		return err
+	}
+
+	var wordCount int64
+	if err := s.db.WithContext(ctx).Model(&storage.Word{}).Where("category_id = ?", category.ID).Count(&wordCount).Error; err != nil {
+		return err
+	}
+	if wordCount > 0 {
+		return errors.New("当前分组下还有词条数据，无法删除")
+	}
+
+	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&category).Error; err != nil {
+			return err
+		}
+		return s.refreshClassificationSummariesForSubjectTx(tx, category.SubjectID)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Service) UpdateCategory(ctx context.Context, id uint, input domain.UpdateCategoryInput) (domain.Category, error) {
@@ -1222,6 +1349,30 @@ func (s *Service) UpdateGrade(ctx context.Context, id uint, input domain.UpdateG
 		return domain.Grade{}, err
 	}
 	return toGrade(model), nil
+}
+
+func (s *Service) DeleteGrade(ctx context.Context, id uint) error {
+	if id == 0 {
+		return errors.New("grade id is required")
+	}
+
+	var grade storage.Grade
+	if err := s.db.WithContext(ctx).Where("id = ?", id).First(&grade).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("grade does not exist")
+		}
+		return err
+	}
+
+	var wordCount int64
+	if err := s.db.WithContext(ctx).Model(&storage.Word{}).Where("grade_id = ?", grade.ID).Count(&wordCount).Error; err != nil {
+		return err
+	}
+	if wordCount > 0 {
+		return errors.New("当前阶段下还有词条数据，无法删除")
+	}
+
+	return s.db.WithContext(ctx).Delete(&grade).Error
 }
 
 func (s *Service) CreateWord(ctx context.Context, input domain.CreateWordInput) (domain.Word, error) {

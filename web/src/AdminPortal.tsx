@@ -343,6 +343,7 @@ export default function AdminPortal() {
   const [inviteWithdraws, setInviteWithdraws] = useState<PagedAdminInviteWithdrawRequests | null>(null);
   const [inviteWithdrawDetail, setInviteWithdrawDetail] = useState<AdminInviteWithdrawDetail | null>(null);
   const [inviteWithdrawDetailLoading, setInviteWithdrawDetailLoading] = useState(false);
+  const [inviteWithdrawQRCodePreview, setInviteWithdrawQRCodePreview] = useState("");
   const [wordFilterCategories, setWordFilterCategories] = useState<Category[]>([]);
   const [wordEditorCategories, setWordEditorCategories] = useState<Category[]>([]);
   const [stats, setStats] = useState<CatalogStats | null>(null);
@@ -1875,6 +1876,16 @@ export default function AdminPortal() {
     }
   }
 
+  function closeInviteWithdrawDetail() {
+    setInviteWithdrawDetail(null);
+    setInviteWithdrawDetailLoading(false);
+    setInviteWithdrawQRCodePreview("");
+  }
+
+  function closeInviteWithdrawQRCodePreview() {
+    setInviteWithdrawQRCodePreview("");
+  }
+
   function resetAPIConfigEditor() {
     setAPIConfigEditor(emptyAdminAPIConfigEditor);
     setAPIConfigParameterRows([createAPIParameterRow()]);
@@ -2283,6 +2294,112 @@ export default function AdminPortal() {
       }
       setReloadKey((current) => current + 1);
       setNotice(gradeForm.id > 0 ? "学习阶段已更新。" : "学习阶段已创建。");
+    } catch (err) {
+      setDataError((err as Error).message);
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function handleDeleteSubject(subject: Subject, confirmed = false) {
+    if (!token || !canManageCatalog || !subject.id) {
+      return;
+    }
+    if (!confirmed) {
+      setConfirmDialog({
+        tone: "warning",
+        title: "删除学习科目",
+        message: `确定删除“${subject.name}”吗？如果这个科目下还有分组、词条、订单或学习记录，系统会阻止删除。`,
+        confirmLabel: "确认删除",
+        onConfirm: () => {
+          void handleDeleteSubject(subject, true);
+        },
+      });
+      return;
+    }
+
+    setBusyAction(`subject-delete-${subject.id}`);
+    setDataError("");
+    setNotice("");
+    try {
+      await api.adminDeleteSubject(token, subject.id);
+      if (subjectFilter === subject.key) {
+        const fallbackSubject = subjects.find((item) => item.id !== subject.id)?.key ?? "";
+        setSubjectFilter(fallbackSubject);
+      }
+      if (contentEditModal === "subject" && subjectForm.id === subject.id) {
+        closeContentEditModal();
+      }
+      setReloadKey((current) => current + 1);
+      setNotice("学习科目已删除。");
+    } catch (err) {
+      setDataError((err as Error).message);
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function handleDeleteCategory(item: Category, confirmed = false) {
+    if (!token || !canManageCatalog || !item.id) {
+      return;
+    }
+    if (!confirmed) {
+      setConfirmDialog({
+        tone: "warning",
+        title: "删除内容分组",
+        message: `确定删除“${item.name}”吗？如果这个分组下还有词条内容，系统会阻止删除。`,
+        confirmLabel: "确认删除",
+        onConfirm: () => {
+          void handleDeleteCategory(item, true);
+        },
+      });
+      return;
+    }
+
+    setBusyAction(`category-delete-${item.id}`);
+    setDataError("");
+    setNotice("");
+    try {
+      await api.adminDeleteCategory(token, item.id);
+      if (contentEditModal === "category" && categoryForm.id === item.id) {
+        closeContentEditModal();
+      }
+      setReloadKey((current) => current + 1);
+      setNotice("内容分组已删除。");
+    } catch (err) {
+      setDataError((err as Error).message);
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function handleDeleteGrade(item: Grade, confirmed = false) {
+    if (!token || !canManageCatalog || !item.id) {
+      return;
+    }
+    if (!confirmed) {
+      setConfirmDialog({
+        tone: "warning",
+        title: "删除学习阶段",
+        message: `确定删除“${item.name}”吗？如果这个阶段下还有词条内容，系统会阻止删除。`,
+        confirmLabel: "确认删除",
+        onConfirm: () => {
+          void handleDeleteGrade(item, true);
+        },
+      });
+      return;
+    }
+
+    setBusyAction(`grade-delete-${item.id}`);
+    setDataError("");
+    setNotice("");
+    try {
+      await api.adminDeleteGrade(token, item.id);
+      if (contentEditModal === "grade" && gradeForm.id === item.id) {
+        closeContentEditModal();
+      }
+      setReloadKey((current) => current + 1);
+      setNotice("学习阶段已删除。");
     } catch (err) {
       setDataError((err as Error).message);
     } finally {
@@ -2973,6 +3090,135 @@ function startEditPlan(plan: Plan) {
                 <button className="primary-button" onClick={handleConfirmDialog} type="button">
                   {confirmDialog.confirmLabel}
                 </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+
+        {inviteWithdrawDetailLoading || inviteWithdrawDetail ? (
+          <div
+            className="admin-edit-modal-backdrop"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                closeInviteWithdrawDetail();
+              }
+            }}
+            role="presentation"
+          >
+            <section
+              aria-labelledby="invite-withdraw-detail-title"
+              aria-modal="true"
+              className="admin-edit-modal api-config-modal"
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+              role="dialog"
+            >
+              <div className="admin-edit-modal-header">
+                <div>
+                  <p className="section-eyebrow">申请详情</p>
+                  <h2 id="invite-withdraw-detail-title">收款信息与佣金来源</h2>
+                </div>
+                <button className="secondary-button small-button" onClick={closeInviteWithdrawDetail} type="button">
+                  关闭
+                </button>
+              </div>
+
+              {inviteWithdrawDetailLoading ? (
+                <div className="feedback-banner">正在加载这笔提现申请的详情...</div>
+              ) : inviteWithdrawDetail ? (
+                <div className="setup-form admin-edit-modal-form">
+                  <ul className="detail-list">
+                    <li>申请单号：#{inviteWithdrawDetail.withdraw.id}</li>
+                    <li>提现状态：{inviteWithdrawStatusLabel(inviteWithdrawDetail.withdraw.status)}</li>
+                    <li>申请用户：{inviteWithdrawDetail.withdraw.learner_display_name || inviteWithdrawDetail.withdraw.learner_username}</li>
+                    <li>提现金额：{formatPrice(inviteWithdrawDetail.withdraw.amount_cents)}</li>
+                    <li>提现方式：{invitePaymentTypeLabel(inviteWithdrawDetail.withdraw.payment_type)}</li>
+                    <li>收款人：{inviteWithdrawDetail.withdraw.account_name || "-"}</li>
+                    <li>收款账号：{inviteWithdrawDetail.withdraw.account_no || "-"}</li>
+                    <li>
+                      收款码：
+                      {inviteWithdrawDetail.withdraw.account_qr_code ? (
+                        <div className="site-icon-field invite-admin-qr-field">
+                          <div className="site-icon-preview-card invite-qr-preview-card">
+                            <div className="site-icon-preview-frame invite-qr-preview-frame">
+                              <img
+                                alt="提现收款码预览"
+                                className="site-icon-preview-image"
+                                src={inviteWithdrawDetail.withdraw.account_qr_code}
+                              />
+                            </div>
+                            <div className="site-icon-preview-meta">
+                              <strong>收款二维码</strong>
+                              <span>管理员可以直接在这里扫码或核对收款码，也可以点下面按钮弹窗查看大图。</span>
+                              <button
+                                className="secondary-button small-button"
+                                onClick={() => {
+                                  setInviteWithdrawQRCodePreview(inviteWithdrawDetail.withdraw.account_qr_code);
+                                }}
+                                type="button"
+                              >
+                                弹窗查看二维码
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        "-"
+                      )}
+                    </li>
+                    <li>管理员备注：{inviteWithdrawDetail.withdraw.admin_note || "-"}</li>
+                    <li>处理人：{inviteWithdrawDetail.withdraw.processed_by_name || "-"}</li>
+                    <li>处理时间：{inviteWithdrawDetail.withdraw.processed_at ? formatDateTime(inviteWithdrawDetail.withdraw.processed_at) : "-"}</li>
+                  </ul>
+                  <DataTable
+                    columns={["好友", "订单号", "充值金额", "佣金金额", "支付时间", "状态"]}
+                    rows={inviteWithdrawDetail.commissions.map((commission) => [
+                      commission.invited_display_name || commission.invited_username || "-",
+                      commission.payment_order_no,
+                      formatPrice(commission.order_amount_cents),
+                      formatPrice(commission.commission_cents),
+                      commission.order_paid_at ? formatDateTime(commission.order_paid_at) : "-",
+                      <span className={`pill ${inviteCommissionStatusClass(commission)}`}>{inviteCommissionStatusLabel(commission)}</span>,
+                    ])}
+                    emptyText="这笔提现申请暂时没有关联的佣金记录。"
+                  />
+                </div>
+              ) : null}
+            </section>
+          </div>
+        ) : null}
+
+        {inviteWithdrawQRCodePreview ? (
+          <div
+            className="admin-edit-modal-backdrop"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                closeInviteWithdrawQRCodePreview();
+              }
+            }}
+            role="presentation"
+          >
+            <section
+              aria-labelledby="invite-withdraw-qr-preview-title"
+              aria-modal="true"
+              className="admin-edit-modal invite-qr-modal"
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+              role="dialog"
+            >
+              <div className="admin-edit-modal-header">
+                <div>
+                  <p className="section-eyebrow">二维码大图</p>
+                  <h2 id="invite-withdraw-qr-preview-title">收款二维码预览</h2>
+                </div>
+                <button className="secondary-button small-button" onClick={closeInviteWithdrawQRCodePreview} type="button">
+                  关闭
+                </button>
+              </div>
+              <div className="invite-qr-modal-body">
+                <img alt="收款二维码大图预览" className="invite-qr-modal-image" src={inviteWithdrawQRCodePreview} />
               </div>
             </section>
           </div>
@@ -5635,47 +5881,6 @@ function startEditLearner(item: AdminLearnerUser) {
                     pageSize={inviteWithdraws?.page_size ?? adminPageSize}
                     total={inviteWithdraws?.total ?? 0}
                   />
-                  <div className="content-card" style={{ marginTop: 16 }}>
-                    <div className="section-header">
-                      <div>
-                        <p className="section-eyebrow">申请详情</p>
-                        <h2>收款信息与佣金来源</h2>
-                      </div>
-                    </div>
-                    {inviteWithdrawDetailLoading ? (
-                      <div className="feedback-banner">正在加载这笔提现申请的详情...</div>
-                    ) : inviteWithdrawDetail ? (
-                      <>
-                        <ul className="detail-list">
-                          <li>申请单号：#{inviteWithdrawDetail.withdraw.id}</li>
-                          <li>提现状态：{inviteWithdrawStatusLabel(inviteWithdrawDetail.withdraw.status)}</li>
-                          <li>申请用户：{inviteWithdrawDetail.withdraw.learner_display_name || inviteWithdrawDetail.withdraw.learner_username}</li>
-                          <li>提现金额：{formatPrice(inviteWithdrawDetail.withdraw.amount_cents)}</li>
-                          <li>提现方式：{invitePaymentTypeLabel(inviteWithdrawDetail.withdraw.payment_type)}</li>
-                          <li>收款人：{inviteWithdrawDetail.withdraw.account_name || "-"}</li>
-                          <li>收款账号：{inviteWithdrawDetail.withdraw.account_no || "-"}</li>
-                          <li>收款码：{inviteWithdrawDetail.withdraw.account_qr_code ? <a href={inviteWithdrawDetail.withdraw.account_qr_code} rel="noreferrer" target="_blank">查看二维码</a> : "-"}</li>
-                          <li>管理员备注：{inviteWithdrawDetail.withdraw.admin_note || "-"}</li>
-                          <li>处理人：{inviteWithdrawDetail.withdraw.processed_by_name || "-"}</li>
-                          <li>处理时间：{inviteWithdrawDetail.withdraw.processed_at ? formatDateTime(inviteWithdrawDetail.withdraw.processed_at) : "-"}</li>
-                        </ul>
-                        <DataTable
-                          columns={["好友", "订单号", "充值金额", "佣金金额", "支付时间", "状态"]}
-                          rows={inviteWithdrawDetail.commissions.map((commission) => [
-                            commission.invited_display_name || commission.invited_username || "-",
-                            commission.payment_order_no,
-                            formatPrice(commission.order_amount_cents),
-                            formatPrice(commission.commission_cents),
-                            commission.order_paid_at ? formatDateTime(commission.order_paid_at) : "-",
-                            <span className={`pill ${inviteCommissionStatusClass(commission)}`}>{inviteCommissionStatusLabel(commission)}</span>,
-                          ])}
-                          emptyText="这笔提现申请暂时没有关联的佣金记录。"
-                        />
-                      </>
-                    ) : (
-                      <div className="feedback-banner">点击上方“查看明细”后，这里会展示对应的收款信息和佣金来源。</div>
-                    )}
-                  </div>
                 </article>
               ) : null}
               </div>

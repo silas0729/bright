@@ -185,10 +185,13 @@ func (s *Server) Routes() http.Handler {
 	admin.POST("/api-configs/:id/test", s.permissionRequired("mcp.write"), s.handleTestAdminAPIConfig)
 	admin.POST("/subjects", s.permissionRequired("subject.write"), s.handleCreateSubject)
 	admin.PUT("/subjects/:id", s.permissionRequired("subject.write"), s.handleUpdateSubject)
+	admin.DELETE("/subjects/:id", s.permissionRequired("subject.write"), s.handleDeleteSubject)
 	admin.POST("/categories", s.permissionRequired("catalog.write"), s.handleCreateCategory)
 	admin.PUT("/categories/:id", s.permissionRequired("catalog.write"), s.handleUpdateCategory)
+	admin.DELETE("/categories/:id", s.permissionRequired("catalog.write"), s.handleDeleteCategory)
 	admin.POST("/grades", s.permissionRequired("grade.write"), s.handleCreateGrade)
 	admin.PUT("/grades/:id", s.permissionRequired("grade.write"), s.handleUpdateGrade)
+	admin.DELETE("/grades/:id", s.permissionRequired("grade.write"), s.handleDeleteGrade)
 	admin.POST("/words", s.permissionRequired("catalog.write"), s.handleCreateWord)
 	admin.PUT("/words/batch-vip", s.permissionRequired("catalog.write"), s.handleBatchUpdateWordVIP)
 	admin.PUT("/words/:id", s.permissionRequired("catalog.write"), s.handleUpdateWord)
@@ -615,6 +618,19 @@ func (s *Server) handleUpdateSubject(c *gin.Context) {
 	c.JSON(http.StatusOK, item)
 }
 
+func (s *Server) handleDeleteSubject(c *gin.Context) {
+	subjectID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || subjectID == 0 {
+		writeError(c, http.StatusBadRequest, domainError("invalid subject id"))
+		return
+	}
+	if err := s.service.DeleteSubject(c.Request.Context(), uint(subjectID)); err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 func (s *Server) handleCreateCategory(c *gin.Context) {
 	var input domain.CreateCategoryInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -648,6 +664,19 @@ func (s *Server) handleUpdateCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, item)
 }
 
+func (s *Server) handleDeleteCategory(c *gin.Context) {
+	categoryID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || categoryID == 0 {
+		writeError(c, http.StatusBadRequest, domainError("invalid category id"))
+		return
+	}
+	if err := s.service.DeleteCategory(c.Request.Context(), uint(categoryID)); err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 func (s *Server) handleCreateGrade(c *gin.Context) {
 	var input domain.CreateGradeInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -679,6 +708,19 @@ func (s *Server) handleUpdateGrade(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, item)
+}
+
+func (s *Server) handleDeleteGrade(c *gin.Context) {
+	gradeID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || gradeID == 0 {
+		writeError(c, http.StatusBadRequest, domainError("invalid grade id"))
+		return
+	}
+	if err := s.service.DeleteGrade(c.Request.Context(), uint(gradeID)); err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 func (s *Server) handleCreateWord(c *gin.Context) {

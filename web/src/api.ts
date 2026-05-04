@@ -2000,6 +2000,12 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+  adminDeleteSubject(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/admin/subjects/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
   adminCreateCategory(token: string, payload: CreateCategoryInput) {
     return request<Category>("/api/v1/admin/categories", {
       method: "POST",
@@ -2014,6 +2020,12 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+  adminDeleteCategory(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/admin/categories/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
   adminCreateGrade(token: string, payload: CreateGradeInput) {
     return request<Grade>("/api/v1/admin/grades", {
       method: "POST",
@@ -2026,6 +2038,12 @@ export const api = {
       method: "PUT",
       headers: authHeaders(token),
       body: JSON.stringify(payload),
+    });
+  },
+  adminDeleteGrade(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/admin/grades/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
     });
   },
   adminCreateWord(token: string, payload: CreateWordInput) {
