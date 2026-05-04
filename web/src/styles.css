@@ -737,6 +737,167 @@ textarea {
   overflow-x: auto;
 }
 
+.xiaomi-device-table {
+  table-layout: fixed;
+}
+
+.xiaomi-device-table th:nth-child(1),
+.xiaomi-device-table td:nth-child(1) {
+  width: 16%;
+}
+
+.xiaomi-device-table th:nth-child(2),
+.xiaomi-device-table td:nth-child(2) {
+  width: 15%;
+}
+
+.xiaomi-device-table th:nth-child(3),
+.xiaomi-device-table td:nth-child(3) {
+  width: 18%;
+}
+
+.xiaomi-device-table th:nth-child(4),
+.xiaomi-device-table td:nth-child(4) {
+  width: 11%;
+}
+
+.xiaomi-device-table th:nth-child(5),
+.xiaomi-device-table td:nth-child(5) {
+  width: 11%;
+}
+
+.xiaomi-device-table th:nth-child(6),
+.xiaomi-device-table td:nth-child(6) {
+  width: 8%;
+}
+
+.xiaomi-ops-col,
+.xiaomi-device-table th:nth-child(7),
+.xiaomi-device-table td:nth-child(7) {
+  width: 21%;
+}
+
+.xiaomi-device-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.xiaomi-ellipsis-text,
+.xiaomi-did-text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.xiaomi-did-text {
+  font-family: "JetBrains Mono", "Consolas", monospace;
+  font-size: 0.83rem;
+}
+
+.xiaomi-ops-cell {
+  min-width: 0;
+}
+
+.xiaomi-ops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.xiaomi-ops .small-button {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 0.84rem;
+}
+
+.xiaomi-ops-note {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.xiaomi-control-modal {
+  width: min(1080px, 100%);
+}
+
+.xiaomi-control-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.xiaomi-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.xiaomi-control-grid div {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+
+.xiaomi-control-grid span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.xiaomi-control-grid strong {
+  font-size: 0.96rem;
+  word-break: break-word;
+}
+
+.xiaomi-control-actions {
+  align-items: center;
+}
+
+.xiaomi-control-section {
+  display: grid;
+  gap: 12px;
+}
+
+.xiaomi-control-section h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.xiaomi-control-table {
+  table-layout: fixed;
+}
+
+.xiaomi-control-table td strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.xiaomi-control-table td small {
+  display: block;
+  color: var(--muted);
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.xiaomi-raw-preview {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-soft);
+}
+
+.xiaomi-raw-preview summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--text);
+}
+
 .site-brand {
   display: flex;
   align-items: center;
@@ -3369,6 +3530,10 @@ textarea {
 
   .profile-overview {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .xiaomi-control-grid {
+    grid-template-columns: 1fr;
   }
 
   .plan-row {

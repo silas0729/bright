@@ -35,6 +35,7 @@ import {
   type XiaomiDevice,
   type XiaomiConfig,
   type XiaomiDeviceListResult,
+  type XiaomiDeviceStatusResult,
   type XiaomiHome,
   type XiaomiQRLoginResult,
   type WechatOrder,
@@ -374,6 +375,10 @@ export default function PublicSite() {
   const [xiaomiSearchQuery, setXiaomiSearchQuery] = useState("");
   const [xiaomiQRSession, setXiaomiQRSession] = useState<XiaomiQRLoginResult | null>(null);
   const [xiaomiQRStatus, setXiaomiQRStatus] = useState("");
+  const [xiaomiDeviceStatusMap, setXiaomiDeviceStatusMap] = useState<Record<string, XiaomiDeviceStatusResult>>({});
+  const [xiaomiDeviceStatusLoadingMap, setXiaomiDeviceStatusLoadingMap] = useState<Record<string, boolean>>({});
+  const [xiaomiControlBusyDid, setXiaomiControlBusyDid] = useState("");
+  const [xiaomiControlModalDevice, setXiaomiControlModalDevice] = useState<XiaomiDevice | null>(null);
   const [marketResult, setMarketResult] = useState<PagedMCPMarketTools | null>(null);
   const [marketLoading, setMarketLoading] = useState(false);
   const [marketError, setMarketError] = useState("");
@@ -1760,6 +1765,235 @@ export default function PublicSite() {
     return Array.from(homes.values()).sort((left, right) => left.name.localeCompare(right.name, "zh-CN"));
   }
 
+  function canControlXiaomiSwitch(device: XiaomiDevice) {
+    const model = (device.model || "").toLowerCase();
+    const specType = (device.spec_type || "").toLowerCase();
+    return (
+      model.includes("plug") ||
+      model.includes("switch") ||
+      specType.includes("switch") ||
+      specType.includes("plug")
+    );
+  }
+
+  function buildXiaomiStatusPropertyRequests(device: XiaomiDevice) {
+    const propertyNames = [
+      "status",
+      "mode",
+      "target_temperature",
+      "temperature",
+      "relative_humidity",
+      "humidity",
+      "battery_level",
+      "battery",
+      "brightness",
+      "fan_level",
+      "pm2_5_density",
+      "pm10_density",
+      "co2_density",
+      "tvoc_density",
+      "illumination",
+      "electricity",
+      "power_consumption",
+      "charging_state",
+    ];
+    if (canControlXiaomiSwitch(device)) {
+      propertyNames.unshift("on", "power");
+    }
+    return Array.from(new Set(propertyNames));
+  }
+
+  function formatXiaomiStatusValue(value: unknown) {
+    if (value === null || value === undefined || value === "") {
+      return "-";
+    }
+    if (typeof value === "string") {
+      return value;
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+
+  function formatXiaomiPropertyValue(value: unknown, unit?: unknown) {
+    const text = formatXiaomiStatusValue(value);
+    const unitText = unit === null || unit === undefined || unit === "" ? "" : formatXiaomiStatusValue(unit);
+    if (text === "-" || !unitText) {
+      return text;
+    }
+    return `${text} ${unitText}`;
+  }
+
+  function resolveXiaomiSwitchPropertyName(status?: XiaomiDeviceStatusResult | null) {
+    const availableProperties = status?.available_properties ?? {};
+    if (Object.prototype.hasOwnProperty.call(availableProperties, "on")) {
+      return "on";
+    }
+    if (Object.prototype.hasOwnProperty.call(availableProperties, "power")) {
+      return "power";
+    }
+    return "on";
+  }
+
+  function inferXiaomiSwitchState(status?: XiaomiDeviceStatusResult | null): boolean | null {
+    const properties = Array.isArray(status?.properties) ? status.properties : [];
+    for (const item of properties) {
+      if (!item || typeof item !== "object") {
+        continue;
+      }
+      const record = item as Record<string, unknown>;
+      const value = record.value;
+      if (typeof value === "boolean") {
+        return value;
+      }
+      if (typeof value === "number" && (value === 0 || value === 1)) {
+        return value === 1;
+      }
+      if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === "true" || normalized === "on" || normalized === "1") {
+          return true;
+        }
+        if (normalized === "false" || normalized === "off" || normalized === "0") {
+          return false;
+        }
+      }
+    }
+    return null;
+  }
+
+  function buildXiaomiPropertyRows(status?: XiaomiDeviceStatusResult | null) {
+    const availableProperties = isPlainJSONObject(status?.available_properties) ? status.available_properties : {};
+    const properties = Array.isArray(status?.properties) ? status.properties : [];
+    const valueMap = new Map<string, Record<string, unknown>>();
+
+    for (const item of properties) {
+      if (!isPlainJSONObject(item)) {
+        continue;
+      }
+      const siid = Number(item.siid);
+      const piid = Number(item.piid);
+      if (!Number.isFinite(siid) || !Number.isFinite(piid)) {
+        continue;
+      }
+      valueMap.set(`${siid}:${piid}`, item);
+    }
+
+    return Object.entries(availableProperties)
+      .map(([name, metaValue]) => {
+        const meta = isPlainJSONObject(metaValue) ? metaValue : {};
+        const siid = Number(meta.siid);
+        const piid = Number(meta.piid);
+        const valueRecord =
+          Number.isFinite(siid) && Number.isFinite(piid) ? valueMap.get(`${siid}:${piid}`) : undefined;
+        const metaSummaryParts = [
+          meta.type ? `类型：${formatXiaomiStatusValue(meta.type)}` : "",
+          meta.range ? `范围：${formatXiaomiStatusValue(meta.range)}` : "",
+          meta.enum ? `枚举：${formatXiaomiStatusValue(meta.enum)}` : "",
+        ].filter(Boolean);
+
+        return {
+          key: `${name}-${Number.isFinite(siid) ? siid : "x"}-${Number.isFinite(piid) ? piid : "x"}`,
+          name,
+          desc: typeof meta.desc === "string" ? meta.desc : "",
+          rw: typeof meta.rw === "string" ? meta.rw : "-",
+          value: valueRecord ? formatXiaomiPropertyValue(valueRecord.value, meta.unit) : "-",
+          metaSummary: metaSummaryParts.join(" | "),
+          hasValue: Boolean(valueRecord),
+        };
+      })
+      .sort((left, right) => {
+        if (left.hasValue !== right.hasValue) {
+          return left.hasValue ? -1 : 1;
+        }
+        return left.name.localeCompare(right.name, "zh-CN");
+      });
+  }
+
+  function buildXiaomiActionRows(status?: XiaomiDeviceStatusResult | null) {
+    const availableActions = isPlainJSONObject(status?.available_actions) ? status.available_actions : {};
+    return Object.entries(availableActions)
+      .map(([name, actionValue]) => {
+        const action = isPlainJSONObject(actionValue) ? actionValue : {};
+        const siid = Number(action.siid);
+        const aiid = Number(action.aiid);
+        return {
+          key: `${name}-${Number.isFinite(siid) ? siid : "x"}-${Number.isFinite(aiid) ? aiid : "x"}`,
+          name,
+          desc: typeof action.desc === "string" ? action.desc : "",
+          identity:
+            Number.isFinite(siid) && Number.isFinite(aiid)
+              ? `siid ${siid} / aiid ${aiid}`
+              : "等待设备返回动作编号",
+        };
+      })
+      .sort((left, right) => left.name.localeCompare(right.name, "zh-CN"));
+  }
+
+  async function handleLoadXiaomiDeviceStatus(device: XiaomiDevice, options?: { silent?: boolean }) {
+    if (!session?.access_token) {
+      return null;
+    }
+    const silent = options?.silent === true;
+    if (!silent) {
+      setXiaomiDeviceStatusLoadingMap((current) => ({ ...current, [device.did]: true }));
+    }
+    try {
+      const result = await api.learnerXiaomiDeviceStatus(session.access_token, device.did, {
+        properties: buildXiaomiStatusPropertyRequests(device),
+      });
+      setXiaomiDeviceStatusMap((current) => ({ ...current, [device.did]: result as XiaomiDeviceStatusResult }));
+      return result as XiaomiDeviceStatusResult;
+    } catch (err) {
+      if (!silent) {
+        setProfileError((err as Error).message);
+      }
+      return null;
+    } finally {
+      if (!silent) {
+        setXiaomiDeviceStatusLoadingMap((current) => ({ ...current, [device.did]: false }));
+      }
+    }
+  }
+
+  async function handleToggleXiaomiSwitch(device: XiaomiDevice, nextOn: boolean) {
+    if (!session?.access_token) {
+      return;
+    }
+    setXiaomiControlBusyDid(device.did);
+    try {
+      const currentStatus =
+        xiaomiDeviceStatusMap[device.did] ?? (await handleLoadXiaomiDeviceStatus(device, { silent: true }));
+      const propName = resolveXiaomiSwitchPropertyName(currentStatus);
+      await api.learnerControlXiaomiDevice(session.access_token, {
+        query: device.did,
+        operation: "set_property",
+        prop_name: propName,
+        value: nextOn,
+      });
+      setProfileNotice(`${device.name} 已${nextOn ? "开启" : "关闭"}。`);
+      await handleLoadXiaomiDeviceStatus(device, { silent: true });
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setXiaomiControlBusyDid("");
+    }
+  }
+
+  function openXiaomiControlModal(device: XiaomiDevice) {
+    setXiaomiControlModalDevice(device);
+    void handleLoadXiaomiDeviceStatus(device);
+  }
+
+  function closeXiaomiControlModal() {
+    setXiaomiControlModalDevice(null);
+  }
+
   const buildAPIParameterEditorState = (item: APIConfig) => {
     const rowMap = new Map<string, APIParameterEditorRow>();
     const headerObject = safeParseJSONObject(item.headers);
@@ -2544,6 +2778,13 @@ export default function PublicSite() {
   const apiConfigTestPreview = apiConfigTestResult
     ? JSON.stringify(apiConfigTestResult.body ?? apiConfigTestResult.raw_body ?? apiConfigTestResult, null, 2)
     : "";
+  const xiaomiControlStatus = xiaomiControlModalDevice ? xiaomiDeviceStatusMap[xiaomiControlModalDevice.did] ?? null : null;
+  const xiaomiControlStatusLoading = xiaomiControlModalDevice
+    ? Boolean(xiaomiDeviceStatusLoadingMap[xiaomiControlModalDevice.did])
+    : false;
+  const xiaomiControlPropertyRows = buildXiaomiPropertyRows(xiaomiControlStatus);
+  const xiaomiControlActionRows = buildXiaomiActionRows(xiaomiControlStatus);
+  const xiaomiControlSwitchState = inferXiaomiSwitchState(xiaomiControlStatus);
   // These workspaces are mounted conditionally, so keep their state and helpers
   // referenced under strict TS unused-local checks.
   void [
@@ -3980,7 +4221,7 @@ export default function PublicSite() {
                       ) : null}
 
                       <div className="table-wrap">
-                        <table className="data-table">
+                        <table className="data-table xiaomi-device-table">
                           <thead>
                             <tr>
                               <th>设备名</th>
@@ -3989,23 +4230,90 @@ export default function PublicSite() {
                               <th>家庭</th>
                               <th>房间</th>
                               <th>在线</th>
+                              <th className="xiaomi-ops-col">网页控制</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {visibleXiaomiDevices.map((item) => (
-                              <tr key={item.did}>
-                                <td>{item.name}</td>
-                                <td>{item.model}</td>
-                                <td>{item.did}</td>
-                                <td>{item.home_name || "-"}</td>
-                                <td>{item.room_name || "-"}</td>
-                                <td>
-                                  <span className={item.is_online ? "pill pill-success" : "pill pill-muted"}>
-                                    {item.is_online ? "在线" : "离线"}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
+                            {visibleXiaomiDevices.map((item) => {
+                              const deviceStatus = xiaomiDeviceStatusMap[item.did];
+                              const statusLoading = Boolean(xiaomiDeviceStatusLoadingMap[item.did]);
+                              const switchBusy = xiaomiControlBusyDid === item.did;
+                              const switchState = inferXiaomiSwitchState(deviceStatus);
+                              const canSwitch = canControlXiaomiSwitch(item);
+                              const switchButtonLabel =
+                                switchState === true ? "立即关闭" : switchState === false ? "立即开启" : "尝试开启";
+                              const statusNote = !item.is_online
+                                ? "设备离线时暂时不能网页控制。"
+                                : statusLoading
+                                  ? "正在读取设备状态..."
+                                  : canSwitch
+                                    ? switchState === null
+                                      ? "支持网页开关，建议先读取状态后再操作。"
+                                      : switchState
+                                        ? "当前设备已开启。"
+                                        : "当前设备已关闭。"
+                                    : "打开详情可查看当前设备属性与动作。";
+
+                              return (
+                                <tr key={item.did}>
+                                  <td title={item.name}>
+                                    <div className="xiaomi-device-name">
+                                      <span className="xiaomi-ellipsis-text">{item.name}</span>
+                                      {item.is_shared ? <span className="pill pill-warning">共享</span> : null}
+                                    </div>
+                                  </td>
+                                  <td title={item.model}>
+                                    <span className="xiaomi-ellipsis-text">{item.model || "-"}</span>
+                                  </td>
+                                  <td title={item.did}>
+                                    <span className="xiaomi-did-text">{item.did}</span>
+                                  </td>
+                                  <td title={item.home_name || "-"}>
+                                    <span className="xiaomi-ellipsis-text">{item.home_name || "-"}</span>
+                                  </td>
+                                  <td title={item.room_name || "-"}>
+                                    <span className="xiaomi-ellipsis-text">{item.room_name || "-"}</span>
+                                  </td>
+                                  <td>
+                                    <span className={item.is_online ? "pill pill-success" : "pill pill-muted"}>
+                                      {item.is_online ? "在线" : "离线"}
+                                    </span>
+                                  </td>
+                                  <td className="xiaomi-ops-cell">
+                                    <div className="xiaomi-ops">
+                                      <button
+                                        className="secondary-button small-button"
+                                        onClick={() => openXiaomiControlModal(item)}
+                                        type="button"
+                                      >
+                                        设备详情
+                                      </button>
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={statusLoading}
+                                        onClick={() => void handleLoadXiaomiDeviceStatus(item)}
+                                        type="button"
+                                      >
+                                        {statusLoading ? "读取中..." : "查看状态"}
+                                      </button>
+                                      {canSwitch ? (
+                                        <button
+                                          className={`small-button ${
+                                            switchState === true ? "secondary-button" : "primary-button"
+                                          }`}
+                                          disabled={!item.is_online || switchBusy}
+                                          onClick={() => void handleToggleXiaomiSwitch(item, !(switchState === true))}
+                                          type="button"
+                                        >
+                                          {switchBusy ? "执行中..." : switchButtonLabel}
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                    <div className="xiaomi-ops-note">{statusNote}</div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -4744,6 +5052,183 @@ export default function PublicSite() {
           </main>
         </div>
       )}
+
+      {xiaomiControlModalDevice ? (
+        <div className="admin-edit-modal-backdrop" onClick={closeXiaomiControlModal} role="presentation">
+          <section
+            aria-labelledby="xiaomi-control-modal-title"
+            aria-modal="true"
+            className="admin-edit-modal xiaomi-control-modal"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+            role="dialog"
+          >
+            <div className="admin-edit-modal-header">
+              <div>
+                <p className="section-eyebrow">米家设备网页控制</p>
+                <h2 id="xiaomi-control-modal-title">{xiaomiControlModalDevice.name}</h2>
+                <p className="helper-text">这里展示的是当前网页端已经连上的设备能力，开关类设备可以直接在这里控制。</p>
+              </div>
+              <button className="secondary-button small-button" onClick={closeXiaomiControlModal} type="button">
+                关闭
+              </button>
+            </div>
+
+            <div className="xiaomi-control-stack">
+              <div className="xiaomi-control-grid">
+                <div>
+                  <span>设备名称</span>
+                  <strong>{xiaomiControlModalDevice.name}</strong>
+                </div>
+                <div>
+                  <span>设备型号</span>
+                  <strong>{xiaomiControlModalDevice.model || "-"}</strong>
+                </div>
+                <div>
+                  <span>DID</span>
+                  <strong>{xiaomiControlModalDevice.did}</strong>
+                </div>
+                <div>
+                  <span>所属家庭 / 房间</span>
+                  <strong>
+                    {[xiaomiControlModalDevice.home_name, xiaomiControlModalDevice.room_name].filter(Boolean).join(" / ") ||
+                      "-"}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="button-row xiaomi-control-actions">
+                <button
+                  className="secondary-button"
+                  disabled={xiaomiControlStatusLoading}
+                  onClick={() => void handleLoadXiaomiDeviceStatus(xiaomiControlModalDevice)}
+                  type="button"
+                >
+                  {xiaomiControlStatusLoading ? "刷新中..." : "刷新设备状态"}
+                </button>
+                {canControlXiaomiSwitch(xiaomiControlModalDevice) ? (
+                  <button
+                    className="primary-button"
+                    disabled={!xiaomiControlModalDevice.is_online || xiaomiControlBusyDid === xiaomiControlModalDevice.did}
+                    onClick={() =>
+                      void handleToggleXiaomiSwitch(
+                        xiaomiControlModalDevice,
+                        !(xiaomiControlSwitchState === true),
+                      )
+                    }
+                    type="button"
+                  >
+                    {xiaomiControlBusyDid === xiaomiControlModalDevice.did
+                      ? "执行中..."
+                      : xiaomiControlSwitchState === true
+                        ? "关闭设备"
+                        : xiaomiControlSwitchState === false
+                          ? "开启设备"
+                          : "尝试开启"}
+                  </button>
+                ) : null}
+                <span className={xiaomiControlModalDevice.is_online ? "pill pill-success" : "pill pill-muted"}>
+                  {xiaomiControlModalDevice.is_online ? "设备在线" : "设备离线"}
+                </span>
+                {canControlXiaomiSwitch(xiaomiControlModalDevice) ? (
+                  <span
+                    className={
+                      xiaomiControlSwitchState === true
+                        ? "pill pill-success"
+                        : xiaomiControlSwitchState === false
+                          ? "pill pill-warning"
+                          : "pill pill-muted"
+                    }
+                  >
+                    {xiaomiControlSwitchState === true
+                      ? "当前已开启"
+                      : xiaomiControlSwitchState === false
+                        ? "当前已关闭"
+                        : "状态待读取"}
+                  </span>
+                ) : null}
+              </div>
+
+              {!xiaomiControlStatus && !xiaomiControlStatusLoading ? (
+                <div className="feedback-banner">点击“刷新设备状态”后，这里会显示当前设备的状态、属性和可用动作。</div>
+              ) : null}
+
+              {xiaomiControlStatusLoading ? <div className="feedback-banner">正在读取设备状态，请稍候...</div> : null}
+
+              {xiaomiControlPropertyRows.length > 0 ? (
+                <section className="xiaomi-control-section">
+                  <div>
+                    <h3>可读取属性</h3>
+                    <p className="helper-text">网页端会优先展示常见属性的当前值，同时保留米家返回的能力说明。</p>
+                  </div>
+                  <div className="table-wrap">
+                    <table className="data-table xiaomi-control-table">
+                      <thead>
+                        <tr>
+                          <th>属性</th>
+                          <th>当前值</th>
+                          <th>说明</th>
+                          <th>读写</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {xiaomiControlPropertyRows.map((row) => (
+                          <tr key={row.key}>
+                            <td>
+                              <strong>{row.name}</strong>
+                              {row.metaSummary ? <small>{row.metaSummary}</small> : null}
+                            </td>
+                            <td>{row.value}</td>
+                            <td>{row.desc || "-"}</td>
+                            <td>{row.rw}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ) : null}
+
+              {xiaomiControlActionRows.length > 0 ? (
+                <section className="xiaomi-control-section">
+                  <div>
+                    <h3>可执行动作</h3>
+                    <p className="helper-text">当前先把动作能力展示出来，后续如果你要我继续做，也可以把常用动作做成直接按钮。</p>
+                  </div>
+                  <div className="table-wrap">
+                    <table className="data-table xiaomi-control-table">
+                      <thead>
+                        <tr>
+                          <th>动作名</th>
+                          <th>说明</th>
+                          <th>调用编号</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {xiaomiControlActionRows.map((row) => (
+                          <tr key={row.key}>
+                            <td>{row.name}</td>
+                            <td>{row.desc || "-"}</td>
+                            <td>{row.identity}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ) : null}
+
+              {xiaomiControlStatus ? (
+                <details className="xiaomi-raw-preview">
+                  <summary>查看原始返回数据</summary>
+                  <pre className="code-panel">{JSON.stringify(xiaomiControlStatus, null, 2)}</pre>
+                </details>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {knowledgeBaseUploadModalOpen ? (
         <div className="admin-edit-modal-backdrop" onClick={closeKnowledgeBaseUploadModal} role="presentation">

@@ -493,6 +493,18 @@ export interface XiaomiDeviceMatch {
   spec_type?: string;
 }
 
+export interface XiaomiDeviceStatusResult {
+  success?: boolean;
+  device?: {
+    did?: string;
+    name?: string;
+    model?: string;
+  };
+  properties?: unknown;
+  available_properties?: Record<string, unknown>;
+  available_actions?: Record<string, unknown>;
+}
+
 export interface XiaomiQRLoginResult {
   success: boolean;
   session_id: string;
