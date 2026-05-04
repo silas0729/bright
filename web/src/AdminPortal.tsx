@@ -580,8 +580,12 @@ export default function AdminPortal() {
     permissionSet.has("learner.write");
   const canManageLearners =
     currentAdmin?.is_super === true || permissionSet.has("*") || permissionSet.has("learner.write");
+  const canManageSubjects =
+    currentAdmin?.is_super === true || permissionSet.has("*") || permissionSet.has("subject.write");
   const canManageCatalog =
     currentAdmin?.is_super === true || permissionSet.has("*") || permissionSet.has("catalog.write");
+  const canManageGrades =
+    currentAdmin?.is_super === true || permissionSet.has("*") || permissionSet.has("grade.write");
   const canViewSiteSettings =
     currentAdmin?.is_super === true ||
     permissionSet.has("*") ||
@@ -2172,7 +2176,7 @@ export default function AdminPortal() {
 
   async function handleSaveSubject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!token) {
+    if (!token || !canManageSubjects) {
       return;
     }
     const nextSort = Number.parseInt(subjectForm.sort, 10) || 0;
@@ -2226,7 +2230,7 @@ export default function AdminPortal() {
 
   async function handleSaveCategory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!token) {
+    if (!token || !canManageCatalog) {
       return;
     }
     const nextSort = Number.parseInt(categoryForm.sort, 10) || 0;
@@ -2265,7 +2269,7 @@ export default function AdminPortal() {
 
   async function handleSaveGrade(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!token) {
+    if (!token || !canManageGrades) {
       return;
     }
     const nextSort = Number.parseInt(gradeForm.sort, 10) || 0;
@@ -2302,7 +2306,7 @@ export default function AdminPortal() {
   }
 
   async function handleDeleteSubject(subject: Subject, confirmed = false) {
-    if (!token || !canManageCatalog || !subject.id) {
+    if (!token || !canManageSubjects || !subject.id) {
       return;
     }
     if (!confirmed) {
@@ -2374,7 +2378,7 @@ export default function AdminPortal() {
   }
 
   async function handleDeleteGrade(item: Grade, confirmed = false) {
-    if (!token || !canManageCatalog || !item.id) {
+    if (!token || !canManageGrades || !item.id) {
       return;
     }
     if (!confirmed) {
@@ -2915,6 +2919,27 @@ function startEditPlan(plan: Plan) {
     resetPlanEditor();
     setActiveSection("payments");
     setPanelEditModal("plan");
+  }
+
+  function openCreateSubjectModal() {
+    resetSubjectEditor();
+    setNotice("");
+    setDataError("");
+    setContentEditModal("subject");
+  }
+
+  function openCreateCategoryModal() {
+    resetCategoryEditor();
+    setNotice("");
+    setDataError("");
+    setContentEditModal("category");
+  }
+
+  function openCreateGradeModal() {
+    resetGradeEditor();
+    setNotice("");
+    setDataError("");
+    setContentEditModal("grade");
   }
 
   function startEditSubject(subject: Subject) {
@@ -3560,10 +3585,13 @@ function startEditLearner(item: AdminLearnerUser) {
     );
   }
 
+  const canAccessImportSection = canManageCatalog || canManageSubjects || canManageGrades;
+  const canAccessCatalogSection = canManageCatalog || canManageGrades;
+
   const navItems: Array<{ key: AdminSection; label: string; hidden?: boolean }> = [
     { key: "dashboard", label: "运营看板" },
-    { key: "import", label: "内容导入" },
-    { key: "catalog", label: "内容整理" },
+    { key: "import", label: "内容导入", hidden: !canAccessImportSection },
+    { key: "catalog", label: "内容整理", hidden: !canAccessCatalogSection },
     { key: "site", label: "站点展示", hidden: !canViewSiteSettings },
     { key: "payments", label: "收费方案", hidden: !canViewPayments && !canViewPlans },
     { key: "memberships", label: "会员服务", hidden: !canViewPayments },
@@ -3576,17 +3604,27 @@ function startEditLearner(item: AdminLearnerUser) {
     { key: "catalog-upload", label: "词库导入", helper: "CSV / Excel" },
     { key: "knowledge-base-upload", label: "知识库导入", helper: "TXT / Markdown / 表格 / Word" },
     { key: "knowledge-base-docs", label: "知识库文档", helper: "已上传文档", count: knowledgeBaseDocuments?.total ?? 0 },
-    { key: "subjects", label: "科目管理", helper: "已开通科目", count: subjects.length },
-    { key: "categories", label: "分组管理", helper: "当前分组", count: categories?.total ?? 0 },
-    { key: "grades", label: "阶段管理", helper: "学习阶段", count: grades?.total ?? 0 },
   ];
+  if (canManageSubjects) {
+    importTabItems.push({ key: "subjects", label: "科目管理", helper: "已开通科目", count: subjects.length });
+  }
+  if (canManageCatalog) {
+    importTabItems.push({ key: "categories", label: "分组管理", helper: "当前分组", count: categories?.total ?? 0 });
+  }
+  if (canManageGrades) {
+    importTabItems.push({ key: "grades", label: "阶段管理", helper: "学习阶段", count: grades?.total ?? 0 });
+  }
 
   const catalogTabItems: Array<WorkspaceTabItem<CatalogWorkspaceTab>> = [
     { key: "word-create", label: "新增词条", helper: "手动录入内容" },
     { key: "words", label: "词库内容", helper: "筛选与批量整理", count: words?.total ?? 0 },
-    { key: "categories", label: "内容分组", helper: "分类与批量处理", count: categories?.total ?? 0 },
-    { key: "grades", label: "学习阶段", helper: "阶段筛选管理", count: grades?.total ?? 0 },
   ];
+  if (canManageCatalog) {
+    catalogTabItems.push({ key: "categories", label: "内容分组", helper: "分类与批量处理", count: categories?.total ?? 0 });
+  }
+  if (canManageGrades) {
+    catalogTabItems.push({ key: "grades", label: "学习阶段", helper: "阶段筛选管理", count: grades?.total ?? 0 });
+  }
 
   const paymentTabItems: Array<{ key: PaymentWorkspaceTab; label: string; helper: string; count?: number; hidden?: boolean }> = [
     { key: "plan-setup", label: "方案操作", helper: canManagePlans ? "新增与调整入口" : "查看说明" },
@@ -4019,92 +4057,52 @@ function startEditLearner(item: AdminLearnerUser) {
 
                 {activeImportTab === "subjects" ? (
                   <div className="import-panel-stack">
-                    <article className="content-card import-panel-card">
-                      <div className="section-toolbar">
-                        <div>
-                          <h2>新增学习科目</h2>
-                          <p className="helper-text">用于管理前台学科入口和导入归属科目。</p>
-                        </div>
-                      </div>
-                      <form className="setup-form" onSubmit={handleSaveSubject}>
-                        <label className="form-field">
-                          <span>科目编码</span>
-                          <input
-                            value={subjectForm.key}
-                            onChange={(event) => {
-                              setSubjectForm((current) => ({ ...current, key: event.target.value }));
-                            }}
-                            placeholder="english"
-                          />
-                        </label>
-                        <label className="form-field">
-                          <span>前台展示名称</span>
-                          <input
-                            value={subjectForm.name}
-                            onChange={(event) => {
-                              setSubjectForm((current) => ({ ...current, name: event.target.value }));
-                            }}
-                            placeholder="英语高频词汇"
-                          />
-                        </label>
-                        <label className="form-field">
-                          <span>显示顺序</span>
-                          <input
-                            inputMode="numeric"
-                            value={subjectForm.sort}
-                            onChange={(event) => {
-                              setSubjectForm((current) => ({ ...current, sort: event.target.value }));
-                            }}
-                            placeholder="0"
-                          />
-                        </label>
-                        <label className="form-field">
-                          <span>科目简介</span>
-                          <textarea
-                            rows={3}
-                            value={subjectForm.description}
-                            onChange={(event) => {
-                              setSubjectForm((current) => ({ ...current, description: event.target.value }));
-                            }}
-                          />
-                        </label>
-                        <label className="checkbox-field">
-                          <input
-                            checked={subjectForm.featured}
-                            onChange={(event) => {
-                              setSubjectForm((current) => ({ ...current, featured: event.target.checked }));
-                            }}
-                            type="checkbox"
-                          />
-                          <span>前台优先展示这个科目</span>
-                        </label>
-                        <div className="button-row">
-                          <button className="primary-button" disabled={busyAction === "subject"} type="submit">
-                            {busyAction === "subject" ? "保存中..." : "新增科目"}
-                          </button>
-                          <button className="secondary-button" onClick={resetSubjectEditor} type="button">
-                            清空表单
-                          </button>
-                        </div>
-                      </form>
-                    </article>
-
                     <div className="table-section import-panel-table">
                       <div className="section-toolbar">
-                        <h2>已开通科目</h2>
+                        <div>
+                          <h2>已开通科目</h2>
+                          <p className="helper-text">集中管理前台学科入口和导入归属科目，新增与编辑统一通过弹窗处理。</p>
+                        </div>
+                        {canManageSubjects ? (
+                          <div className="toolbar-controls">
+                            <button className="primary-button" onClick={openCreateSubjectModal} type="button">
+                              新增科目
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                       <DataTable
                         columns={["科目名称", "科目编码", "显示顺序", "首页优先", "科目说明", "操作"]}
-                        rows={subjects.map((subject) => [
-                          subject.name,
-                          subject.key,
-                          subject.sort,
-                          subject.featured ? "是" : "否",
-                          subject.description || "-",
-                          <button className="secondary-button small-button" onClick={() => startEditSubject(subject)} type="button">
-                            编辑
-                          </button>,
-                        ])}
+                        rows={subjects.map((subject) => {
+                          const deleteActionBusy = subject.id ? busyAction === `subject-delete-${subject.id}` : false;
+                          return [
+                            subject.name,
+                            subject.key,
+                            subject.sort,
+                            subject.featured ? "是" : "否",
+                            subject.description || "-",
+                            <div className="button-row" key={`subject-actions-${subject.id ?? subject.key}`}>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={!canManageSubjects || deleteActionBusy}
+                                onClick={() => startEditSubject(subject)}
+                                type="button"
+                              >
+                                编辑
+                              </button>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={!canManageSubjects || deleteActionBusy || !subject.id}
+                                onClick={() => {
+                                  void handleDeleteSubject(subject);
+                                }}
+                                type="button"
+                              >
+                                {deleteActionBusy ? "删除中..." : "删除"}
+                              </button>
+                            </div>,
+                          ];
+                        })}
                         emptyText="当前还没有开通任何学习科目。"
                       />
                     </div>
@@ -4113,138 +4111,64 @@ function startEditLearner(item: AdminLearnerUser) {
 
                 {activeImportTab === "categories" ? (
                   <div className="import-panel-stack">
-                    <article className="content-card import-panel-card">
-                      <div className="section-toolbar">
-                        <div>
-                          <h2>新增内容分组</h2>
-                          <p className="helper-text">内容分组会影响词库展示和批量导入后的分类归属。</p>
-                        </div>
-                      </div>
-                      <form className="setup-form" onSubmit={handleSaveCategory}>
-                        <label className="form-field">
-                          <span>归属科目</span>
-                          <select
-                            value={categoryForm.subjectKey}
-                            onChange={(event) => {
-                              setCategoryForm((current) => ({ ...current, subjectKey: event.target.value }));
-                            }}
-                          >
-                            {subjects.map((subject) => (
-                              <option key={subject.key} value={subject.key}>
-                                {subject.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="form-field">
-                          <span>分组类型</span>
-                          <input
-                            value={categoryForm.kind}
-                            onChange={(event) => {
-                              setCategoryForm((current) => ({ ...current, kind: event.target.value }));
-                            }}
-                            placeholder="topic"
-                          />
-                        </label>
-                        <label className="form-field">
-                          <span>分组编码</span>
-                          <input
-                            value={categoryForm.key}
-                            onChange={(event) => {
-                              setCategoryForm((current) => ({ ...current, key: event.target.value }));
-                            }}
-                            placeholder="travel"
-                          />
-                        </label>
-                        <label className="form-field">
-                          <span>前台展示名称</span>
-                          <input
-                            value={categoryForm.name}
-                            onChange={(event) => {
-                              setCategoryForm((current) => ({ ...current, name: event.target.value }));
-                            }}
-                            placeholder="旅行场景"
-                          />
-                        </label>
-                        <div className="form-grid-two">
-                          <label className="form-field">
-                            <span>显示顺序</span>
-                            <input
-                              inputMode="numeric"
-                              value={categoryForm.sort}
-                              onChange={(event) => {
-                                setCategoryForm((current) => ({ ...current, sort: event.target.value }));
-                              }}
-                              placeholder="0"
-                            />
-                          </label>
-                          <label className="form-field">
-                            <span>当前状态</span>
-                            <select
-                              value={categoryForm.enabled ? "enabled" : "disabled"}
-                              onChange={(event) => {
-                                setCategoryForm((current) => ({
-                                  ...current,
-                                  enabled: event.target.value === "enabled",
-                                }));
-                              }}
-                            >
-                              <option value="enabled">启用</option>
-                              <option value="disabled">停用</option>
-                            </select>
-                          </label>
-                        </div>
-                        <label className="form-field">
-                          <span>分组说明</span>
-                          <textarea
-                            rows={3}
-                            value={categoryForm.description}
-                            onChange={(event) => {
-                              setCategoryForm((current) => ({ ...current, description: event.target.value }));
-                            }}
-                          />
-                        </label>
-                        <div className="button-row">
-                          <button className="primary-button" disabled={busyAction === "category"} type="submit">
-                            {busyAction === "category" ? "保存中..." : "新增分组"}
-                          </button>
-                          <button className="secondary-button" onClick={resetCategoryEditor} type="button">
-                            清空表单
-                          </button>
-                        </div>
-                      </form>
-                    </article>
-
                     <div className="table-section import-panel-table">
                       <div className="section-toolbar">
-                        <h2>内容分组列表</h2>
-                        <input
-                          className="toolbar-search"
-                          value={categoryQuery}
-                          onChange={(event) => {
-                            setCategoryQuery(event.target.value);
-                            setCategoryPage(1);
-                          }}
-                          placeholder="搜索分组名称"
-                        />
+                        <div>
+                          <h2>内容分组列表</h2>
+                          <p className="helper-text">管理词库分类归属，新增与编辑都通过弹窗处理，列表操作更轻量。</p>
+                        </div>
+                        <div className="toolbar-controls">
+                          {canManageCatalog ? (
+                            <button className="primary-button" onClick={openCreateCategoryModal} type="button">
+                              新增分组
+                            </button>
+                          ) : null}
+                          <input
+                            className="toolbar-search"
+                            value={categoryQuery}
+                            onChange={(event) => {
+                              setCategoryQuery(event.target.value);
+                              setCategoryPage(1);
+                            }}
+                            placeholder="搜索分组名称"
+                          />
+                        </div>
                       </div>
                       <DataTable
                         columns={["名称", "分组编码", "所属科目", "分组类型", "状态", "操作"]}
-                        rows={(categories?.items ?? []).map((item) => [
-                          item.name,
-                          item.key,
-                          formatSubjectLabel(item.subject_key || ""),
-                          item.kind,
-                          item.enabled ? "启用" : "停用",
-                          <div className="button-row" key={`category-actions-${item.id}`}>
-                            <button className="secondary-button small-button" onClick={() => startEditCategory(item)} type="button">
-                              编辑
-                            </button>
-                            <button className="secondary-button small-button" onClick={() => focusWordsByClassification(item.name)} type="button">
-                              查看词库
-                            </button>
-                          </div>,
-                        ])}
+                        rows={(categories?.items ?? []).map((item) => {
+                          const deleteActionBusy = busyAction === `category-delete-${item.id}`;
+                          return [
+                            item.name,
+                            item.key,
+                            formatSubjectLabel(item.subject_key || ""),
+                            item.kind,
+                            item.enabled ? "启用" : "停用",
+                            <div className="button-row" key={`category-actions-${item.id}`}>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={!canManageCatalog || deleteActionBusy}
+                                onClick={() => startEditCategory(item)}
+                                type="button"
+                              >
+                                编辑
+                              </button>
+                              <button className="secondary-button small-button" onClick={() => focusWordsByClassification(item.name)} type="button">
+                                查看词库
+                              </button>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={!canManageCatalog || deleteActionBusy}
+                                onClick={() => {
+                                  void handleDeleteCategory(item);
+                                }}
+                                type="button"
+                              >
+                                {deleteActionBusy ? "删除中..." : "删除"}
+                              </button>
+                            </div>,
+                          ];
+                        })}
                         emptyText="当前还没有符合条件的内容分组。"
                       />
                       <PagerControls
@@ -4259,117 +4183,60 @@ function startEditLearner(item: AdminLearnerUser) {
 
                 {activeImportTab === "grades" ? (
                   <div className="import-panel-stack">
-                    <article className="content-card import-panel-card">
-                      <div className="section-toolbar">
-                        <div>
-                          <h2>新增学习阶段</h2>
-                          <p className="helper-text">学习阶段用于组织词库的适用范围和后台筛选维度。</p>
-                        </div>
-                      </div>
-                      <form className="setup-form" onSubmit={handleSaveGrade}>
-                        <label className="form-field">
-                          <span>阶段编码</span>
-                          <input
-                            value={gradeForm.key}
-                            onChange={(event) => {
-                              setGradeForm((current) => ({ ...current, key: event.target.value }));
-                            }}
-                            placeholder="junior-1"
-                          />
-                        </label>
-                        <label className="form-field">
-                          <span>阶段名称</span>
-                          <input
-                            value={gradeForm.name}
-                            onChange={(event) => {
-                              setGradeForm((current) => ({ ...current, name: event.target.value }));
-                            }}
-                            placeholder="初一"
-                          />
-                        </label>
-                        <label className="form-field">
-                          <span>阶段类型</span>
-                          <input
-                            value={gradeForm.stage}
-                            onChange={(event) => {
-                              setGradeForm((current) => ({ ...current, stage: event.target.value }));
-                            }}
-                            placeholder="junior"
-                          />
-                        </label>
-                        <div className="form-grid-two">
-                          <label className="form-field">
-                            <span>显示顺序</span>
-                            <input
-                              inputMode="numeric"
-                              value={gradeForm.sort}
-                              onChange={(event) => {
-                                setGradeForm((current) => ({ ...current, sort: event.target.value }));
-                              }}
-                              placeholder="0"
-                            />
-                          </label>
-                          <label className="form-field">
-                            <span>当前状态</span>
-                            <select
-                              value={gradeForm.enabled ? "enabled" : "disabled"}
-                              onChange={(event) => {
-                                setGradeForm((current) => ({
-                                  ...current,
-                                  enabled: event.target.value === "enabled",
-                                }));
-                              }}
-                            >
-                              <option value="enabled">启用</option>
-                              <option value="disabled">停用</option>
-                            </select>
-                          </label>
-                        </div>
-                        <label className="form-field">
-                          <span>阶段说明</span>
-                          <textarea
-                            rows={3}
-                            value={gradeForm.description}
-                            onChange={(event) => {
-                              setGradeForm((current) => ({ ...current, description: event.target.value }));
-                            }}
-                          />
-                        </label>
-                        <div className="button-row">
-                          <button className="primary-button" disabled={busyAction === "grade"} type="submit">
-                            {busyAction === "grade" ? "保存中..." : "新增阶段"}
-                          </button>
-                          <button className="secondary-button" onClick={resetGradeEditor} type="button">
-                            清空表单
-                          </button>
-                        </div>
-                      </form>
-                    </article>
-
                     <div className="table-section import-panel-table">
                       <div className="section-toolbar">
-                        <h2>学习阶段列表</h2>
-                        <input
-                          className="toolbar-search"
-                          value={gradeQuery}
-                          onChange={(event) => {
-                            setGradeQuery(event.target.value);
-                            setGradePage(1);
-                          }}
-                          placeholder="搜索阶段名称"
-                        />
+                        <div>
+                          <h2>学习阶段列表</h2>
+                          <p className="helper-text">集中维护筛选阶段和展示顺序，新增与编辑都走弹窗，列表视图更清爽。</p>
+                        </div>
+                        <div className="toolbar-controls">
+                          {canManageGrades ? (
+                            <button className="primary-button" onClick={openCreateGradeModal} type="button">
+                              新增阶段
+                            </button>
+                          ) : null}
+                          <input
+                            className="toolbar-search"
+                            value={gradeQuery}
+                            onChange={(event) => {
+                              setGradeQuery(event.target.value);
+                              setGradePage(1);
+                            }}
+                            placeholder="搜索阶段名称"
+                          />
+                        </div>
                       </div>
                       <DataTable
                         columns={["名称", "编码", "阶段类型", "启用", "操作"]}
-                        rows={(grades?.items ?? []).map((item) => [
-                          item.name,
-                          item.key,
-                          item.stage || "-",
-                          item.enabled ? "是" : "否",
-                          <button className="secondary-button small-button" onClick={() => startEditGrade(item)} type="button">
-                            编辑
-                          </button>,
-                        ])}
+                        rows={(grades?.items ?? []).map((item) => {
+                          const deleteActionBusy = busyAction === `grade-delete-${item.id}`;
+                          return [
+                            item.name,
+                            item.key,
+                            item.stage || "-",
+                            item.enabled ? "是" : "否",
+                            <div className="button-row" key={`grade-actions-${item.id}`}>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={!canManageGrades || deleteActionBusy}
+                                onClick={() => startEditGrade(item)}
+                                type="button"
+                              >
+                                编辑
+                              </button>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={!canManageGrades || deleteActionBusy}
+                                onClick={() => {
+                                  void handleDeleteGrade(item);
+                                }}
+                                type="button"
+                              >
+                                {deleteActionBusy ? "删除中..." : "删除"}
+                              </button>
+                            </div>,
+                          ];
+                        })}
                         emptyText="当前还没有符合条件的学习阶段。"
                       />
                       <PagerControls
@@ -4702,63 +4569,89 @@ function startEditLearner(item: AdminLearnerUser) {
                           <h2>内容分组列表</h2>
                           <p className="helper-text">这里集中做分组筛选、编辑和按分组查看词库内容。</p>
                         </div>
-                        <input
-                          className="toolbar-search"
-                          value={categoryQuery}
-                          onChange={(event) => {
-                            setCategoryQuery(event.target.value);
-                            setCategoryPage(1);
-                          }}
-                          placeholder="搜索分组名称"
-                        />
+                        <div className="toolbar-controls">
+                          {canManageCatalog ? (
+                            <button className="primary-button" onClick={openCreateCategoryModal} type="button">
+                              新增分组
+                            </button>
+                          ) : null}
+                          <input
+                            className="toolbar-search"
+                            value={categoryQuery}
+                            onChange={(event) => {
+                              setCategoryQuery(event.target.value);
+                              setCategoryPage(1);
+                            }}
+                            placeholder="搜索分组名称"
+                          />
+                        </div>
                       </div>
                       <DataTable
                         columns={["名称", "分组编码", "所属科目", "分组类型", "状态", "操作"]}
-                        rows={(categories?.items ?? []).map((item) => [
-                          item.name,
-                          item.key,
-                          formatSubjectLabel(item.subject_key || ""),
-                          item.kind,
-                          item.enabled ? "启用" : "停用",
-                          <div className="button-row" key={`category-actions-${item.id}`}>
-                            <button className="secondary-button small-button" onClick={() => startEditCategory(item)} type="button">
-                              编辑
-                            </button>
-                            <button className="secondary-button small-button" onClick={() => focusWordsByClassification(item.name)} type="button">
-                              查看单词
-                            </button>
-                            <button
-                              className="secondary-button small-button"
-                              disabled={busyAction === "word-batch-vip"}
-                              onClick={() =>
-                                void handleBatchUpdateWordVIP({
-                                  categoryId: item.id,
-                                  classification: item.name,
-                                  label: item.name,
-                                  isVIP: true,
-                                })
-                              }
-                              type="button"
-                            >
-                              设为会员
-                            </button>
-                            <button
-                              className="secondary-button small-button"
-                              disabled={busyAction === "word-batch-vip"}
-                              onClick={() =>
-                                void handleBatchUpdateWordVIP({
-                                  categoryId: item.id,
-                                  classification: item.name,
-                                  label: item.name,
-                                  isVIP: false,
-                                })
-                              }
-                              type="button"
-                            >
-                              设为普通
-                            </button>
-                          </div>,
-                        ])}
+                        rows={(categories?.items ?? []).map((item) => {
+                          const deleteActionBusy = busyAction === `category-delete-${item.id}`;
+                          const batchBusy = busyAction === "word-batch-vip";
+                          return [
+                            item.name,
+                            item.key,
+                            formatSubjectLabel(item.subject_key || ""),
+                            item.kind,
+                            item.enabled ? "启用" : "停用",
+                            <div className="button-row" key={`category-actions-${item.id}`}>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={!canManageCatalog || deleteActionBusy || batchBusy}
+                                onClick={() => startEditCategory(item)}
+                                type="button"
+                              >
+                                编辑
+                              </button>
+                              <button className="secondary-button small-button" onClick={() => focusWordsByClassification(item.name)} type="button">
+                                查看单词
+                              </button>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={!canManageCatalog || deleteActionBusy || batchBusy}
+                                onClick={() =>
+                                  void handleBatchUpdateWordVIP({
+                                    categoryId: item.id,
+                                    classification: item.name,
+                                    label: item.name,
+                                    isVIP: true,
+                                  })
+                                }
+                                type="button"
+                              >
+                                设为会员
+                              </button>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={!canManageCatalog || deleteActionBusy || batchBusy}
+                                onClick={() =>
+                                  void handleBatchUpdateWordVIP({
+                                    categoryId: item.id,
+                                    classification: item.name,
+                                    label: item.name,
+                                    isVIP: false,
+                                  })
+                                }
+                                type="button"
+                              >
+                                设为普通
+                              </button>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={!canManageCatalog || deleteActionBusy || batchBusy}
+                                onClick={() => {
+                                  void handleDeleteCategory(item);
+                                }}
+                                type="button"
+                              >
+                                {deleteActionBusy ? "删除中..." : "删除"}
+                              </button>
+                            </div>,
+                          ];
+                        })}
                         emptyText="当前还没有符合条件的内容分组。"
                       />
                       <PagerControls
@@ -4779,27 +4672,54 @@ function startEditLearner(item: AdminLearnerUser) {
                           <h2>学习阶段列表</h2>
                           <p className="helper-text">集中维护阶段维度，便于词库筛选和内容标注。</p>
                         </div>
-                        <input
-                          className="toolbar-search"
-                          value={gradeQuery}
-                          onChange={(event) => {
-                            setGradeQuery(event.target.value);
-                            setGradePage(1);
-                          }}
-                          placeholder="搜索阶段名称"
-                        />
+                        <div className="toolbar-controls">
+                          {canManageGrades ? (
+                            <button className="primary-button" onClick={openCreateGradeModal} type="button">
+                              新增阶段
+                            </button>
+                          ) : null}
+                          <input
+                            className="toolbar-search"
+                            value={gradeQuery}
+                            onChange={(event) => {
+                              setGradeQuery(event.target.value);
+                              setGradePage(1);
+                            }}
+                            placeholder="搜索阶段名称"
+                          />
+                        </div>
                       </div>
                       <DataTable
                         columns={["名称", "编码", "阶段类型", "启用", "操作"]}
-                        rows={(grades?.items ?? []).map((item) => [
-                          item.name,
-                          item.key,
-                          item.stage || "-",
-                          item.enabled ? "是" : "否",
-                          <button className="secondary-button small-button" onClick={() => startEditGrade(item)} type="button">
-                            编辑
-                          </button>,
-                        ])}
+                        rows={(grades?.items ?? []).map((item) => {
+                          const deleteActionBusy = busyAction === `grade-delete-${item.id}`;
+                          return [
+                            item.name,
+                            item.key,
+                            item.stage || "-",
+                            item.enabled ? "是" : "否",
+                            <div className="button-row" key={`grade-actions-${item.id}`}>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={!canManageGrades || deleteActionBusy}
+                                onClick={() => startEditGrade(item)}
+                                type="button"
+                              >
+                                编辑
+                              </button>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={!canManageGrades || deleteActionBusy}
+                                onClick={() => {
+                                  void handleDeleteGrade(item);
+                                }}
+                                type="button"
+                              >
+                                {deleteActionBusy ? "删除中..." : "删除"}
+                              </button>
+                            </div>,
+                          ];
+                        })}
                         emptyText="当前还没有符合条件的学习阶段。"
                       />
                       <PagerControls
@@ -7182,9 +7102,9 @@ function startEditLearner(item: AdminLearnerUser) {
                   <div>
                     <p className="section-eyebrow">当前页编辑</p>
                     <h2 id="content-edit-modal-title">
-                      {contentEditModal === "subject" ? "编辑学习科目" : null}
-                      {contentEditModal === "category" ? "编辑内容分组" : null}
-                      {contentEditModal === "grade" ? "编辑学习阶段" : null}
+                      {contentEditModal === "subject" ? (subjectForm.id > 0 ? "编辑学习科目" : "新增学习科目") : null}
+                      {contentEditModal === "category" ? (categoryForm.id > 0 ? "编辑内容分组" : "新增内容分组") : null}
+                      {contentEditModal === "grade" ? (gradeForm.id > 0 ? "编辑学习阶段" : "新增学习阶段") : null}
                       {contentEditModal === "word" ? "编辑单词内容" : null}
                     </h2>
                   </div>
@@ -7247,8 +7167,8 @@ function startEditLearner(item: AdminLearnerUser) {
                       <span>前台优先展示这个科目</span>
                     </label>
                     <div className="button-row">
-                      <button className="primary-button" disabled={busyAction === "subject"} type="submit">
-                        {busyAction === "subject" ? "保存中..." : "保存科目"}
+                      <button className="primary-button" disabled={!canManageSubjects || busyAction === "subject"} type="submit">
+                        {busyAction === "subject" ? "保存中..." : subjectForm.id > 0 ? "保存科目" : "创建科目"}
                       </button>
                       <button className="secondary-button" onClick={closeContentEditModal} type="button">
                         取消
@@ -7343,8 +7263,8 @@ function startEditLearner(item: AdminLearnerUser) {
                       />
                     </label>
                     <div className="button-row">
-                      <button className="primary-button" disabled={busyAction === "category"} type="submit">
-                        {busyAction === "category" ? "保存中..." : "保存分组"}
+                      <button className="primary-button" disabled={!canManageCatalog || busyAction === "category"} type="submit">
+                        {busyAction === "category" ? "保存中..." : categoryForm.id > 0 ? "保存分组" : "创建分组"}
                       </button>
                       <button className="secondary-button" onClick={closeContentEditModal} type="button">
                         取消
@@ -7424,8 +7344,8 @@ function startEditLearner(item: AdminLearnerUser) {
                       />
                     </label>
                     <div className="button-row">
-                      <button className="primary-button" disabled={busyAction === "grade"} type="submit">
-                        {busyAction === "grade" ? "保存中..." : "保存阶段"}
+                      <button className="primary-button" disabled={!canManageGrades || busyAction === "grade"} type="submit">
+                        {busyAction === "grade" ? "保存中..." : gradeForm.id > 0 ? "保存阶段" : "创建阶段"}
                       </button>
                       <button className="secondary-button" onClick={closeContentEditModal} type="button">
                         取消

@@ -2674,26 +2674,6 @@ export default function PublicSite() {
                     </a>
                     <a
                       className="site-account-dropdown-link"
-                      href="#profile-knowledge-base"
-                      onClick={() => {
-                        setAccountMenuOpen(false);
-                      }}
-                      role="menuitem"
-                    >
-                      我的知识库
-                    </a>
-                    <a
-                      className="site-account-dropdown-link"
-                      href="#profile-api-tools"
-                      onClick={() => {
-                        setAccountMenuOpen(false);
-                      }}
-                      role="menuitem"
-                    >
-                      API 工具
-                    </a>
-                    <a
-                      className="site-account-dropdown-link"
                       href="#mcp-market"
                       onClick={() => {
                         setAccountMenuOpen(false);
@@ -2701,46 +2681,6 @@ export default function PublicSite() {
                       role="menuitem"
                     >
                       MCP 工具市场
-                    </a>
-                    <a
-                      className="site-account-dropdown-link"
-                      href="#profile-xiaomi"
-                      onClick={() => {
-                        setAccountMenuOpen(false);
-                      }}
-                      role="menuitem"
-                    >
-                      米家智能
-                    </a>
-                    <a
-                      className="site-account-dropdown-link"
-                      href="#profile-invite"
-                      onClick={() => {
-                        setAccountMenuOpen(false);
-                      }}
-                      role="menuitem"
-                    >
-                      邀请好友
-                    </a>
-                    <a
-                      className="site-account-dropdown-link"
-                      href="#profile-orders"
-                      onClick={() => {
-                        setAccountMenuOpen(false);
-                      }}
-                      role="menuitem"
-                    >
-                      购买记录
-                    </a>
-                    <a
-                      className="site-account-dropdown-link"
-                      href="#profile-insights"
-                      onClick={() => {
-                        setAccountMenuOpen(false);
-                      }}
-                      role="menuitem"
-                    >
-                      学习进度
                     </a>
                     <a
                       className="site-account-dropdown-link"
