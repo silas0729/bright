@@ -159,7 +159,7 @@ func (s *Server) handleLearnerMCPEndpointTools(c *gin.Context) {
 		return
 	}
 
-	endpoint, tools, err := mcp.EndpointToolsForLearner(c.Request.Context(), s.mcpServer, claims.UserID, uint(endpointID))
+	endpoint, tools, err := mcp.EndpointToolsForLearner(c.Request.Context(), s.mcpServer, claims.UserID, uint(endpointID), c.Query("subject"))
 	if err != nil {
 		writeError(c, http.StatusBadGateway, err)
 		return

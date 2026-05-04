@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -127,6 +128,12 @@ func (s *Server) HandleInfo(c *gin.Context) {
 
 	exampleSubject := firstNonEmpty(strings.TrimSpace(c.Query("subject")), "english")
 	websocketURL := fmt.Sprintf("%s://%s/mcp?subject=%s&token={learner_access_token}", scheme, host, exampleSubject)
+	session, err := s.authenticateOptionalRequest(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	toolItems := s.tools(c.Request.Context(), session)
 
 	c.JSON(http.StatusOK, gin.H{
 		"name":             serverName,
@@ -135,12 +142,19 @@ func (s *Server) HandleInfo(c *gin.Context) {
 		"websocketPath":    "/mcp",
 		"websocketURL":     websocketURL,
 		"availableMethods": []string{"initialize", "ping", "tools/list", "tools/call"},
-		"tools":            s.tools(),
+		"toolCount":        len(toolItems),
+		"tools":            toolItems,
 		"auth": gin.H{
-			"mode":               "learner_bearer_or_query_token",
-			"queryTokenParam":    "token",
-			"querySubjectParam":  "subject",
-			"requiresMembership": true,
+			"mode":                 "learner_bearer_or_query_token",
+			"queryTokenParam":      "token",
+			"querySubjectParam":    "subject",
+			"tokenOptionalForInfo": true,
+			"requiresMembership":   true,
+		},
+		"viewer": gin.H{
+			"isAuthenticated": session != nil && strings.TrimSpace(session.Username) != "",
+			"username":        firstNonEmpty(session.Username, ""),
+			"subjectKey":      firstNonEmpty(session.SubjectKey, exampleSubject),
 		},
 		"examples": gin.H{
 			"headerAuthURL": websocketURL[:strings.LastIndex(websocketURL, "&token=")],
@@ -179,6 +193,19 @@ func (s *Server) HandleInfo(c *gin.Context) {
 			},
 		},
 	})
+}
+
+// HandleToolMarket returns a paged MCP tool market response for the public site.
+func (s *Server) HandleToolMarket(c *gin.Context) {
+	session, err := s.authenticateOptionalRequest(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "12"))
+	c.JSON(http.StatusOK, s.toolMarket(c.Request.Context(), session, strings.TrimSpace(c.Query("q")), strings.TrimSpace(c.Query("category")), page, pageSize))
 }
 
 func (s *Server) keepAlive(conn *websocket.Conn, done <-chan struct{}) {
@@ -230,7 +257,7 @@ func (s *Server) handleRequest(ctx context.Context, session Session, req Request
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Result: ListToolsResult{
-				Tools: s.tools(),
+				Tools: s.tools(ctx, &session),
 			},
 		}
 	case "tools/call":
@@ -279,10 +306,11 @@ func (s *Server) handleRequest(ctx context.Context, session Session, req Request
 }
 
 type Session struct {
-	UserID     uint
-	Username   string
-	SubjectKey string
-	Token      string
+	UserID      uint
+	Username    string
+	SubjectKey  string
+	Token       string
+	HTTPBaseURL string
 }
 
 func (s *Server) authenticateRequest(c *gin.Context) (Session, error) {
@@ -302,11 +330,28 @@ func (s *Server) authenticateRequest(c *gin.Context) (Session, error) {
 	}
 
 	return Session{
-		UserID:     claims.UserID,
-		Username:   claims.Username,
-		SubjectKey: strings.TrimSpace(subjectKey),
-		Token:      token,
+		UserID:      claims.UserID,
+		Username:    claims.Username,
+		SubjectKey:  strings.TrimSpace(subjectKey),
+		Token:       token,
+		HTTPBaseURL: requestHTTPBaseURL(c.Request),
 	}, nil
+}
+
+func (s *Server) authenticateOptionalRequest(c *gin.Context) (*Session, error) {
+	subjectKey := firstNonEmpty(c.Query("subject"), c.Query("subject_key"))
+	token := tokenFromRequest(c.Request)
+	if token == "" {
+		return &Session{
+			SubjectKey:  strings.TrimSpace(subjectKey),
+			HTTPBaseURL: requestHTTPBaseURL(c.Request),
+		}, nil
+	}
+	session, err := s.authenticateRequest(c)
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
 }
 
 func sessionForToolCall(session Session, req CallToolRequest) Session {
@@ -393,12 +438,15 @@ func decodeCallToolRequest(params interface{}) (CallToolRequest, error) {
 	return request, nil
 }
 
-func (s *Server) tools() []Tool {
-	return []Tool{
+func (s *Server) tools(ctx context.Context, session *Session) []Tool {
+	tools := []Tool{
 		{
 			Name:         "list_subjects",
 			Title:        "List Subjects",
 			Description:  "List all Brights subjects.",
+			Category:     "catalog",
+			SourceType:   "builtin",
+			Enabled:      true,
 			InputSchema:  objectSchema(nil),
 			OutputSchema: toolResultSchema,
 		},
@@ -406,6 +454,9 @@ func (s *Server) tools() []Tool {
 			Name:        "list_categories",
 			Title:       "List Categories",
 			Description: "List categories for a subject and kind.",
+			Category:    "catalog",
+			SourceType:  "builtin",
+			Enabled:     true,
 			InputSchema: objectSchema(map[string]interface{}{
 				"subject_key": map[string]interface{}{"type": "string", "description": "Optional subject key, for example english."},
 				"kind":        map[string]interface{}{"type": "string", "description": "Optional category kind, defaults to topic."},
@@ -416,6 +467,9 @@ func (s *Server) tools() []Tool {
 			Name:         "list_grades",
 			Title:        "List Grades",
 			Description:  "List all grade definitions.",
+			Category:     "catalog",
+			SourceType:   "builtin",
+			Enabled:      true,
 			InputSchema:  objectSchema(nil),
 			OutputSchema: toolResultSchema,
 		},
@@ -423,6 +477,9 @@ func (s *Server) tools() []Tool {
 			Name:        "search_words",
 			Title:       "Search Words",
 			Description: "Search and paginate Brights words.",
+			Category:    "catalog",
+			SourceType:  "builtin",
+			Enabled:     true,
 			InputSchema: objectSchema(map[string]interface{}{
 				"subject_key":    map[string]interface{}{"type": "string"},
 				"subject_id":     map[string]interface{}{"type": "integer"},
@@ -440,6 +497,9 @@ func (s *Server) tools() []Tool {
 			Name:        "list_classification_stats",
 			Title:       "List Classification Stats",
 			Description: "List classification statistics with pagination.",
+			Category:    "catalog",
+			SourceType:  "builtin",
+			Enabled:     true,
 			InputSchema: objectSchema(map[string]interface{}{
 				"subject_key": map[string]interface{}{"type": "string"},
 				"page":        map[string]interface{}{"type": "integer"},
@@ -451,6 +511,9 @@ func (s *Server) tools() []Tool {
 			Name:         "list_membership_plans",
 			Title:        "List Membership Plans",
 			Description:  "List Brights membership or payment plans.",
+			Category:     "membership",
+			SourceType:   "builtin",
+			Enabled:      true,
 			InputSchema:  objectSchema(nil),
 			OutputSchema: toolResultSchema,
 		},
@@ -458,13 +521,19 @@ func (s *Server) tools() []Tool {
 			Name:         "get_catalog_stats",
 			Title:        "Get Catalog Stats",
 			Description:  "Get overall Brights catalog statistics.",
+			Category:     "catalog",
+			SourceType:   "builtin",
+			Enabled:      true,
 			InputSchema:  objectSchema(nil),
 			OutputSchema: toolResultSchema,
 		},
 		{
 			Name:        "search_knowledge_base",
 			Title:       "Search Knowledge Base",
-			Description: "Search uploaded text or spreadsheet knowledge base content.",
+			Description: "Search uploaded text, spreadsheet, or Word knowledge base content.",
+			Category:    "knowledge",
+			SourceType:  "builtin",
+			Enabled:     true,
 			InputSchema: objectSchema(map[string]interface{}{
 				"subject_key": map[string]interface{}{"type": "string"},
 				"query":       map[string]interface{}{"type": "string", "description": "Knowledge base search keyword."},
@@ -474,7 +543,282 @@ func (s *Server) tools() []Tool {
 			}),
 			OutputSchema: toolResultSchema,
 		},
+		{
+			Name:        "list_my_knowledge_base_documents",
+			Title:       "List My Knowledge Base Documents",
+			Description: "List the current learner's uploaded text, spreadsheet, or Word knowledge base documents.",
+			Category:    "knowledge",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"subject_key": map[string]interface{}{"type": "string"},
+				"query":       map[string]interface{}{"type": "string"},
+				"q":           map[string]interface{}{"type": "string"},
+				"page":        map[string]interface{}{"type": "integer"},
+				"page_size":   map[string]interface{}{"type": "integer"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "view_knowledge_base_document",
+			Title:       "View Knowledge Base Document",
+			Description: "View chunks and original content for one uploaded knowledge base document.",
+			Category:    "knowledge",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"document_id": map[string]interface{}{"type": "integer"},
+				"page":        map[string]interface{}{"type": "integer"},
+				"page_size":   map[string]interface{}{"type": "integer"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "list_my_payment_orders",
+			Title:       "List My Payment Orders",
+			Description: "List the current learner's recharge or purchase records.",
+			Category:    "account",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"subject_key": map[string]interface{}{"type": "string"},
+				"status":      map[string]interface{}{"type": "string"},
+				"query":       map[string]interface{}{"type": "string"},
+				"q":           map[string]interface{}{"type": "string"},
+				"page":        map[string]interface{}{"type": "integer"},
+				"page_size":   map[string]interface{}{"type": "integer"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "list_my_memberships",
+			Title:       "List My Memberships",
+			Description: "List the current learner's membership records.",
+			Category:    "account",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"subject_key": map[string]interface{}{"type": "string"},
+				"status":      map[string]interface{}{"type": "string"},
+				"query":       map[string]interface{}{"type": "string"},
+				"q":           map[string]interface{}{"type": "string"},
+				"page":        map[string]interface{}{"type": "integer"},
+				"page_size":   map[string]interface{}{"type": "integer"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:         "get_invite_summary",
+			Title:        "Get Invite Summary",
+			Description:  "Get the current learner's invite code and invite statistics.",
+			Category:     "account",
+			SourceType:   "builtin",
+			Enabled:      true,
+			InputSchema:  objectSchema(nil),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:         "get_my_invite_payout_profile",
+			Title:        "Get Invite Payout Profile",
+			Description:  "Get the current learner's invite commission payout profile.",
+			Category:     "account",
+			SourceType:   "builtin",
+			Enabled:      true,
+			InputSchema:  objectSchema(nil),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "save_my_invite_payout_profile",
+			Title:       "Save Invite Payout Profile",
+			Description: "Create or update the current learner's invite commission payout profile.",
+			Category:    "account",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"real_name":      map[string]interface{}{"type": "string"},
+				"wechat_account": map[string]interface{}{"type": "string"},
+				"wechat_qr_code": map[string]interface{}{"type": "string"},
+				"alipay_account": map[string]interface{}{"type": "string"},
+				"alipay_qr_code": map[string]interface{}{"type": "string"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "list_my_invite_commissions",
+			Title:       "List Invite Commissions",
+			Description: "List the current learner's invite commission records.",
+			Category:    "account",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"status":    map[string]interface{}{"type": "string"},
+				"page":      map[string]interface{}{"type": "integer"},
+				"page_size": map[string]interface{}{"type": "integer"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "list_my_invite_withdraw_requests",
+			Title:       "List Invite Withdraw Requests",
+			Description: "List the current learner's invite commission withdraw requests.",
+			Category:    "account",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"status":    map[string]interface{}{"type": "string"},
+				"query":     map[string]interface{}{"type": "string"},
+				"q":         map[string]interface{}{"type": "string"},
+				"page":      map[string]interface{}{"type": "integer"},
+				"page_size": map[string]interface{}{"type": "integer"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "create_invite_withdraw_request",
+			Title:       "Create Invite Withdraw Request",
+			Description: "Create a withdraw request for the current learner's invite commissions.",
+			Category:    "account",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"amount_cents": map[string]interface{}{"type": "integer"},
+				"payment_type": map[string]interface{}{"type": "string", "description": "wechat or alipay."},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "cancel_invite_withdraw_request",
+			Title:       "Cancel Invite Withdraw Request",
+			Description: "Cancel a pending invite commission withdraw request for the current learner.",
+			Category:    "account",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"withdraw_request_id": map[string]interface{}{"type": "integer"},
+				"id":                  map[string]interface{}{"type": "integer"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "get_learning_summary",
+			Title:       "Get Learning Summary",
+			Description: "Get level counts, difficulty counts, and memory curve statistics for the current learner.",
+			Category:    "learning",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"subject_key": map[string]interface{}{"type": "string"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "list_learning_progress",
+			Title:       "List Learning Progress",
+			Description: "List tracked learning words with level, difficulty, and next review time.",
+			Category:    "learning",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"subject_key": map[string]interface{}{"type": "string"},
+				"query":       map[string]interface{}{"type": "string"},
+				"q":           map[string]interface{}{"type": "string"},
+				"level":       map[string]interface{}{"type": "string"},
+				"difficulty":  map[string]interface{}{"type": "string"},
+				"due_only":    map[string]interface{}{"type": "boolean"},
+				"page":        map[string]interface{}{"type": "integer"},
+				"page_size":   map[string]interface{}{"type": "integer"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "save_learning_word_progress",
+			Title:       "Save Learning Word Progress",
+			Description: "Create or update the current learner's level and difficulty for a word.",
+			Category:    "learning",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"word_id":     map[string]interface{}{"type": "integer"},
+				"subject_key": map[string]interface{}{"type": "string"},
+				"level":       map[string]interface{}{"type": "string"},
+				"difficulty":  map[string]interface{}{"type": "string"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
+		{
+			Name:        "review_learning_word",
+			Title:       "Review Learning Word",
+			Description: "Record whether the current learner remembered a word and schedule the next review.",
+			Category:    "learning",
+			SourceType:  "builtin",
+			Enabled:     true,
+			InputSchema: objectSchema(map[string]interface{}{
+				"word_id":     map[string]interface{}{"type": "integer"},
+				"subject_key": map[string]interface{}{"type": "string"},
+				"remembered":  map[string]interface{}{"type": "boolean"},
+				"level":       map[string]interface{}{"type": "string"},
+				"difficulty":  map[string]interface{}{"type": "string"},
+			}),
+			OutputSchema: toolResultSchema,
+		},
 	}
+	tools = append(tools, xiaomiBuiltinTools()...)
+	tools = append(tools, s.dynamicAPITools(ctx, session)...)
+
+	configMap, err := s.service.GetMCPToolConfigMap(ctx)
+	if err != nil {
+		return tools
+	}
+
+	hasMembership := false
+	if session != nil && strings.TrimSpace(session.Username) != "" && strings.TrimSpace(session.SubjectKey) != "" {
+		if allowed, accessErr := s.subjectMembershipAccess(ctx, *session); accessErr == nil {
+			hasMembership = allowed
+		}
+	}
+	hasSession := session != nil && strings.TrimSpace(session.Username) != ""
+
+	items := make([]Tool, 0, len(tools))
+	for _, tool := range tools {
+		localizedTitle, localizedDescription := domain.LocalizedMCPToolText(tool.Name, tool.Title, tool.Description)
+		if strings.TrimSpace(localizedTitle) != "" {
+			tool.Title = localizedTitle
+		}
+		if strings.TrimSpace(localizedDescription) != "" {
+			tool.Description = localizedDescription
+		}
+		tool.RequiresAuth = toolRequiresAuthenticatedSession(tool)
+		if config, ok := configMap[tool.Name]; ok {
+			if strings.TrimSpace(config.Title) != "" {
+				tool.Title = config.Title
+			}
+			if strings.TrimSpace(config.Description) != "" {
+				tool.Description = config.Description
+			}
+			if strings.TrimSpace(config.Category) != "" {
+				tool.Category = config.Category
+			}
+			if strings.TrimSpace(config.SourceType) != "" {
+				tool.SourceType = config.SourceType
+			}
+			tool.Enabled = config.IsEnabled
+			tool.RequiresMembership = config.RequiresMembership
+		}
+		if !tool.Enabled {
+			continue
+		}
+		switch {
+		case tool.RequiresAuth && !hasSession:
+			tool.CanUse = false
+		case tool.RequiresMembership:
+			tool.CanUse = hasMembership
+		default:
+			tool.CanUse = true
+		}
+		items = append(items, tool)
+	}
+
+	return items
 }
 
 func objectSchema(properties map[string]interface{}) map[string]interface{} {
@@ -492,6 +836,18 @@ func (s *Server) callTool(ctx context.Context, session Session, req CallToolRequ
 	hasMembership, err := s.subjectMembershipAccess(ctx, session)
 	if err != nil {
 		return CallToolResult{}, err
+	}
+	configMap, err := s.service.GetMCPToolConfigMap(ctx)
+	if err != nil {
+		return CallToolResult{}, err
+	}
+	if config, ok := configMap[canonicalName]; ok {
+		if !config.IsEnabled {
+			return CallToolResult{}, fmt.Errorf("tool %s is disabled by administrator", canonicalName)
+		}
+		if config.RequiresMembership && !hasMembership {
+			return CallToolResult{}, fmt.Errorf("membership required for tool %s", canonicalName)
+		}
 	}
 	switch canonicalName {
 	case "list_subjects":
@@ -534,20 +890,141 @@ func (s *Server) callTool(ctx context.Context, session Session, req CallToolRequ
 		return newToolResult(canonicalName, data, err)
 	case "search_knowledge_base":
 		data, err := s.service.SearchKnowledgeBase(ctx, domain.SearchKnowledgeBaseInput{
+			SubjectKey:    stringArg(req.Arguments, "subject_key", session.SubjectKey),
+			Query:         firstNonEmpty(stringArg(req.Arguments, "query", ""), stringArg(req.Arguments, "q", "")),
+			Page:          intArg(req.Arguments, "page", 1),
+			PageSize:      intArg(req.Arguments, "page_size", 10),
+			LearnerUserID: session.UserID,
+		})
+		return knowledgeBaseToolResult(canonicalName, data, err)
+	case "list_my_knowledge_base_documents":
+		data, err := s.service.ListKnowledgeBaseDocuments(ctx, domain.KnowledgeBaseDocumentFilter{
+			SubjectKey:         stringArg(req.Arguments, "subject_key", session.SubjectKey),
+			Query:              firstNonEmpty(stringArg(req.Arguments, "query", ""), stringArg(req.Arguments, "q", "")),
+			Page:               intArg(req.Arguments, "page", 1),
+			PageSize:           intArg(req.Arguments, "page_size", 20),
+			OnlyOwned:          true,
+			OwnerLearnerUserID: session.UserID,
+		})
+		return newToolResult(canonicalName, data, err)
+	case "view_knowledge_base_document":
+		data, err := s.service.ListLearnerKnowledgeBaseDocumentChunks(ctx, session.UserID, uint(intArg(req.Arguments, "document_id", 0)), domain.KnowledgeBaseChunkFilter{
+			Page:     intArg(req.Arguments, "page", 1),
+			PageSize: intArg(req.Arguments, "page_size", 200),
+		})
+		return newToolResult(canonicalName, data, err)
+	case "list_my_payment_orders":
+		data, err := s.service.ListLearnerPaymentOrders(ctx, session.Username, domain.PaymentOrderFilter{
 			SubjectKey: stringArg(req.Arguments, "subject_key", session.SubjectKey),
+			Status:     stringArg(req.Arguments, "status", ""),
 			Query:      firstNonEmpty(stringArg(req.Arguments, "query", ""), stringArg(req.Arguments, "q", "")),
 			Page:       intArg(req.Arguments, "page", 1),
 			PageSize:   intArg(req.Arguments, "page_size", 10),
 		})
 		return newToolResult(canonicalName, data, err)
+	case "list_my_memberships":
+		data, err := s.service.ListLearnerMemberships(ctx, session.Username, domain.SubscriptionFilter{
+			SubjectKey: stringArg(req.Arguments, "subject_key", session.SubjectKey),
+			Status:     stringArg(req.Arguments, "status", ""),
+			Query:      firstNonEmpty(stringArg(req.Arguments, "query", ""), stringArg(req.Arguments, "q", "")),
+			Page:       intArg(req.Arguments, "page", 1),
+			PageSize:   intArg(req.Arguments, "page_size", 10),
+		})
+		return newToolResult(canonicalName, data, err)
+	case "get_invite_summary":
+		data, err := s.service.GetInviteSummary(ctx, session.UserID)
+		return newToolResult(canonicalName, data, err)
+	case "get_my_invite_payout_profile":
+		data, err := s.service.GetInvitePayoutProfile(ctx, session.UserID)
+		return newToolResult(canonicalName, data, err)
+	case "save_my_invite_payout_profile":
+		data, err := s.service.SaveInvitePayoutProfile(ctx, session.UserID, domain.SaveInvitePayoutProfileInput{
+			RealName:      stringArg(req.Arguments, "real_name", ""),
+			WechatAccount: stringArg(req.Arguments, "wechat_account", ""),
+			WechatQRCode:  stringArg(req.Arguments, "wechat_qr_code", ""),
+			AlipayAccount: stringArg(req.Arguments, "alipay_account", ""),
+			AlipayQRCode:  stringArg(req.Arguments, "alipay_qr_code", ""),
+		})
+		return newToolResult(canonicalName, data, err)
+	case "list_my_invite_commissions":
+		data, err := s.service.ListInviteCommissionRecords(ctx, session.UserID, domain.InviteCommissionFilter{
+			Status:   stringArg(req.Arguments, "status", ""),
+			Page:     intArg(req.Arguments, "page", 1),
+			PageSize: intArg(req.Arguments, "page_size", 10),
+		})
+		return newToolResult(canonicalName, data, err)
+	case "list_my_invite_withdraw_requests":
+		data, err := s.service.ListInviteWithdrawRequests(ctx, session.UserID, domain.InviteWithdrawFilter{
+			Query:    firstNonEmpty(stringArg(req.Arguments, "query", ""), stringArg(req.Arguments, "q", "")),
+			Status:   stringArg(req.Arguments, "status", ""),
+			Page:     intArg(req.Arguments, "page", 1),
+			PageSize: intArg(req.Arguments, "page_size", 10),
+		})
+		return newToolResult(canonicalName, data, err)
+	case "create_invite_withdraw_request":
+		data, err := s.service.CreateInviteWithdrawRequest(ctx, session.UserID, domain.CreateInviteWithdrawRequestInput{
+			AmountCents: int64(intArg(req.Arguments, "amount_cents", 0)),
+			PaymentType: stringArg(req.Arguments, "payment_type", ""),
+		})
+		return newToolResult(canonicalName, data, err)
+	case "cancel_invite_withdraw_request":
+		requestID := intArg(req.Arguments, "withdraw_request_id", 0)
+		if requestID <= 0 {
+			requestID = intArg(req.Arguments, "id", 0)
+		}
+		err := s.service.CancelInviteWithdrawRequest(ctx, session.UserID, uint(requestID))
+		return newToolResult(canonicalName, map[string]interface{}{
+			"success":             err == nil,
+			"withdraw_request_id": requestID,
+		}, err)
+	case "get_learning_summary":
+		data, err := s.service.GetLearnerLearningSummary(ctx, session.UserID, stringArg(req.Arguments, "subject_key", session.SubjectKey))
+		return newToolResult(canonicalName, data, err)
+	case "list_learning_progress":
+		data, err := s.service.ListLearnerWordProgress(ctx, session.UserID, domain.LearnerWordProgressFilter{
+			SubjectKey: stringArg(req.Arguments, "subject_key", session.SubjectKey),
+			Query:      firstNonEmpty(stringArg(req.Arguments, "query", ""), stringArg(req.Arguments, "q", "")),
+			Level:      stringArg(req.Arguments, "level", ""),
+			Difficulty: stringArg(req.Arguments, "difficulty", ""),
+			Page:       intArg(req.Arguments, "page", 1),
+			PageSize:   intArg(req.Arguments, "page_size", 20),
+			DueOnly:    boolArg(req.Arguments, "due_only", false),
+		})
+		return newToolResult(canonicalName, data, err)
+	case "save_learning_word_progress":
+		data, err := s.service.SaveLearnerWordProgress(ctx, session.UserID, domain.SaveLearnerWordProgressInput{
+			WordID:     uint64(intArg(req.Arguments, "word_id", 0)),
+			SubjectKey: stringArg(req.Arguments, "subject_key", session.SubjectKey),
+			Level:      stringArg(req.Arguments, "level", ""),
+			Difficulty: stringArg(req.Arguments, "difficulty", ""),
+		})
+		return newToolResult(canonicalName, data, err)
+	case "review_learning_word":
+		data, err := s.service.ReviewLearnerWord(ctx, session.UserID, domain.ReviewLearnerWordInput{
+			WordID:     uint64(intArg(req.Arguments, "word_id", 0)),
+			SubjectKey: stringArg(req.Arguments, "subject_key", session.SubjectKey),
+			Remembered: boolArg(req.Arguments, "remembered", false),
+			Level:      stringArg(req.Arguments, "level", ""),
+			Difficulty: stringArg(req.Arguments, "difficulty", ""),
+		})
+		return newToolResult(canonicalName, data, err)
 	default:
+		if result, handled, err := s.handleXiaomiTool(ctx, session, req); handled {
+			return result, err
+		}
+		if result, handled, err := s.callDynamicAPITool(ctx, session, req); handled {
+			return result, err
+		}
 		return CallToolResult{}, fmt.Errorf("unknown tool: %s", req.Name)
 	}
 }
 
 func (s *Server) subjectMembershipAccess(ctx context.Context, session Session) (bool, error) {
-	if strings.TrimSpace(session.Username) == "" || strings.TrimSpace(session.SubjectKey) == "" {
+	if strings.TrimSpace(session.Username) == "" {
 		return false, nil
+	}
+	if strings.TrimSpace(session.SubjectKey) == "" {
+		return s.service.LearnerHasAnyActiveMembership(ctx, session.Username)
 	}
 	return s.service.LearnerHasActiveMembership(ctx, session.Username, session.SubjectKey)
 }
@@ -565,14 +1042,92 @@ func newToolResult(toolName string, data interface{}, err error) (CallToolResult
 	if formatErr != nil {
 		return CallToolResult{}, formatErr
 	}
+	text := string(formatted)
+	if optimized := formatToolText(toolName, data); optimized != "" {
+		text = optimized
+	}
 	return CallToolResult{
 		StructuredContent: payload,
 		Content: []Content{
 			{
 				Type: "text",
-				Text: string(formatted),
+				Text: text,
 			},
 		},
+	}, nil
+}
+
+func formatToolText(toolName string, data interface{}) string {
+	switch toolName {
+	case "search_knowledge_base":
+		result, ok := data.(domain.PagedKnowledgeBaseChunks)
+		if !ok {
+			return ""
+		}
+		var builder strings.Builder
+		builder.WriteString(fmt.Sprintf("Knowledge base hits: %d\n", result.Total))
+		for index, item := range result.Items {
+			builder.WriteString(fmt.Sprintf("\n%d. %s", index+1, firstNonEmpty(item.DocumentTitle, item.Title, "Untitled Document")))
+			if strings.TrimSpace(item.SourceFileName) != "" {
+				builder.WriteString(fmt.Sprintf("\n   source: %s", item.SourceFileName))
+			}
+			builder.WriteString(fmt.Sprintf("\n   chunk: #%d", item.ChunkIndex))
+			snippet := firstNonEmpty(item.HighlightedSnippet, item.Snippet, item.Content)
+			if strings.TrimSpace(snippet) != "" {
+				builder.WriteString(fmt.Sprintf("\n   snippet: %s\n", strings.TrimSpace(snippet)))
+			} else {
+				builder.WriteString("\n")
+			}
+		}
+		return strings.TrimSpace(builder.String())
+	default:
+		return ""
+	}
+}
+
+func knowledgeBaseToolResult(toolName string, data domain.PagedKnowledgeBaseChunks, err error) (CallToolResult, error) {
+	if err != nil {
+		return CallToolResult{}, err
+	}
+	hits := make([]map[string]interface{}, 0, len(data.Items))
+	for _, item := range data.Items {
+		hits = append(hits, map[string]interface{}{
+			"document_id":         item.DocumentID,
+			"document_title":      item.DocumentTitle,
+			"source_file_name":    item.SourceFileName,
+			"source_type":         item.SourceType,
+			"source_label":        firstNonEmpty(item.SourceFileName, item.DocumentTitle, item.Title),
+			"chunk_index":         item.ChunkIndex,
+			"snippet":             item.Snippet,
+			"highlighted_snippet": firstNonEmpty(item.HighlightedSnippet, item.Snippet),
+			"status":              item.Status,
+		})
+	}
+	payload := map[string]interface{}{
+		"success": true,
+		"tool":    toolName,
+		"result": map[string]interface{}{
+			"items":     data.Items,
+			"hits":      hits,
+			"total":     data.Total,
+			"page":      data.Page,
+			"page_size": data.PageSize,
+		},
+	}
+	text := formatToolText(toolName, data)
+	if text == "" {
+		formatted, formatErr := json.MarshalIndent(payload, "", "  ")
+		if formatErr != nil {
+			return CallToolResult{}, formatErr
+		}
+		text = string(formatted)
+	}
+	return CallToolResult{
+		StructuredContent: payload,
+		Content: []Content{{
+			Type: "text",
+			Text: text,
+		}},
 	}, nil
 }
 
@@ -618,8 +1173,60 @@ func canonicalToolName(name string) string {
 		return "get_catalog_stats"
 	case "search_knowledge_base", "brights_search_knowledge_base", "search_kb":
 		return "search_knowledge_base"
+	case "list_my_knowledge_base_documents", "my_knowledge_base_documents":
+		return "list_my_knowledge_base_documents"
+	case "view_knowledge_base_document", "knowledge_base_document_view":
+		return "view_knowledge_base_document"
+	case "list_my_payment_orders", "my_payment_orders", "brights_list_my_payment_orders":
+		return "list_my_payment_orders"
+	case "list_my_memberships", "my_memberships", "brights_list_my_memberships":
+		return "list_my_memberships"
+	case "get_invite_summary", "my_invite_summary", "brights_get_invite_summary":
+		return "get_invite_summary"
+	case "get_my_invite_payout_profile", "my_invite_payout_profile":
+		return "get_my_invite_payout_profile"
+	case "save_my_invite_payout_profile", "update_my_invite_payout_profile":
+		return "save_my_invite_payout_profile"
+	case "list_my_invite_commissions", "my_invite_commissions":
+		return "list_my_invite_commissions"
+	case "list_my_invite_withdraw_requests", "my_invite_withdraw_requests":
+		return "list_my_invite_withdraw_requests"
+	case "create_invite_withdraw_request", "my_create_invite_withdraw_request":
+		return "create_invite_withdraw_request"
+	case "cancel_invite_withdraw_request", "my_cancel_invite_withdraw_request":
+		return "cancel_invite_withdraw_request"
+	case "get_learning_summary", "my_learning_summary":
+		return "get_learning_summary"
+	case "list_learning_progress", "my_learning_progress":
+		return "list_learning_progress"
+	case "save_learning_word_progress", "update_learning_word_progress":
+		return "save_learning_word_progress"
+	case "review_learning_word", "remember_learning_word":
+		return "review_learning_word"
 	default:
 		return strings.TrimSpace(name)
+	}
+}
+
+func toolRequiresAuthenticatedSession(tool Tool) bool {
+	if strings.EqualFold(strings.TrimSpace(tool.SourceType), "api_config_personal") {
+		return true
+	}
+	switch canonicalToolName(tool.Name) {
+	case "list_my_knowledge_base_documents", "view_knowledge_base_document",
+		"list_my_payment_orders", "list_my_memberships", "get_invite_summary",
+		"get_my_invite_payout_profile", "save_my_invite_payout_profile",
+		"list_my_invite_commissions", "list_my_invite_withdraw_requests",
+		"create_invite_withdraw_request", "cancel_invite_withdraw_request",
+		"get_learning_summary", "list_learning_progress", "save_learning_word_progress", "review_learning_word",
+		"xiaomi_get_devices", "xiaomi_extract_tokens", "xiaomi_miot_prop_get", "xiaomi_miot_prop_set",
+		"xiaomi_miot_action", "xiaomi_miot_prop_get_batch", "xiaomi_find_device", "xiaomi_control_device",
+		"list_mijia_homes", "get_mijia_devices", "get_device_status", "control_device", "get_device_spec",
+		"mijia_list_devices", "mijia_get_caps", "mijia_switch_set", "mijia_sensor_get",
+		"mijia_position_set", "mijia_action_call", "mijia_hvac_set":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -703,4 +1310,105 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func (s *Server) toolMarket(ctx context.Context, session *Session, queryText, category string, page, pageSize int) ToolMarketResponse {
+	page, pageSize = normalizeToolMarketPage(page, pageSize)
+	tools := s.tools(ctx, session)
+	categories := toolMarketCategories(tools)
+
+	selectedCategory := strings.ToLower(strings.TrimSpace(category))
+	searchText := strings.ToLower(strings.TrimSpace(queryText))
+	filtered := make([]Tool, 0, len(tools))
+	for _, tool := range tools {
+		if selectedCategory != "" && strings.ToLower(strings.TrimSpace(tool.Category)) != selectedCategory {
+			continue
+		}
+		if searchText != "" {
+			haystack := strings.ToLower(strings.Join([]string{
+				tool.Title,
+				tool.Name,
+				tool.Description,
+				tool.Category,
+				tool.SourceType,
+			}, " "))
+			if !strings.Contains(haystack, searchText) {
+				continue
+			}
+		}
+		filtered = append(filtered, tool)
+	}
+
+	total := len(filtered)
+	start := (page - 1) * pageSize
+	if start > total {
+		start = total
+	}
+	end := start + pageSize
+	if end > total {
+		end = total
+	}
+
+	items := make([]Tool, 0, end-start)
+	if start < end {
+		items = append(items, filtered[start:end]...)
+	}
+
+	return ToolMarketResponse{
+		Items:      items,
+		Total:      total,
+		Page:       page,
+		PageSize:   pageSize,
+		Categories: categories,
+	}
+}
+
+func normalizeToolMarketPage(page, pageSize int) (int, int) {
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 12
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	return page, pageSize
+}
+
+func toolMarketCategories(tools []Tool) []string {
+	seen := make(map[string]struct{}, len(tools))
+	items := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		category := strings.TrimSpace(tool.Category)
+		if category == "" {
+			category = "general"
+		}
+		key := strings.ToLower(category)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		items = append(items, category)
+	}
+	sort.Strings(items)
+	return items
+}
+
+func requestHTTPBaseURL(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if forwarded := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Proto"), ",")[0]); forwarded != "" {
+		scheme = forwarded
+	}
+	host := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Host"), ",")[0])
+	if host == "" {
+		host = strings.TrimSpace(r.Host)
+	}
+	if host == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s://%s", scheme, host)
 }

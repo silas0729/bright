@@ -34,21 +34,23 @@ type Grade struct {
 }
 
 type Word struct {
-	ID             uint64 `json:"id"`
-	LegacyID       int64  `json:"legacy_id,omitempty"`
-	SubjectID      uint   `json:"subject_id"`
-	SubjectKey     string `json:"subject_key"`
-	CategoryID     *uint  `json:"category_id,omitempty"`
-	CategoryName   string `json:"category_name,omitempty"`
-	GradeID        *uint  `json:"grade_id,omitempty"`
-	GradeName      string `json:"grade_name,omitempty"`
-	Term           string `json:"term"`
-	Translation    string `json:"translation"`
-	Classification string `json:"classification"`
-	Source         string `json:"source,omitempty"`
-	Phonetics      string `json:"phonetics,omitempty"`
-	Explanation    string `json:"explanation,omitempty"`
-	IsVIP          bool   `json:"is_vip"`
+	ID                uint64 `json:"id"`
+	LegacyID          int64  `json:"legacy_id,omitempty"`
+	SubjectID         uint   `json:"subject_id"`
+	SubjectKey        string `json:"subject_key"`
+	CategoryID        *uint  `json:"category_id,omitempty"`
+	CategoryName      string `json:"category_name,omitempty"`
+	GradeID           *uint  `json:"grade_id,omitempty"`
+	GradeName         string `json:"grade_name,omitempty"`
+	Term              string `json:"term"`
+	Translation       string `json:"translation"`
+	Classification    string `json:"classification"`
+	Source            string `json:"source,omitempty"`
+	Phonetics         string `json:"phonetics,omitempty"`
+	Explanation       string `json:"explanation,omitempty"`
+	DefaultLevel      string `json:"default_level,omitempty"`
+	DefaultDifficulty string `json:"default_difficulty,omitempty"`
+	IsVIP             bool   `json:"is_vip"`
 }
 
 type ClassificationStat struct {
@@ -105,6 +107,7 @@ type LearnerUser struct {
 	Username    string              `json:"username"`
 	DisplayName string              `json:"display_name"`
 	Status      string              `json:"status"`
+	InviteCode  string              `json:"invite_code,omitempty"`
 	CreatedAt   time.Time           `json:"created_at"`
 	Membership  *SubscriptionStatus `json:"membership,omitempty"`
 }
@@ -138,6 +141,7 @@ type LearnerRegisterInput struct {
 	Username      string `json:"username"`
 	Password      string `json:"password"`
 	DisplayName   string `json:"display_name"`
+	InviteCode    string `json:"invite_code"`
 	CaptchaID     string `json:"captcha_id"`
 	CaptchaAnswer string `json:"captcha_answer"`
 }
@@ -324,35 +328,39 @@ type UpdateGradeInput struct {
 }
 
 type CreateWordInput struct {
-	LegacyID       int64  `json:"legacy_id"`
-	SubjectID      uint   `json:"subject_id"`
-	SubjectKey     string `json:"subject_key"`
-	CategoryID     *uint  `json:"category_id"`
-	CategoryName   string `json:"category_name"`
-	Classification string `json:"classification"`
-	GradeID        *uint  `json:"grade_id"`
-	Term           string `json:"term"`
-	Translation    string `json:"translation"`
-	Source         string `json:"source"`
-	Phonetics      string `json:"phonetics"`
-	Explanation    string `json:"explanation"`
-	IsVIP          bool   `json:"is_vip"`
+	LegacyID          int64  `json:"legacy_id"`
+	SubjectID         uint   `json:"subject_id"`
+	SubjectKey        string `json:"subject_key"`
+	CategoryID        *uint  `json:"category_id"`
+	CategoryName      string `json:"category_name"`
+	Classification    string `json:"classification"`
+	GradeID           *uint  `json:"grade_id"`
+	Term              string `json:"term"`
+	Translation       string `json:"translation"`
+	Source            string `json:"source"`
+	Phonetics         string `json:"phonetics"`
+	Explanation       string `json:"explanation"`
+	DefaultLevel      string `json:"default_level"`
+	DefaultDifficulty string `json:"default_difficulty"`
+	IsVIP             bool   `json:"is_vip"`
 }
 
 type UpdateWordInput struct {
-	LegacyID       int64  `json:"legacy_id"`
-	SubjectID      uint   `json:"subject_id"`
-	SubjectKey     string `json:"subject_key"`
-	CategoryID     *uint  `json:"category_id"`
-	CategoryName   string `json:"category_name"`
-	Classification string `json:"classification"`
-	GradeID        *uint  `json:"grade_id"`
-	Term           string `json:"term"`
-	Translation    string `json:"translation"`
-	Source         string `json:"source"`
-	Phonetics      string `json:"phonetics"`
-	Explanation    string `json:"explanation"`
-	IsVIP          bool   `json:"is_vip"`
+	LegacyID          int64  `json:"legacy_id"`
+	SubjectID         uint   `json:"subject_id"`
+	SubjectKey        string `json:"subject_key"`
+	CategoryID        *uint  `json:"category_id"`
+	CategoryName      string `json:"category_name"`
+	Classification    string `json:"classification"`
+	GradeID           *uint  `json:"grade_id"`
+	Term              string `json:"term"`
+	Translation       string `json:"translation"`
+	Source            string `json:"source"`
+	Phonetics         string `json:"phonetics"`
+	Explanation       string `json:"explanation"`
+	DefaultLevel      string `json:"default_level"`
+	DefaultDifficulty string `json:"default_difficulty"`
+	IsVIP             bool   `json:"is_vip"`
 }
 
 type BatchUpdateWordVIPInput struct {

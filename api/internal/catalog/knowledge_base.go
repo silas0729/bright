@@ -27,6 +27,8 @@ func LoadKnowledgeBaseChunksFromFile(path, fallbackTitle string) ([]KnowledgeBas
 		return loadKnowledgeBaseCSV(path, fallbackTitle)
 	case ".xlsx":
 		return loadKnowledgeBaseXLSX(path, fallbackTitle)
+	case ".docx":
+		return loadKnowledgeBaseDOCX(path, fallbackTitle)
 	default:
 		return nil, errors.New("unsupported knowledge base file type")
 	}
@@ -152,6 +154,101 @@ func loadKnowledgeBaseXLSX(path, fallbackTitle string) ([]KnowledgeBaseChunk, er
 		return nil, errors.New("knowledge base file is empty")
 	}
 	return chunks, nil
+}
+
+func loadKnowledgeBaseDOCX(path, fallbackTitle string) ([]KnowledgeBaseChunk, error) {
+	reader, err := zip.OpenReader(path)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	var documentFile *zip.File
+	for _, file := range reader.File {
+		if file.Name == "word/document.xml" {
+			documentFile = file
+			break
+		}
+	}
+	if documentFile == nil {
+		return nil, errors.New("word document content not found")
+	}
+
+	paragraphs, err := readDOCXParagraphs(documentFile)
+	if err != nil {
+		return nil, err
+	}
+
+	parts := make([]string, 0, len(paragraphs))
+	for _, paragraph := range paragraphs {
+		paragraph = cleanKnowledgeBaseText(paragraph)
+		if paragraph != "" {
+			parts = append(parts, paragraph)
+		}
+	}
+	if len(parts) == 0 {
+		return nil, errors.New("knowledge base file is empty")
+	}
+
+	text := strings.Join(parts, "\n")
+	return chunkKnowledgeBaseText(firstNonBlankTitle(fallbackTitle, filepath.Base(path)), text), nil
+}
+
+func readDOCXParagraphs(documentFile *zip.File) ([]string, error) {
+	rc, err := documentFile.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+
+	decoder := xml.NewDecoder(rc)
+	paragraphs := make([]string, 0, 64)
+	var builder strings.Builder
+	inText := false
+
+	flushParagraph := func() {
+		paragraph := builder.String()
+		builder.Reset()
+		if strings.TrimSpace(paragraph) != "" {
+			paragraphs = append(paragraphs, paragraph)
+		}
+	}
+
+	for {
+		token, err := decoder.Token()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		switch value := token.(type) {
+		case xml.StartElement:
+			switch value.Name.Local {
+			case "t":
+				inText = true
+			case "tab":
+				builder.WriteString("\t")
+			case "br", "cr":
+				builder.WriteString("\n")
+			}
+		case xml.EndElement:
+			switch value.Name.Local {
+			case "t":
+				inText = false
+			case "p":
+				flushParagraph()
+			}
+		case xml.CharData:
+			if inText {
+				builder.WriteString(string(value))
+			}
+		}
+	}
+
+	flushParagraph()
+	return paragraphs, nil
 }
 
 func readWorksheetRows(sheetFile *zip.File, sharedStrings []string) ([][]string, error) {

@@ -67,6 +67,8 @@ func (s *Server) Routes() http.Handler {
 	v1.GET("/grades", s.handleGrades)
 	v1.GET("/words", s.handleWords)
 	v1.GET("/knowledge-base/search", s.handleSearchKnowledgeBase)
+	v1.GET("/api-configs/market", s.handleAccessibleAPIConfigMarket)
+	v1.GET("/mcp/tools/market", s.mcpServer.HandleToolMarket)
 	v1.GET("/plans", s.handlePlans)
 	v1.GET("/site/settings", s.handleSiteSettings)
 	v1.GET("/auth/captcha", s.handleLearnerCaptcha)
@@ -82,6 +84,45 @@ func (s *Server) Routes() http.Handler {
 	userProtected.Use(s.userRequired())
 	userProtected.GET("/me", s.handleLearnerMe)
 	userProtected.POST("/logout", s.handleLearnerLogout)
+	userProtected.GET("/payments/orders", s.handleLearnerPaymentOrders)
+	userProtected.GET("/payments/subscriptions", s.handleLearnerMemberships)
+	userProtected.GET("/invite/summary", s.handleLearnerInviteSummary)
+	userProtected.GET("/invite/payout-profile", s.handleLearnerInvitePayoutProfile)
+	userProtected.PUT("/invite/payout-profile", s.handleLearnerSaveInvitePayoutProfile)
+	userProtected.GET("/invite/commissions", s.handleLearnerInviteCommissions)
+	userProtected.GET("/invite/withdraws", s.handleLearnerInviteWithdraws)
+	userProtected.POST("/invite/withdraws", s.handleLearnerCreateInviteWithdraw)
+	userProtected.DELETE("/invite/withdraws/:id", s.handleLearnerCancelInviteWithdraw)
+	userProtected.GET("/knowledge-base/documents", s.handleLearnerKnowledgeBaseDocuments)
+	userProtected.GET("/knowledge-base/documents/:id/chunks", s.handleLearnerKnowledgeBaseDocumentChunks)
+	userProtected.POST("/knowledge-base/import", s.handleLearnerImportKnowledgeBase)
+	userProtected.PUT("/knowledge-base/documents/:id/status", s.handleLearnerUpdateKnowledgeBaseDocumentStatus)
+	userProtected.DELETE("/knowledge-base/documents/:id", s.handleLearnerDeleteKnowledgeBaseDocument)
+	userProtected.GET("/learning/progress", s.handleLearnerLearningProgress)
+	userProtected.POST("/learning/progress", s.handleLearnerSaveLearningProgress)
+	userProtected.POST("/learning/review", s.handleLearnerReviewLearningWord)
+	userProtected.GET("/learning/summary", s.handleLearnerLearningSummary)
+	userProtected.GET("/api-configs", s.handleLearnerAPIConfigs)
+	userProtected.POST("/api-configs", s.handleCreateLearnerAPIConfig)
+	userProtected.PUT("/api-configs/:id", s.handleUpdateLearnerAPIConfig)
+	userProtected.DELETE("/api-configs/:id", s.handleDeleteLearnerAPIConfig)
+	userProtected.POST("/api-configs/:id/test", s.handleTestLearnerAPIConfig)
+	userProtected.GET("/xiaomi/config", s.handleLearnerGetXiaomiConfig)
+	userProtected.POST("/xiaomi/config", s.handleLearnerSaveXiaomiConfig)
+	userProtected.DELETE("/xiaomi/tokens", s.handleLearnerClearXiaomiTokens)
+	userProtected.POST("/xiaomi/qr-login", s.handleLearnerXiaomiQRLogin)
+	userProtected.GET("/xiaomi/qr-check/:session_id", s.handleLearnerXiaomiQRCheck)
+	userProtected.GET("/xiaomi/homes", s.handleLearnerXiaomiHomes)
+	userProtected.GET("/xiaomi/devices", s.handleLearnerXiaomiDevices)
+	userProtected.POST("/xiaomi/devices/refresh", s.handleLearnerRefreshXiaomiDevices)
+	userProtected.GET("/xiaomi/devices/search", s.handleLearnerSearchXiaomiDevices)
+	userProtected.GET("/xiaomi/devices/:did/status", s.handleLearnerXiaomiDeviceStatus)
+	userProtected.POST("/xiaomi/devices/control", s.handleLearnerControlXiaomiDevice)
+	userProtected.POST("/xiaomi/miot/prop/get", s.handleLearnerXiaomiPropGet)
+	userProtected.POST("/xiaomi/miot/prop/set", s.handleLearnerXiaomiPropSet)
+	userProtected.POST("/xiaomi/miot/action", s.handleLearnerXiaomiAction)
+	userProtected.POST("/xiaomi/miot/prop/get-batch", s.handleLearnerXiaomiPropGetBatch)
+	userProtected.GET("/xiaomi/miot/spec", s.handleLearnerXiaomiMiotSpec)
 	userProtected.GET("/mcp/endpoints", s.handleLearnerMCPEndpoints)
 	userProtected.POST("/mcp/endpoints", s.handleCreateLearnerMCPEndpoint)
 	userProtected.GET("/mcp/endpoints/:id/tools", s.handleLearnerMCPEndpointTools)
@@ -112,6 +153,12 @@ func (s *Server) Routes() http.Handler {
 	adminProtected.PUT("/site/settings", s.permissionRequired("site.write"), s.handleAdminSaveSiteSettings)
 	adminProtected.GET("/words", s.permissionRequired("catalog.read"), s.handleAdminWords)
 	adminProtected.GET("/knowledge-base/documents", s.permissionRequired("catalog.read"), s.handleAdminKnowledgeBaseDocuments)
+	adminProtected.GET("/knowledge-base/documents/:id/chunks", s.permissionRequired("catalog.read"), s.handleAdminKnowledgeBaseDocumentChunks)
+	adminProtected.GET("/invite/stats", s.permissionRequired("invite.read"), s.handleAdminInviteStats)
+	adminProtected.GET("/invite/withdraws", s.permissionRequired("invite.read"), s.handleAdminInviteWithdraws)
+	adminProtected.GET("/invite/withdraws/:id", s.permissionRequired("invite.read"), s.handleAdminInviteWithdrawDetail)
+	adminProtected.GET("/mcp/tools", s.permissionRequired("mcp.read"), s.handleAdminMCPToolConfigs)
+	adminProtected.GET("/api-configs", s.permissionRequired("mcp.read"), s.handleAdminAPIConfigs)
 	adminProtected.GET("/categories", s.permissionRequired("catalog.read"), s.handleAdminCategories)
 	adminProtected.GET("/grades", s.permissionRequired("grade.read"), s.handleAdminGrades)
 	adminProtected.GET("/plans", s.permissionRequired("plan.read"), s.handleAdminPlans)
@@ -126,12 +173,25 @@ func (s *Server) Routes() http.Handler {
 	admin.Use(s.authRequired())
 	admin.POST("/import/local", s.permissionRequired("catalog.write"), s.handleImportLocal)
 	admin.POST("/knowledge-base/import", s.permissionRequired("catalog.write"), s.handleAdminImportKnowledgeBase)
+	admin.PUT("/knowledge-base/documents/:id/status", s.permissionRequired("catalog.write"), s.handleAdminUpdateKnowledgeBaseDocumentStatus)
+	admin.DELETE("/knowledge-base/documents/:id", s.permissionRequired("catalog.write"), s.handleAdminDeleteKnowledgeBaseDocument)
+	admin.POST("/invite/withdraws/:id/approve", s.permissionRequired("invite.write"), s.handleAdminApproveInviteWithdraw)
+	admin.POST("/invite/withdraws/:id/reject", s.permissionRequired("invite.write"), s.handleAdminRejectInviteWithdraw)
+	admin.POST("/invite/withdraws/:id/pay", s.permissionRequired("invite.write"), s.handleAdminPayInviteWithdraw)
+	admin.PUT("/mcp/tools/:toolName", s.permissionRequired("mcp.write"), s.handleAdminUpdateMCPToolConfig)
+	admin.POST("/api-configs", s.permissionRequired("mcp.write"), s.handleCreateAdminAPIConfig)
+	admin.PUT("/api-configs/:id", s.permissionRequired("mcp.write"), s.handleUpdateAdminAPIConfig)
+	admin.DELETE("/api-configs/:id", s.permissionRequired("mcp.write"), s.handleDeleteAdminAPIConfig)
+	admin.POST("/api-configs/:id/test", s.permissionRequired("mcp.write"), s.handleTestAdminAPIConfig)
 	admin.POST("/subjects", s.permissionRequired("subject.write"), s.handleCreateSubject)
 	admin.PUT("/subjects/:id", s.permissionRequired("subject.write"), s.handleUpdateSubject)
+	admin.DELETE("/subjects/:id", s.permissionRequired("subject.write"), s.handleDeleteSubject)
 	admin.POST("/categories", s.permissionRequired("catalog.write"), s.handleCreateCategory)
 	admin.PUT("/categories/:id", s.permissionRequired("catalog.write"), s.handleUpdateCategory)
+	admin.DELETE("/categories/:id", s.permissionRequired("catalog.write"), s.handleDeleteCategory)
 	admin.POST("/grades", s.permissionRequired("grade.write"), s.handleCreateGrade)
 	admin.PUT("/grades/:id", s.permissionRequired("grade.write"), s.handleUpdateGrade)
+	admin.DELETE("/grades/:id", s.permissionRequired("grade.write"), s.handleDeleteGrade)
 	admin.POST("/words", s.permissionRequired("catalog.write"), s.handleCreateWord)
 	admin.PUT("/words/batch-vip", s.permissionRequired("catalog.write"), s.handleBatchUpdateWordVIP)
 	admin.PUT("/words/:id", s.permissionRequired("catalog.write"), s.handleUpdateWord)
@@ -558,6 +618,19 @@ func (s *Server) handleUpdateSubject(c *gin.Context) {
 	c.JSON(http.StatusOK, item)
 }
 
+func (s *Server) handleDeleteSubject(c *gin.Context) {
+	subjectID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || subjectID == 0 {
+		writeError(c, http.StatusBadRequest, domainError("invalid subject id"))
+		return
+	}
+	if err := s.service.DeleteSubject(c.Request.Context(), uint(subjectID)); err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 func (s *Server) handleCreateCategory(c *gin.Context) {
 	var input domain.CreateCategoryInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -591,6 +664,19 @@ func (s *Server) handleUpdateCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, item)
 }
 
+func (s *Server) handleDeleteCategory(c *gin.Context) {
+	categoryID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || categoryID == 0 {
+		writeError(c, http.StatusBadRequest, domainError("invalid category id"))
+		return
+	}
+	if err := s.service.DeleteCategory(c.Request.Context(), uint(categoryID)); err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 func (s *Server) handleCreateGrade(c *gin.Context) {
 	var input domain.CreateGradeInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -622,6 +708,19 @@ func (s *Server) handleUpdateGrade(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, item)
+}
+
+func (s *Server) handleDeleteGrade(c *gin.Context) {
+	gradeID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || gradeID == 0 {
+		writeError(c, http.StatusBadRequest, domainError("invalid grade id"))
+		return
+	}
+	if err := s.service.DeleteGrade(c.Request.Context(), uint(gradeID)); err != nil {
+		writeError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 func (s *Server) handleCreateWord(c *gin.Context) {

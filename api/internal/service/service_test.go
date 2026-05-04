@@ -1,10 +1,13 @@
 package service
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -258,6 +261,215 @@ func TestImportKnowledgeBaseFromFileAndSearch(t *testing.T) {
 	}
 	if searchResult.Items[0].DocumentID != result.Document.ID {
 		t.Fatalf("expected search result to belong to document %d, got %d", result.Document.ID, searchResult.Items[0].DocumentID)
+	}
+}
+
+func TestImportKnowledgeBaseFromDOCXAndSearch(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+	if err := svc.SeedDefaults(ctx); err != nil {
+		t.Fatalf("seed defaults: %v", err)
+	}
+
+	tempDir := t.TempDir()
+	path := filepath.Join(tempDir, "kb.docx")
+	if err := createTestDOCX(path, []string{
+		"Brights knowledge base docx sample.",
+		"XiaoZhi can search Word documents through MCP.",
+	}); err != nil {
+		t.Fatalf("create docx: %v", err)
+	}
+
+	result, err := svc.ImportKnowledgeBaseFromFile(ctx, domain.ImportKnowledgeBaseInput{
+		Path:       path,
+		SubjectKey: "english",
+		Title:      "Word KB",
+	})
+	if err != nil {
+		t.Fatalf("import knowledge base docx: %v", err)
+	}
+	if result.ChunkCount == 0 {
+		t.Fatal("expected imported docx knowledge base to create chunks")
+	}
+
+	searchResult, err := svc.SearchKnowledgeBase(ctx, domain.SearchKnowledgeBaseInput{
+		SubjectKey: "english",
+		Query:      "XiaoZhi",
+		Page:       1,
+		PageSize:   10,
+	})
+	if err != nil {
+		t.Fatalf("search knowledge base docx: %v", err)
+	}
+	if searchResult.Total == 0 || len(searchResult.Items) == 0 {
+		t.Fatal("expected docx search to return imported knowledge base content")
+	}
+	if searchResult.Items[0].DocumentID != result.Document.ID {
+		t.Fatalf("expected docx search result to belong to document %d, got %d", result.Document.ID, searchResult.Items[0].DocumentID)
+	}
+}
+
+func TestListAdminMCPToolConfigsSupportsEnabledAndMembershipFilters(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	if err := svc.SyncDefaultMCPToolConfigs(ctx); err != nil {
+		t.Fatalf("sync default mcp tools: %v", err)
+	}
+
+	updated, err := svc.UpdateMCPToolConfig(ctx, "search_knowledge_base", domain.UpdateMCPToolConfigInput{
+		IsEnabled:          boolPtr(false),
+		RequiresMembership: boolPtr(true),
+	})
+	if err != nil {
+		t.Fatalf("update mcp tool config: %v", err)
+	}
+	if updated.ToolName != "search_knowledge_base" {
+		t.Fatalf("expected search_knowledge_base to be updated, got %q", updated.ToolName)
+	}
+
+	result, err := svc.ListAdminMCPToolConfigs(ctx, domain.MCPToolConfigFilter{
+		IsEnabled:          boolPtr(false),
+		RequiresMembership: boolPtr(true),
+		Page:               1,
+		PageSize:           50,
+	})
+	if err != nil {
+		t.Fatalf("list filtered mcp tool configs: %v", err)
+	}
+	if result.Total == 0 || len(result.Items) == 0 {
+		t.Fatal("expected filtered mcp tool configs to return at least one item")
+	}
+	found := false
+	for _, item := range result.Items {
+		if item.ToolName == "search_knowledge_base" {
+			found = true
+		}
+		if item.IsEnabled {
+			t.Fatalf("expected filtered item %q to be disabled", item.ToolName)
+		}
+		if !item.RequiresMembership {
+			t.Fatalf("expected filtered item %q to require membership", item.ToolName)
+		}
+	}
+	if !found {
+		t.Fatal("expected filtered result to include search_knowledge_base")
+	}
+}
+
+func TestAppendAPIConfigQueryArgsFillsExistingEmptyQueryValue(t *testing.T) {
+	resolved, err := appendAPIConfigQueryArgs(
+		"https://api.pearapi.ai/api/drvinglicense/?keyword=",
+		storage.APIConfig{
+			Parameters: `[{"name":"keyword","type":"string","required":true,"in":"url"}]`,
+		},
+		domain.APIConfigExecutionContext{},
+		map[string]interface{}{
+			"keyword": "高速爆胎后为什么要紧握转向盘",
+		},
+	)
+	if err != nil {
+		t.Fatalf("append query args: %v", err)
+	}
+
+	parsed, err := url.Parse(resolved)
+	if err != nil {
+		t.Fatalf("parse resolved url: %v", err)
+	}
+	if got := parsed.Query().Get("keyword"); got != "高速爆胎后为什么要紧握转向盘" {
+		t.Fatalf("expected keyword query to be populated, got %q", got)
+	}
+}
+
+func createTestDOCX(path string, paragraphs []string) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := zip.NewWriter(file)
+
+	if _, err := writer.Create("[Content_Types].xml"); err != nil {
+		_ = writer.Close()
+		return err
+	}
+
+	documentFile, err := writer.Create("word/document.xml")
+	if err != nil {
+		_ = writer.Close()
+		return err
+	}
+
+	bodyParts := make([]string, 0, len(paragraphs))
+	for _, paragraph := range paragraphs {
+		bodyParts = append(
+			bodyParts,
+			`<w:p><w:r><w:t xml:space="preserve">`+escapeXMLText(paragraph)+`</w:t></w:r></w:p>`,
+		)
+	}
+	documentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+		`<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>` +
+		strings.Join(bodyParts, "") +
+		`</w:body></w:document>`
+	if _, err := documentFile.Write([]byte(documentXML)); err != nil {
+		_ = writer.Close()
+		return err
+	}
+
+	return writer.Close()
+}
+
+func escapeXMLText(value string) string {
+	replacer := strings.NewReplacer(
+		"&", "&amp;",
+		"<", "&lt;",
+		">", "&gt;",
+		`"`, "&quot;",
+		"'", "&apos;",
+	)
+	return replacer.Replace(value)
+}
+
+func TestAppendAPIConfigQueryArgsKeepsExistingNonEmptyQueryValue(t *testing.T) {
+	resolved, err := appendAPIConfigQueryArgs(
+		"https://api.pearapi.ai/api/drvinglicense/?keyword=existing",
+		storage.APIConfig{
+			Parameters: `[{"name":"keyword","type":"string","required":true,"in":"url"}]`,
+		},
+		domain.APIConfigExecutionContext{},
+		map[string]interface{}{
+			"keyword": "replacement",
+		},
+	)
+	if err != nil {
+		t.Fatalf("append query args: %v", err)
+	}
+
+	parsed, err := url.Parse(resolved)
+	if err != nil {
+		t.Fatalf("parse resolved url: %v", err)
+	}
+	if got := parsed.Query().Get("keyword"); got != "existing" {
+		t.Fatalf("expected existing keyword query to be preserved, got %q", got)
+	}
+}
+
+func TestValidateAPIConfigInputRejectsInvalidHeaderFieldName(t *testing.T) {
+	_, err := validateAPIConfigInput(
+		"驾驶题查询",
+		"driving_question_lookup",
+		"https://api.pearapi.ai/api/drvinglicense/",
+		"GET",
+		`{"keyword=":"{{keyword}}"}`,
+		"",
+		`[{"name":"keyword","type":"string","required":true,"in":"url"}]`,
+	)
+	if err == nil {
+		t.Fatal("expected invalid header field name to be rejected")
+	}
+	if !strings.Contains(err.Error(), "invalid header name") {
+		t.Fatalf("expected invalid header name error, got %v", err)
 	}
 }
 

@@ -1,31 +1,67 @@
 import QRCode from "qrcode";
-import { useDeferredValue, useEffect, useRef, useState, type FormEvent } from "react";
+import { useDeferredValue, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 import {
   api,
+  type APIConfig,
+  type APIConfigTestResult,
   type CaptchaChallenge,
   type CatalogStats,
   type ClassificationStat,
+  type InvitePayoutProfile,
+  type InviteSummary,
+  type KnowledgeBaseChunk,
+  type KnowledgeBaseDocument,
+  type LearningSummary,
   type LearnerSession,
   type LearnerUser,
+  type MCPInfoTool,
+  type PagedAPIConfigs,
   type PagedClassificationStats,
+  type PagedInviteCommissionRecords,
+  type PagedInviteWithdrawRequests,
+  type PagedKnowledgeBaseDocuments,
+  type PagedLearningWordProgress,
+  type PagedMCPMarketTools,
+  type PagedPaymentOrders,
+  type PagedSubscriptions,
   type PagedWords,
   type PaymentOrderStatus,
   type Plan,
+  type SaveAPIConfigInput,
   type SiteSetting,
   type SubscriptionStatus,
   type Subject,
+  type XiaomiDevice,
+  type XiaomiConfig,
+  type XiaomiDeviceListResult,
+  type XiaomiDeviceStatusResult,
+  type XiaomiHome,
+  type XiaomiQRLoginResult,
   type WechatOrder,
 } from "./api";
 import MCPConsole from "./MCPConsole";
 
 const publicPageSize = 18;
 const publicClassificationPageSize = 8;
+const profilePageSize = 5;
+const marketPageSize = 12;
 const publicUIStateStorageKey = "brights_public_ui_state";
 const publicSessionStorageKey = "brights_public_session";
+const inviteCodeSessionStorageKey = "brights_invite_code";
 
 type AuthMode = "login" | "register";
-type PublicView = "home" | "profile" | "mcp";
+type PublicView = "home" | "profile" | "mcp" | "market";
+type ProfileWorkspaceTab =
+  | "overview"
+  | "memberships"
+  | "orders"
+  | "invite"
+  | "knowledge-base"
+  | "api-tools"
+  | "xiaomi"
+  | "plans"
+  | "insights";
 type NoticeDialogTone = "info" | "success" | "error";
 
 type NoticeDialogState = {
@@ -34,6 +70,29 @@ type NoticeDialogState = {
   message: string;
   actionLabel?: string;
   actionHref?: string;
+};
+
+type APIParameterValueType = "string" | "number" | "boolean" | "object";
+type APIParameterLocation = "url" | "body" | "header";
+type APIParameterEditorRow = {
+  id: string;
+  name: string;
+  type: APIParameterValueType;
+  location: APIParameterLocation;
+  description: string;
+  exampleValue: string;
+  required: boolean;
+};
+type APIParameterDraft = {
+  name?: unknown;
+  type?: unknown;
+  description?: unknown;
+  example?: unknown;
+  default?: unknown;
+  sample?: unknown;
+  required?: unknown;
+  in?: unknown;
+  location?: unknown;
 };
 
 const fallbackSiteSettings: SiteSetting = {
@@ -53,6 +112,164 @@ const fallbackSiteSettings: SiteSetting = {
   contact_email: "support@brights.local",
 };
 
+const emptyAPIConfigEditor: SaveAPIConfigInput & { id: number } = {
+  id: 0,
+  name: "",
+  tool_name: "",
+  url: "",
+  method: "GET",
+  category: "custom",
+  category_color: "",
+  icon: "",
+  description: "",
+  headers: "{}",
+  body: "",
+  parameters: "[]",
+  is_active: true,
+  is_public: false,
+  allow_admin_publish: false,
+};
+
+const emptyInvitePayoutProfile: InvitePayoutProfile = {
+  real_name: "",
+  wechat_account: "",
+  wechat_qr_code: "",
+  alipay_account: "",
+  alipay_qr_code: "",
+};
+
+const apiParameterTypeOptions: Array<{ value: APIParameterValueType; label: string }> = [
+  { value: "string", label: "文本" },
+  { value: "number", label: "数字" },
+  { value: "boolean", label: "布尔" },
+  { value: "object", label: "JSON" },
+];
+
+const apiParameterLocationOptions: Array<{ value: APIParameterLocation; label: string }> = [
+  { value: "url", label: "URL 参数" },
+  { value: "body", label: "请求体" },
+  { value: "header", label: "请求头" },
+];
+
+const createAPIParameterRow = (overrides: Partial<Omit<APIParameterEditorRow, "id">> = {}): APIParameterEditorRow => ({
+  id: `api-param-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  name: "",
+  type: "string",
+  location: "url",
+  description: "",
+  exampleValue: "",
+  required: false,
+  ...overrides,
+});
+
+const normalizeAPIParameterType = (value: unknown): APIParameterValueType => {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  switch (normalized) {
+    case "number":
+    case "integer":
+      return "number";
+    case "boolean":
+    case "bool":
+      return "boolean";
+    case "object":
+    case "json":
+    case "array":
+      return "object";
+    default:
+      return "string";
+  }
+};
+
+const normalizeAPIParameterLocation = (value: unknown): APIParameterLocation => {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  switch (normalized) {
+    case "body":
+    case "request_body":
+    case "payload":
+      return "body";
+    case "header":
+    case "headers":
+    case "request_header":
+      return "header";
+    default:
+      return "url";
+  }
+};
+
+const safeParseJSONValue = (raw: string): unknown => {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return null;
+  }
+};
+
+const safeParseJSONObject = (raw: string): Record<string, unknown> | null => {
+  const parsed = safeParseJSONValue(raw);
+  if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+    return null;
+  }
+  return parsed as Record<string, unknown>;
+};
+
+const isPlainJSONObject = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && !Array.isArray(value) && typeof value === "object";
+
+const extractExactTemplateToken = (value: string) => {
+  const match = value.trim().match(/^\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}$/);
+  return match?.[1]?.trim() ?? "";
+};
+
+const extractTemplateKeysFromText = (value: string) => {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  const matcher = /\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g;
+  for (const match of value.matchAll(matcher)) {
+    const key = match[1]?.trim();
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    keys.push(key);
+  }
+  return keys;
+};
+
+const parseAPIParameterDrafts = (raw: string): APIParameterDraft[] => {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return [];
+  }
+  const parsed = safeParseJSONValue(trimmed);
+  if (Array.isArray(parsed)) {
+    return parsed.map((item) => (typeof item === "string" ? { name: item } : ((item as APIParameterDraft) ?? {})));
+  }
+  if (isPlainJSONObject(parsed)) {
+    return Object.entries(parsed).map(([name, value]) => {
+      if (isPlainJSONObject(value)) {
+        return { name, ...(value as APIParameterDraft) };
+      }
+      if (typeof value === "string") {
+        return { name, description: value };
+      }
+      return { name };
+    });
+  }
+  return trimmed
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((name) => ({ name }));
+};
+
 export default function PublicSite() {
   const persistedUIState = readStoredState<{
     subjectKey?: string;
@@ -69,6 +286,7 @@ export default function PublicSite() {
   const [authForm, setAuthForm] = useState({
     username: "",
     displayName: "",
+    inviteCode: "",
     password: "",
     confirmPassword: "",
   });
@@ -78,6 +296,7 @@ export default function PublicSite() {
   const [authError, setAuthError] = useState("");
   const [authNotice, setAuthNotice] = useState("");
   const [authCaptchaLoading, setAuthCaptchaLoading] = useState(false);
+  const [inviteCodeLocked, setInviteCodeLocked] = useState(false);
 
   const [siteSettings, setSiteSettings] = useState<SiteSetting>(fallbackSiteSettings);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -107,14 +326,87 @@ export default function PublicSite() {
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
   const [noticeDialog, setNoticeDialog] = useState<NoticeDialogState | null>(null);
+  const [inviteSummary, setInviteSummary] = useState<InviteSummary | null>(null);
+  const [invitePayoutProfile, setInvitePayoutProfile] = useState<InvitePayoutProfile>(emptyInvitePayoutProfile);
+  const [inviteCommissions, setInviteCommissions] = useState<PagedInviteCommissionRecords | null>(null);
+  const [inviteWithdraws, setInviteWithdraws] = useState<PagedInviteWithdrawRequests | null>(null);
+  const [paymentOrders, setPaymentOrders] = useState<PagedPaymentOrders | null>(null);
+  const [membershipHistory, setMembershipHistory] = useState<PagedSubscriptions | null>(null);
+  const [knowledgeBaseDocuments, setKnowledgeBaseDocuments] = useState<PagedKnowledgeBaseDocuments | null>(null);
+  const [knowledgeBaseDocumentPreview, setKnowledgeBaseDocumentPreview] = useState<KnowledgeBaseDocument | null>(null);
+  const [knowledgeBaseDocumentChunks, setKnowledgeBaseDocumentChunks] = useState<KnowledgeBaseChunk[]>([]);
+  const [knowledgeBaseDocumentPreviewLoading, setKnowledgeBaseDocumentPreviewLoading] = useState(false);
+  const [profileBusyAction, setProfileBusyAction] = useState("");
+  const [profileError, setProfileError] = useState("");
+  const [profileNotice, setProfileNotice] = useState("");
+  const [profileReloadKey, setProfileReloadKey] = useState(0);
+  const [orderHistoryPage, setOrderHistoryPage] = useState(1);
+  const [membershipHistoryPage, setMembershipHistoryPage] = useState(1);
+  const [inviteCommissionPage, setInviteCommissionPage] = useState(1);
+  const [inviteWithdrawPage, setInviteWithdrawPage] = useState(1);
+  const [knowledgeBasePage, setKnowledgeBasePage] = useState(1);
+  const [knowledgeBaseQuery, setKnowledgeBaseQuery] = useState("");
+  const [inviteWithdrawForm, setInviteWithdrawForm] = useState({
+    amount: "",
+    paymentType: "alipay",
+  });
+  const [knowledgeBaseForm, setKnowledgeBaseForm] = useState({
+    file: null as File | null,
+    fileName: "",
+    title: "",
+  });
+  const [knowledgeBaseUploadModalOpen, setKnowledgeBaseUploadModalOpen] = useState(false);
+  const [apiConfigs, setAPIConfigs] = useState<PagedAPIConfigs | null>(null);
+  const [apiConfigPage, setAPIConfigPage] = useState(1);
+  const [apiConfigQuery, setAPIConfigQuery] = useState("");
+  const [apiConfigEditor, setAPIConfigEditor] = useState(emptyAPIConfigEditor);
+  const [apiConfigModalOpen, setAPIConfigModalOpen] = useState(false);
+  const [apiConfigParameterRows, setAPIConfigParameterRows] = useState<APIParameterEditorRow[]>([]);
+  const [apiConfigAdvancedHeaders, setAPIConfigAdvancedHeaders] = useState("");
+  const [apiConfigAdvancedBody, setAPIConfigAdvancedBody] = useState("");
+  const [apiConfigAdvancedOpen, setAPIConfigAdvancedOpen] = useState(false);
+  const [apiConfigTestArguments, setAPIConfigTestArguments] = useState("{}");
+  const [apiConfigTestValues, setAPIConfigTestValues] = useState<Record<string, string>>({});
+  const [apiConfigTestResult, setAPIConfigTestResult] = useState<APIConfigTestResult | null>(null);
+  const [apiConfigTestTarget, setAPIConfigTestTarget] = useState<APIConfig | null>(null);
+  const [xiaomiConfig, setXiaomiConfig] = useState<XiaomiConfig | null>(null);
+  const [xiaomiHomes, setXiaomiHomes] = useState<XiaomiHome[]>([]);
+  const [xiaomiDevices, setXiaomiDevices] = useState<XiaomiDeviceListResult | null>(null);
+  const [xiaomiSearchQuery, setXiaomiSearchQuery] = useState("");
+  const [xiaomiQRSession, setXiaomiQRSession] = useState<XiaomiQRLoginResult | null>(null);
+  const [xiaomiQRStatus, setXiaomiQRStatus] = useState("");
+  const [xiaomiDeviceStatusMap, setXiaomiDeviceStatusMap] = useState<Record<string, XiaomiDeviceStatusResult>>({});
+  const [xiaomiDeviceStatusLoadingMap, setXiaomiDeviceStatusLoadingMap] = useState<Record<string, boolean>>({});
+  const [xiaomiControlBusyDid, setXiaomiControlBusyDid] = useState("");
+  const [xiaomiControlModalDevice, setXiaomiControlModalDevice] = useState<XiaomiDevice | null>(null);
+  const [marketResult, setMarketResult] = useState<PagedMCPMarketTools | null>(null);
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [marketError, setMarketError] = useState("");
+  const [marketPage, setMarketPage] = useState(1);
+  const [marketQuery, setMarketQuery] = useState("");
+  const [marketCategory, setMarketCategory] = useState("");
+  const [learningSummary, setLearningSummary] = useState<LearningSummary | null>(null);
+  const [learningProgress, setLearningProgress] = useState<PagedLearningWordProgress | null>(null);
+  const [learningPage, setLearningPage] = useState(1);
+  const [learningQuery, setLearningQuery] = useState("");
+  const [learningLevelFilter, setLearningLevelFilter] = useState("");
+  const [learningDifficultyFilter, setLearningDifficultyFilter] = useState("");
 
   const deferredQuery = useDeferredValue(query);
+  const deferredKnowledgeBaseQuery = useDeferredValue(knowledgeBaseQuery);
+  const deferredAPIConfigQuery = useDeferredValue(apiConfigQuery);
+  const deferredMarketQuery = useDeferredValue(marketQuery);
+  const deferredLearningQuery = useDeferredValue(learningQuery);
   const activeCheckoutOrder = checkoutStatus?.order ?? checkoutOrder;
   const currentSettings = siteSettings ?? fallbackSiteSettings;
   const learnerName = currentUser?.display_name || currentUser?.username || "";
   const currentMembership = currentUser?.membership ?? null;
   const hasActiveMembership = currentMembership?.status === "active";
   const membershipExpiryText = formatMembershipExpiry(currentMembership);
+  const currentInviteCode = (inviteSummary?.invite_code || currentUser?.invite_code || "").trim();
+  const inviteRegistrationLink = buildInviteRegistrationLink(currentInviteCode);
+  const inviteAvailableCommissionCents = inviteSummary?.commission_available_cents ?? 0;
+  const inviteCommissionRate = inviteSummary?.commission_rate ?? 0;
   const membershipBadgeText = currentMembership
     ? hasActiveMembership
       ? "\u4f1a\u5458\u5df2\u5f00\u901a"
@@ -123,12 +415,32 @@ export default function PublicSite() {
   const learnerAccessToken = session?.access_token ?? "";
   const speechSupported = canUseBrowserSpeech();
   const activeView: PublicView = resolvePublicView(currentHash);
+  const currentProfileTab: ProfileWorkspaceTab = resolveProfileWorkspaceTab(currentHash);
   const classifications = classificationResult?.items ?? [];
   const classificationTotal = classificationResult?.total ?? 0;
+  const marketTools = marketResult?.items ?? [];
+  const marketCategories = marketResult?.categories ?? [];
+  const learningLevelCounts = learningSummary?.level_counts ?? [];
+  const learningDifficultyCounts = learningSummary?.difficulty_counts ?? [];
+  const learningCurvePoints = learningSummary?.curve_points ?? [];
+  const learningCountByKey = (items: Array<{ key: string; count: number }>, key: string) =>
+    items.find((item) => item.key === key)?.count ?? 0;
   const speakTimerRef = useRef<number | null>(null);
+  const filteredMarketTools = marketTools;
   const speechTokenRef = useRef(0);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const checkoutNoticeKeyRef = useRef("");
+  const profileTabItems: Array<{ key: ProfileWorkspaceTab; label: string; helper: string; href: string; count?: number }> = [
+    { key: "overview", label: "账号总览", helper: currentUser ? "资料与权益" : "登录与注册", href: "#profile" },
+    { key: "memberships", label: "会员记录", helper: "状态与有效期", href: "#profile-memberships", count: membershipHistory?.total ?? 0 },
+    { key: "orders", label: "购买记录", helper: "订单与支付", href: "#profile-orders", count: paymentOrders?.total ?? 0 },
+    { key: "invite", label: "邀请好友", helper: "邀请码与转化", href: "#profile-invite", count: Number(inviteSummary?.invited_count ?? 0) },
+    { key: "knowledge-base", label: "我的知识库", helper: "上传与文档", href: "#profile-knowledge-base", count: knowledgeBaseDocuments?.total ?? 0 },
+    { key: "api-tools", label: "API 工具", helper: "个人接口与 MCP", href: "#profile-api-tools", count: apiConfigs?.total ?? 0 },
+    { key: "xiaomi", label: "米家智能", helper: "小米设备与控制", href: "#profile-xiaomi", count: xiaomiDevices?.total ?? xiaomiConfig?.device_count ?? 0 },
+    { key: "plans", label: "会员方案", helper: "购买与续费", href: "#plans", count: plans.length },
+    { key: "insights", label: "学习概况", helper: "词库与建议", href: "#profile-insights" },
+  ];
 
   useEffect(() => {
     let active = true;
@@ -178,9 +490,28 @@ export default function PublicSite() {
   }, []);
 
   useEffect(() => {
+    if (currentUser) {
+      return;
+    }
+
+    const inviteCode = resolveInitialInviteCode();
+    if (!inviteCode) {
+      return;
+    }
+
+    setInviteCodeLocked(true);
+    setAuthMode("register");
+    setAuthForm((current) => ({ ...current, inviteCode }));
+
+    if (resolvePublicView(getCurrentHash()) !== "profile") {
+      window.location.hash = "#profile";
+    }
+  }, []);
+
+  useEffect(() => {
     const targetId = currentHash.replace(/^#/, "");
     window.requestAnimationFrame(() => {
-      if (!targetId || targetId === "home" || targetId === "profile" || targetId === "account" || targetId === "mcp") {
+      if (!targetId || targetId === "home" || targetId === "profile" || targetId === "account" || targetId === "mcp" || targetId === "mcp-market") {
         window.scrollTo({ top: 0, left: 0, behavior: "auto" });
         return;
       }
@@ -263,6 +594,265 @@ export default function PublicSite() {
       active = false;
     };
   }, [session, subjectKey]);
+
+  useEffect(() => {
+    if (!session?.access_token) {
+      setInviteSummary(null);
+      setInvitePayoutProfile(emptyInvitePayoutProfile);
+      setInviteCommissions(null);
+      setInviteWithdraws(null);
+      setPaymentOrders(null);
+      setMembershipHistory(null);
+      setKnowledgeBaseDocuments(null);
+      setKnowledgeBaseDocumentPreview(null);
+      setKnowledgeBaseDocumentChunks([]);
+      return;
+    }
+
+    let active = true;
+    Promise.all([
+      api.learnerInviteSummary(session.access_token),
+      api.learnerInvitePayoutProfile(session.access_token),
+      api.learnerInviteCommissions(session.access_token, {
+        page: inviteCommissionPage,
+        pageSize: profilePageSize,
+      }),
+      api.learnerInviteWithdraws(session.access_token, {
+        page: inviteWithdrawPage,
+        pageSize: profilePageSize,
+      }),
+      api.learnerPaymentOrders(session.access_token, {
+        page: orderHistoryPage,
+        pageSize: profilePageSize,
+        subject: subjectKey,
+      }),
+      api.learnerMemberships(session.access_token, {
+        page: membershipHistoryPage,
+        pageSize: profilePageSize,
+        subject: subjectKey,
+      }),
+      api.learnerKnowledgeBaseDocuments(session.access_token, {
+        page: knowledgeBasePage,
+        pageSize: profilePageSize,
+        query: deferredKnowledgeBaseQuery,
+        subjectKey,
+      }),
+    ])
+      .then(([inviteData, payoutData, commissionData, withdrawData, orderData, membershipData, knowledgeBaseData]) => {
+        if (!active) {
+          return;
+        }
+        setInviteSummary(inviteData);
+        setInvitePayoutProfile(payoutData);
+        setInviteCommissions(commissionData);
+        setInviteWithdraws(withdrawData);
+        setPaymentOrders(orderData);
+        setMembershipHistory(membershipData);
+        setKnowledgeBaseDocuments(knowledgeBaseData);
+      })
+      .catch((err: Error) => {
+        if (!active) {
+          return;
+        }
+        setProfileError(err.message);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    deferredKnowledgeBaseQuery,
+    inviteCommissionPage,
+    inviteWithdrawPage,
+    knowledgeBasePage,
+    membershipHistoryPage,
+    orderHistoryPage,
+    profileReloadKey,
+    session,
+    subjectKey,
+  ]);
+
+  useEffect(() => {
+    if (!session?.access_token) {
+      setAPIConfigs(null);
+      setAPIConfigTestResult(null);
+      return;
+    }
+
+    let active = true;
+    api
+      .learnerAPIConfigs(session.access_token, {
+        page: apiConfigPage,
+        pageSize: profilePageSize,
+        query: deferredAPIConfigQuery,
+      })
+      .then((result) => {
+        if (active) {
+          setAPIConfigs(result);
+        }
+      })
+      .catch((err: Error) => {
+        if (active) {
+          setProfileError(err.message);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [apiConfigPage, deferredAPIConfigQuery, profileReloadKey, session?.access_token]);
+
+  useEffect(() => {
+    if (!session?.access_token) {
+      setXiaomiConfig(null);
+      setXiaomiHomes([]);
+      setXiaomiDevices(null);
+      setXiaomiQRSession(null);
+      setXiaomiQRStatus("");
+      return;
+    }
+    if (currentProfileTab !== "xiaomi") {
+      return;
+    }
+    void loadXiaomiWorkspace(false);
+  }, [currentProfileTab, profileReloadKey, session?.access_token]);
+
+  useEffect(() => {
+    setMarketPage(1);
+  }, [deferredMarketQuery, marketCategory]);
+
+  useEffect(() => {
+    if (activeView !== "market") {
+      return;
+    }
+
+    let active = true;
+    setMarketLoading(true);
+    setMarketError("");
+    api
+      .getMCPToolMarket({
+        page: marketPage,
+        pageSize: marketPageSize,
+        query: deferredMarketQuery,
+        category: marketCategory || undefined,
+        token: learnerAccessToken || undefined,
+      })
+      .then((result) => {
+        if (!active) {
+          return;
+        }
+        setMarketResult(result);
+      })
+      .catch((err: Error) => {
+        if (active) {
+          setMarketError(err.message);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setMarketLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [activeView, deferredMarketQuery, learnerAccessToken, marketCategory, marketPage, profileReloadKey]);
+
+  useEffect(() => {
+    if (!session?.access_token) {
+      setLearningSummary(null);
+      setLearningProgress(null);
+      return;
+    }
+    if (currentProfileTab !== "insights") {
+      return;
+    }
+
+    let active = true;
+    Promise.all([
+      api.learnerLearningSummary(session.access_token, subjectKey),
+      api.learnerLearningProgress(session.access_token, {
+        page: learningPage,
+        pageSize: profilePageSize,
+        query: deferredLearningQuery,
+        subjectKey,
+        level: learningLevelFilter || undefined,
+        difficulty: learningDifficultyFilter || undefined,
+      }),
+    ])
+      .then(([summaryData, progressData]) => {
+        if (!active) {
+          return;
+        }
+        setLearningSummary(summaryData);
+        setLearningProgress(progressData);
+      })
+      .catch((err: Error) => {
+        if (active) {
+          setProfileError(err.message);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    currentProfileTab,
+    deferredLearningQuery,
+    learningDifficultyFilter,
+    learningLevelFilter,
+    learningPage,
+    profileReloadKey,
+    session?.access_token,
+    subjectKey,
+  ]);
+
+  useEffect(() => {
+    if (!session?.access_token || !xiaomiQRSession?.session_id) {
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setInterval(() => {
+      api
+        .learnerCheckXiaomiQRLogin(session.access_token, xiaomiQRSession.session_id)
+        .then((result) => {
+          if (cancelled) {
+            return;
+          }
+          const nextStatus = result.status || (result.success ? "success" : "waiting");
+          setXiaomiQRStatus(result.message || nextStatus);
+          if (nextStatus === "success" || result.success) {
+            setXiaomiQRSession(null);
+            setProfileNotice(
+              result.devices_synced
+                ? `小米账号扫码登录成功，已同步 ${result.device_count ?? 0} 台设备。`
+                : "小米账号扫码登录成功，正在载入设备列表。",
+            );
+            void loadXiaomiWorkspace(false);
+          }
+        })
+        .catch((err: Error) => {
+          if (cancelled) {
+            return;
+          }
+          setXiaomiQRStatus(err.message);
+        });
+    }, 4000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [session?.access_token, xiaomiQRSession?.session_id]);
+
+  useEffect(() => {
+    setOrderHistoryPage(1);
+    setMembershipHistoryPage(1);
+    setKnowledgeBasePage(1);
+    setLearningPage(1);
+  }, [subjectKey]);
 
   useEffect(() => {
     if (currentUser) {
@@ -474,6 +1064,18 @@ export default function PublicSite() {
   }, [authNotice]);
 
   useEffect(() => {
+    if (!profileNotice) {
+      return;
+    }
+    openNoticeDialog({
+      tone: "success",
+      title: "操作已完成",
+      message: profileNotice,
+    });
+    setProfileNotice("");
+  }, [profileNotice]);
+
+  useEffect(() => {
     if (!authError) {
       return;
     }
@@ -484,6 +1086,18 @@ export default function PublicSite() {
     });
     setAuthError("");
   }, [authError]);
+
+  useEffect(() => {
+    if (!profileError) {
+      return;
+    }
+    openNoticeDialog({
+      tone: "error",
+      title: "个人中心操作未完成",
+      message: profileError,
+    });
+    setProfileError("");
+  }, [profileError]);
 
   useEffect(() => {
     if (!classificationError) {
@@ -540,6 +1154,8 @@ export default function PublicSite() {
         ? `会员已生效，有效期至 ${formatDateTime(checkoutStatus.subscription.current_period_end)}。`
         : "会员已生效，当前为长期有效。"
       : "支付已成功，我们正在同步你的会员权益。";
+
+    setProfileReloadKey((current) => current + 1);
 
     openNoticeDialog({
       tone: "success",
@@ -723,11 +1339,15 @@ export default function PublicSite() {
           username: authForm.username,
           password: authForm.password,
           display_name: authForm.displayName,
+          invite_code: authForm.inviteCode.trim() || undefined,
           captcha_id: authCaptcha.captcha_id,
           captcha_answer: authCaptchaAnswer,
         });
         persistLearnerSession(nextSession);
         setCheckoutCustomerRef(nextSession.user.username);
+        window.sessionStorage.removeItem(inviteCodeSessionStorageKey);
+        clearInviteQueryParam();
+        setInviteCodeLocked(false);
         setAuthNotice("注册成功，已经自动登录。");
       } else {
         const nextSession = await api.learnerLogin(
@@ -744,6 +1364,7 @@ export default function PublicSite() {
       setAuthForm({
         username: "",
         displayName: "",
+        inviteCode: "",
         password: "",
         confirmPassword: "",
       });
@@ -771,7 +1392,1230 @@ export default function PublicSite() {
       setCurrentUser(null);
       setAuthNotice("你已退出登录。");
       setCheckoutCustomerRef("");
+      setKnowledgeBaseUploadModalOpen(false);
+      resetKnowledgeBaseForm();
       void refreshAuthCaptcha(authMode);
+    }
+  }
+
+  async function handleCopyInviteCode() {
+    if (!currentInviteCode || !window.navigator.clipboard) {
+      return;
+    }
+    const code = currentInviteCode;
+    try {
+      await window.navigator.clipboard.writeText(currentInviteCode);
+      setProfileNotice(`邀请码 ${code} 已复制。`);
+    } catch {
+      setProfileError("复制邀请码失败，请手动复制。");
+    }
+  }
+
+  async function handleCopyInviteLink() {
+    if (!inviteRegistrationLink || !window.navigator.clipboard) {
+      return;
+    }
+    try {
+      await window.navigator.clipboard.writeText(inviteRegistrationLink);
+      setProfileNotice("注册链接已复制。");
+    } catch {
+      setProfileError("复制注册链接失败，请手动复制。");
+    }
+  }
+
+  async function handleInviteQRCodeSelected(channel: "wechat" | "alipay", event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setProfileError("收款码只支持上传图片文件。");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setProfileError("收款码图片请控制在 2MB 以内。");
+      return;
+    }
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setInvitePayoutProfile((current) =>
+        channel === "wechat"
+          ? { ...current, wechat_qr_code: dataUrl }
+          : { ...current, alipay_qr_code: dataUrl },
+      );
+    } catch {
+      setProfileError("收款码图片读取失败，请换一张图片再试。");
+    }
+  }
+
+  function handleClearInviteQRCode(channel: "wechat" | "alipay") {
+    setInvitePayoutProfile((current) =>
+      channel === "wechat"
+        ? { ...current, wechat_qr_code: "" }
+        : { ...current, alipay_qr_code: "" },
+    );
+  }
+
+  async function handleSaveInvitePayoutProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session?.access_token) {
+      return;
+    }
+
+    const payload = {
+      real_name: invitePayoutProfile.real_name.trim(),
+      wechat_account: invitePayoutProfile.wechat_account.trim(),
+      wechat_qr_code: invitePayoutProfile.wechat_qr_code.trim(),
+      alipay_account: invitePayoutProfile.alipay_account.trim(),
+      alipay_qr_code: invitePayoutProfile.alipay_qr_code.trim(),
+    };
+
+    setProfileBusyAction("invite-payout-save");
+    try {
+      const result = await api.learnerSaveInvitePayoutProfile(session.access_token, payload);
+      setInvitePayoutProfile(result);
+      setProfileNotice("返佣收款资料已保存。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  function handleFillInviteWithdrawAmount() {
+    setInviteWithdrawForm((current) => ({
+      ...current,
+      amount: formatPriceInput(inviteAvailableCommissionCents),
+    }));
+  }
+
+  async function handleCreateInviteWithdraw(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session?.access_token) {
+      return;
+    }
+    if (inviteAvailableCommissionCents <= 0) {
+      setProfileError("当前没有可提现的返佣金额。");
+      return;
+    }
+
+    const amountCents = parsePriceInputToCents(inviteWithdrawForm.amount);
+    if (amountCents <= 0) {
+      setProfileError("请输入正确的提现金额。");
+      return;
+    }
+
+    const paymentType = inviteWithdrawForm.paymentType === "wechat" ? "wechat" : "alipay";
+    if (
+      paymentType === "wechat" &&
+      !invitePayoutProfile.wechat_account.trim() &&
+      !invitePayoutProfile.wechat_qr_code.trim()
+    ) {
+      setProfileError("请先完善微信提现账号或收款码。");
+      return;
+    }
+    if (
+      paymentType === "alipay" &&
+      !invitePayoutProfile.alipay_account.trim() &&
+      !invitePayoutProfile.alipay_qr_code.trim()
+    ) {
+      setProfileError("请先完善支付宝收款账号或收款码。");
+      return;
+    }
+
+    setProfileBusyAction("invite-withdraw-create");
+    try {
+      await api.learnerCreateInviteWithdraw(session.access_token, {
+        amount_cents: amountCents,
+        payment_type: paymentType,
+      });
+      setInviteWithdrawForm((current) => ({ ...current, amount: "" }));
+      setInviteWithdrawPage(1);
+      setInviteCommissionPage(1);
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice("提现申请已提交，请等待管理员审核打款。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleCancelInviteWithdraw(item: { id: number; amount_cents: number }) {
+    if (!session?.access_token) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `确认取消这笔 ${formatPrice(item.amount_cents)} 的提现申请吗？取消后对应返佣会重新回到可提现余额。`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setProfileBusyAction(`invite-withdraw-cancel-${item.id}`);
+    try {
+      await api.learnerCancelInviteWithdraw(session.access_token, item.id);
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice("提现申请已取消。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleSubmitKnowledgeBase(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session?.access_token) {
+      return;
+    }
+    if (!knowledgeBaseForm.file) {
+      setProfileError("请先选择要上传的知识库文件。");
+      return;
+    }
+
+    setProfileBusyAction("knowledge-base-upload");
+    try {
+      const result = await api.learnerImportKnowledgeBase(session.access_token, {
+        file: knowledgeBaseForm.file,
+        subject_key: subjectKey,
+        title: knowledgeBaseForm.title.trim(),
+      });
+      closeKnowledgeBaseUploadModal();
+      setKnowledgeBasePage(1);
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice(`知识库文档《${result.document.title || result.document.source_file_name}》已上传。`);
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleToggleKnowledgeBaseDocument(item: KnowledgeBaseDocument) {
+    if (!session?.access_token) {
+      return;
+    }
+
+    const nextStatus = item.status === "active" ? "disabled" : "active";
+    setProfileBusyAction(`knowledge-base-status-${item.id}`);
+    try {
+      await api.learnerUpdateKnowledgeBaseDocumentStatus(session.access_token, item.id, nextStatus);
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice(nextStatus === "active" ? "文档已启用。" : "文档已停用。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleDeleteKnowledgeBaseDocument(item: KnowledgeBaseDocument) {
+    if (!session?.access_token) {
+      return;
+    }
+    const confirmed = window.confirm(`确认删除知识库文档“${item.title || item.source_file_name}”吗？删除后对应检索片段也会移除。`);
+    if (!confirmed) {
+      return;
+    }
+
+    setProfileBusyAction(`knowledge-base-delete-${item.id}`);
+    try {
+      await api.learnerDeleteKnowledgeBaseDocument(session.access_token, item.id);
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice("知识库文档已删除。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleViewKnowledgeBaseDocument(item: KnowledgeBaseDocument) {
+    if (!session?.access_token) {
+      return;
+    }
+
+    setKnowledgeBaseDocumentPreview(item);
+    setKnowledgeBaseDocumentPreviewLoading(true);
+    setKnowledgeBaseDocumentChunks([]);
+    try {
+      const result = await api.learnerKnowledgeBaseDocumentChunks(session.access_token, item.id, {
+        page: 1,
+        pageSize: 200,
+      });
+      setKnowledgeBaseDocumentChunks(result.items);
+    } catch (err) {
+      setProfileError((err as Error).message);
+      setKnowledgeBaseDocumentPreview(null);
+    } finally {
+      setKnowledgeBaseDocumentPreviewLoading(false);
+    }
+  }
+
+  function closeKnowledgeBaseDocumentPreview() {
+    setKnowledgeBaseDocumentPreview(null);
+    setKnowledgeBaseDocumentChunks([]);
+    setKnowledgeBaseDocumentPreviewLoading(false);
+  }
+
+  function resetKnowledgeBaseForm() {
+    setKnowledgeBaseForm({
+      file: null,
+      fileName: "",
+      title: "",
+    });
+  }
+
+  function openKnowledgeBaseUploadModal() {
+    setKnowledgeBaseUploadModalOpen(true);
+  }
+
+  function closeKnowledgeBaseUploadModal() {
+    setKnowledgeBaseUploadModalOpen(false);
+    resetKnowledgeBaseForm();
+  }
+
+  async function handleSaveLearningProgress(wordID: number, level: string, difficulty: string) {
+    if (!session?.access_token || wordID <= 0) {
+      return;
+    }
+
+    setProfileBusyAction(`learning-save-${wordID}`);
+    try {
+      await api.learnerSaveLearningProgress(session.access_token, {
+        word_id: wordID,
+        subject_key: subjectKey,
+        level,
+        difficulty,
+      });
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice("学习级别与难度已更新。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleReviewLearningWord(
+    word: { id: number },
+    remembered: boolean,
+    options?: { level?: string; difficulty?: string },
+  ) {
+    if (!session?.access_token || word.id <= 0) {
+      return;
+    }
+
+    setProfileBusyAction(`learning-review-${word.id}`);
+    try {
+      await api.learnerReviewLearningWord(session.access_token, {
+        word_id: word.id,
+        subject_key: subjectKey,
+        remembered,
+        level: options?.level,
+        difficulty: options?.difficulty,
+      });
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice(remembered ? "已记录为记住，系统已生成下一次复习时间。" : "已记录为待复习，稍后会更早提醒。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function loadXiaomiWorkspace(refreshDevices: boolean) {
+    if (!session?.access_token) {
+      return;
+    }
+    try {
+      const [configResult, deviceResult] = await Promise.all([
+        api.learnerXiaomiConfig(session.access_token),
+        api.learnerXiaomiDevices(session.access_token, refreshDevices),
+      ]);
+      setXiaomiConfig(configResult);
+      setXiaomiDevices(deviceResult);
+      setXiaomiHomes(buildXiaomiHomesFromDevices(deviceResult.devices));
+    } catch (err) {
+      setProfileError((err as Error).message);
+    }
+  }
+
+  function buildXiaomiHomesFromDevices(devices: XiaomiDevice[]): XiaomiHome[] {
+    const homes = new Map<string, XiaomiHome>();
+    for (const item of devices) {
+      const homeID = item.home_id?.trim() || "";
+      const homeName = item.home_name?.trim() || "";
+      if (!homeID && !homeName) {
+        continue;
+      }
+      const key = homeID || homeName;
+      if (homes.has(key)) {
+        continue;
+      }
+      homes.set(key, {
+        id: homeID || key,
+        name: homeName || homeID || "未命名家庭",
+      });
+    }
+    return Array.from(homes.values()).sort((left, right) => left.name.localeCompare(right.name, "zh-CN"));
+  }
+
+  function canControlXiaomiSwitch(device: XiaomiDevice) {
+    const model = (device.model || "").toLowerCase();
+    const specType = (device.spec_type || "").toLowerCase();
+    return (
+      model.includes("plug") ||
+      model.includes("switch") ||
+      specType.includes("switch") ||
+      specType.includes("plug")
+    );
+  }
+
+  function buildXiaomiStatusPropertyRequests(device: XiaomiDevice) {
+    const propertyNames = [
+      "status",
+      "mode",
+      "target_temperature",
+      "temperature",
+      "relative_humidity",
+      "humidity",
+      "battery_level",
+      "battery",
+      "brightness",
+      "fan_level",
+      "pm2_5_density",
+      "pm10_density",
+      "co2_density",
+      "tvoc_density",
+      "illumination",
+      "electricity",
+      "power_consumption",
+      "charging_state",
+    ];
+    if (canControlXiaomiSwitch(device)) {
+      propertyNames.unshift("on", "power");
+    }
+    return Array.from(new Set(propertyNames));
+  }
+
+  function formatXiaomiStatusValue(value: unknown) {
+    if (value === null || value === undefined || value === "") {
+      return "-";
+    }
+    if (typeof value === "string") {
+      return value;
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+
+  function formatXiaomiPropertyValue(value: unknown, unit?: unknown) {
+    const text = formatXiaomiStatusValue(value);
+    const unitText = unit === null || unit === undefined || unit === "" ? "" : formatXiaomiStatusValue(unit);
+    if (text === "-" || !unitText) {
+      return text;
+    }
+    return `${text} ${unitText}`;
+  }
+
+  function resolveXiaomiSwitchPropertyName(status?: XiaomiDeviceStatusResult | null) {
+    const availableProperties = status?.available_properties ?? {};
+    if (Object.prototype.hasOwnProperty.call(availableProperties, "on")) {
+      return "on";
+    }
+    if (Object.prototype.hasOwnProperty.call(availableProperties, "power")) {
+      return "power";
+    }
+    return "on";
+  }
+
+  function inferXiaomiSwitchState(status?: XiaomiDeviceStatusResult | null): boolean | null {
+    const properties = Array.isArray(status?.properties) ? status.properties : [];
+    for (const item of properties) {
+      if (!item || typeof item !== "object") {
+        continue;
+      }
+      const record = item as Record<string, unknown>;
+      const value = record.value;
+      if (typeof value === "boolean") {
+        return value;
+      }
+      if (typeof value === "number" && (value === 0 || value === 1)) {
+        return value === 1;
+      }
+      if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === "true" || normalized === "on" || normalized === "1") {
+          return true;
+        }
+        if (normalized === "false" || normalized === "off" || normalized === "0") {
+          return false;
+        }
+      }
+    }
+    return null;
+  }
+
+  function buildXiaomiPropertyRows(status?: XiaomiDeviceStatusResult | null) {
+    const availableProperties = isPlainJSONObject(status?.available_properties) ? status.available_properties : {};
+    const properties = Array.isArray(status?.properties) ? status.properties : [];
+    const valueMap = new Map<string, Record<string, unknown>>();
+
+    for (const item of properties) {
+      if (!isPlainJSONObject(item)) {
+        continue;
+      }
+      const siid = Number(item.siid);
+      const piid = Number(item.piid);
+      if (!Number.isFinite(siid) || !Number.isFinite(piid)) {
+        continue;
+      }
+      valueMap.set(`${siid}:${piid}`, item);
+    }
+
+    return Object.entries(availableProperties)
+      .map(([name, metaValue]) => {
+        const meta = isPlainJSONObject(metaValue) ? metaValue : {};
+        const siid = Number(meta.siid);
+        const piid = Number(meta.piid);
+        const valueRecord =
+          Number.isFinite(siid) && Number.isFinite(piid) ? valueMap.get(`${siid}:${piid}`) : undefined;
+        const metaSummaryParts = [
+          meta.type ? `类型：${formatXiaomiStatusValue(meta.type)}` : "",
+          meta.range ? `范围：${formatXiaomiStatusValue(meta.range)}` : "",
+          meta.enum ? `枚举：${formatXiaomiStatusValue(meta.enum)}` : "",
+        ].filter(Boolean);
+
+        return {
+          key: `${name}-${Number.isFinite(siid) ? siid : "x"}-${Number.isFinite(piid) ? piid : "x"}`,
+          name,
+          desc: typeof meta.desc === "string" ? meta.desc : "",
+          rw: typeof meta.rw === "string" ? meta.rw : "-",
+          value: valueRecord ? formatXiaomiPropertyValue(valueRecord.value, meta.unit) : "-",
+          metaSummary: metaSummaryParts.join(" | "),
+          hasValue: Boolean(valueRecord),
+        };
+      })
+      .sort((left, right) => {
+        if (left.hasValue !== right.hasValue) {
+          return left.hasValue ? -1 : 1;
+        }
+        return left.name.localeCompare(right.name, "zh-CN");
+      });
+  }
+
+  function buildXiaomiActionRows(status?: XiaomiDeviceStatusResult | null) {
+    const availableActions = isPlainJSONObject(status?.available_actions) ? status.available_actions : {};
+    return Object.entries(availableActions)
+      .map(([name, actionValue]) => {
+        const action = isPlainJSONObject(actionValue) ? actionValue : {};
+        const siid = Number(action.siid);
+        const aiid = Number(action.aiid);
+        return {
+          key: `${name}-${Number.isFinite(siid) ? siid : "x"}-${Number.isFinite(aiid) ? aiid : "x"}`,
+          name,
+          desc: typeof action.desc === "string" ? action.desc : "",
+          identity:
+            Number.isFinite(siid) && Number.isFinite(aiid)
+              ? `siid ${siid} / aiid ${aiid}`
+              : "等待设备返回动作编号",
+        };
+      })
+      .sort((left, right) => left.name.localeCompare(right.name, "zh-CN"));
+  }
+
+  async function handleLoadXiaomiDeviceStatus(device: XiaomiDevice, options?: { silent?: boolean }) {
+    if (!session?.access_token) {
+      return null;
+    }
+    const silent = options?.silent === true;
+    if (!silent) {
+      setXiaomiDeviceStatusLoadingMap((current) => ({ ...current, [device.did]: true }));
+    }
+    try {
+      const result = await api.learnerXiaomiDeviceStatus(session.access_token, device.did, {
+        properties: buildXiaomiStatusPropertyRequests(device),
+      });
+      setXiaomiDeviceStatusMap((current) => ({ ...current, [device.did]: result as XiaomiDeviceStatusResult }));
+      return result as XiaomiDeviceStatusResult;
+    } catch (err) {
+      if (!silent) {
+        setProfileError((err as Error).message);
+      }
+      return null;
+    } finally {
+      if (!silent) {
+        setXiaomiDeviceStatusLoadingMap((current) => ({ ...current, [device.did]: false }));
+      }
+    }
+  }
+
+  async function handleToggleXiaomiSwitch(device: XiaomiDevice, nextOn: boolean) {
+    if (!session?.access_token) {
+      return;
+    }
+    setXiaomiControlBusyDid(device.did);
+    try {
+      const currentStatus =
+        xiaomiDeviceStatusMap[device.did] ?? (await handleLoadXiaomiDeviceStatus(device, { silent: true }));
+      const propName = resolveXiaomiSwitchPropertyName(currentStatus);
+      await api.learnerControlXiaomiDevice(session.access_token, {
+        query: device.did,
+        operation: "set_property",
+        prop_name: propName,
+        value: nextOn,
+      });
+      setProfileNotice(`${device.name} 已${nextOn ? "开启" : "关闭"}。`);
+      await handleLoadXiaomiDeviceStatus(device, { silent: true });
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setXiaomiControlBusyDid("");
+    }
+  }
+
+  function openXiaomiControlModal(device: XiaomiDevice) {
+    setXiaomiControlModalDevice(device);
+    void handleLoadXiaomiDeviceStatus(device);
+  }
+
+  function closeXiaomiControlModal() {
+    setXiaomiControlModalDevice(null);
+  }
+
+  const buildAPIParameterEditorState = (item: APIConfig) => {
+    const rowMap = new Map<string, APIParameterEditorRow>();
+    const headerObject = safeParseJSONObject(item.headers);
+    const bodyValue = safeParseJSONValue(item.body);
+    let advancedHeaders = item.headers.trim();
+    let advancedBody = item.body.trim();
+
+    const upsertRow = (name: string, partial: Partial<Omit<APIParameterEditorRow, "id" | "name">> = {}) => {
+      const normalizedName = name.trim();
+      if (!normalizedName) {
+        return;
+      }
+      const existing = rowMap.get(normalizedName);
+      if (existing) {
+        rowMap.set(normalizedName, {
+          ...existing,
+          ...partial,
+          name: normalizedName,
+          description: partial.description !== undefined ? partial.description : existing.description,
+          exampleValue: partial.exampleValue !== undefined ? partial.exampleValue : existing.exampleValue,
+        });
+        return;
+      }
+      rowMap.set(
+        normalizedName,
+        createAPIParameterRow({
+          name: normalizedName,
+          type: normalizeAPIParameterType(partial.type),
+          location: normalizeAPIParameterLocation(partial.location),
+          description: partial.description ?? "",
+          exampleValue: partial.exampleValue ?? "",
+          required: partial.required ?? false,
+        }),
+      );
+    };
+
+    for (const definition of parseAPIParameterDrafts(item.parameters)) {
+      const name = String(definition.name ?? "").trim();
+      if (!name) {
+        continue;
+      }
+      upsertRow(name, {
+        type: normalizeAPIParameterType(definition.type),
+        location: normalizeAPIParameterLocation(definition.in ?? definition.location),
+        description: String(definition.description ?? "").trim(),
+        exampleValue: String(definition.example ?? definition.default ?? definition.sample ?? "").trim(),
+        required: Boolean(definition.required),
+      });
+    }
+
+    if (headerObject) {
+      const extras: Record<string, unknown> = { ...headerObject };
+      Object.entries(headerObject).forEach(([key, value]) => {
+        if (typeof value !== "string") {
+          return;
+        }
+        const token = extractExactTemplateToken(value);
+        if (!token || token !== key) {
+          return;
+        }
+        delete extras[key];
+        upsertRow(token, {
+          location: "header",
+          description: rowMap.get(token)?.description || `请求头参数：${token}`,
+        });
+      });
+      advancedHeaders = Object.keys(extras).length > 0 ? JSON.stringify(extras, null, 2) : "";
+    }
+
+    if (isPlainJSONObject(bodyValue)) {
+      const extras: Record<string, unknown> = { ...bodyValue };
+      Object.entries(bodyValue).forEach(([key, value]) => {
+        if (typeof value !== "string") {
+          return;
+        }
+        const token = extractExactTemplateToken(value);
+        if (!token || token !== key) {
+          return;
+        }
+        delete extras[key];
+        upsertRow(token, {
+          location: "body",
+          description: rowMap.get(token)?.description || `请求体参数：${token}`,
+        });
+      });
+      advancedBody = Object.keys(extras).length > 0 ? JSON.stringify(extras, null, 2) : "";
+    }
+
+    for (const key of extractTemplateKeysFromText(item.url)) {
+      upsertRow(key, {
+        location: rowMap.get(key)?.location ?? "url",
+        description: rowMap.get(key)?.description || `URL 参数：${key}`,
+      });
+    }
+
+    const rows = Array.from(rowMap.values()).sort((left, right) => {
+      const locationOrder: Record<APIParameterLocation, number> = { url: 0, body: 1, header: 2 };
+      const locationDiff = locationOrder[left.location] - locationOrder[right.location];
+      if (locationDiff !== 0) {
+        return locationDiff;
+      }
+      return left.name.localeCompare(right.name, "zh-CN");
+    });
+
+    return {
+      rows,
+      advancedHeaders,
+      advancedBody,
+      advancedOpen: Boolean(advancedHeaders || advancedBody),
+    };
+  };
+
+  const getAPIConfigTestRows = (item: APIConfig | null) =>
+    item ? buildAPIParameterEditorState(item).rows.filter((row) => row.name.trim()) : [];
+
+  const buildAPIConfigTestValuePreset = (item: APIConfig) => {
+    const rows = getAPIConfigTestRows(item);
+    const values: Record<string, string> = {};
+    rows.forEach((row) => {
+      if (values[row.name] !== undefined) {
+        return;
+      }
+      if (row.exampleValue.trim()) {
+        values[row.name] = row.exampleValue.trim();
+        return;
+      }
+      if (row.type === "boolean") {
+        values[row.name] = "true";
+        return;
+      }
+      values[row.name] = "";
+    });
+    return values;
+  };
+
+  const buildAPIConfigTestArgumentPreview = (item: APIConfig, values: Record<string, string>) => {
+    const payload: Record<string, unknown> = {};
+    getAPIConfigTestRows(item).forEach((row) => {
+      if (payload[row.name] !== undefined) {
+        return;
+      }
+      const rawValue = values[row.name] ?? "";
+      const trimmedValue = rawValue.trim();
+      if (!trimmedValue) {
+        payload[row.name] = row.type === "boolean" ? false : "";
+        return;
+      }
+      switch (row.type) {
+        case "number": {
+          const numeric = Number(trimmedValue);
+          payload[row.name] = Number.isFinite(numeric) ? numeric : rawValue;
+          return;
+        }
+        case "boolean":
+          payload[row.name] = trimmedValue.toLowerCase() === "true";
+          return;
+        case "object":
+          payload[row.name] = safeParseJSONValue(rawValue) ?? rawValue;
+          return;
+        default:
+          payload[row.name] = rawValue;
+      }
+    });
+    return JSON.stringify(payload, null, 2);
+  };
+
+  const buildAPIConfigTestPayload = (item: APIConfig, values: Record<string, string>) => {
+    const payload: Record<string, unknown> = {};
+    getAPIConfigTestRows(item).forEach((row) => {
+      if (payload[row.name] !== undefined) {
+        return;
+      }
+      const rawValue = values[row.name] ?? "";
+      const trimmedValue = rawValue.trim();
+      if (!trimmedValue) {
+        if (row.required) {
+          throw new Error(`请填写“${row.name}”测试值。`);
+        }
+        return;
+      }
+      switch (row.type) {
+        case "number": {
+          const numeric = Number(trimmedValue);
+          if (!Number.isFinite(numeric)) {
+            throw new Error(`参数“${row.name}”必须填写数字。`);
+          }
+          payload[row.name] = numeric;
+          return;
+        }
+        case "boolean":
+          if (trimmedValue !== "true" && trimmedValue !== "false") {
+            throw new Error(`参数“${row.name}”只能选择 true 或 false。`);
+          }
+          payload[row.name] = trimmedValue === "true";
+          return;
+        case "object": {
+          const parsed = safeParseJSONValue(rawValue);
+          if (parsed === null && trimmedValue !== "null") {
+            throw new Error(`参数“${row.name}”必须是有效 JSON。`);
+          }
+          payload[row.name] = parsed;
+          return;
+        }
+        default:
+          payload[row.name] = rawValue;
+      }
+    });
+    return payload;
+  };
+
+  function resetAPIConfigEditor() {
+    setAPIConfigEditor(emptyAPIConfigEditor);
+    setAPIConfigParameterRows([createAPIParameterRow()]);
+    setAPIConfigAdvancedHeaders("");
+    setAPIConfigAdvancedBody("");
+    setAPIConfigAdvancedOpen(false);
+    setAPIConfigTestArguments("{}");
+    setAPIConfigTestValues({});
+    setAPIConfigTestResult(null);
+  }
+
+  function openCreateAPIConfigModal() {
+    resetAPIConfigEditor();
+    setAPIConfigModalOpen(true);
+  }
+
+  function closeAPIConfigModal() {
+    setAPIConfigModalOpen(false);
+    resetAPIConfigEditor();
+  }
+
+  function addAPIConfigParameterRow(location: APIParameterLocation = "url") {
+    setAPIConfigParameterRows((current) => [...current, createAPIParameterRow({ location })]);
+  }
+
+  function updateAPIConfigParameterRow(id: string, patch: Partial<Omit<APIParameterEditorRow, "id">>) {
+    setAPIConfigParameterRows((current) =>
+      current.map((row) =>
+        row.id === id
+          ? {
+              ...row,
+              ...patch,
+            }
+          : row,
+      ),
+    );
+  }
+
+  function removeAPIConfigParameterRow(id: string) {
+    setAPIConfigParameterRows((current) => {
+      const nextRows = current.filter((row) => row.id !== id);
+      return nextRows.length > 0 ? nextRows : [createAPIParameterRow()];
+    });
+  }
+
+  function isValidHTTPHeaderFieldName(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return false;
+    }
+    return /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(trimmed);
+  }
+
+  function openAPIConfigTestModal(item: APIConfig) {
+    const presetValues = buildAPIConfigTestValuePreset(item);
+    setAPIConfigTestTarget(item);
+    setAPIConfigTestValues(presetValues);
+    setAPIConfigTestArguments(buildAPIConfigTestArgumentPreview(item, presetValues));
+    setAPIConfigTestResult(null);
+  }
+
+  function closeAPIConfigTestModal() {
+    setAPIConfigTestTarget(null);
+    setAPIConfigTestValues({});
+    setAPIConfigTestArguments("{}");
+    setAPIConfigTestResult(null);
+  }
+
+  function updateAPIConfigTestValue(name: string, value: string) {
+    setAPIConfigTestValues((current) => {
+      const nextValues = {
+        ...current,
+        [name]: value,
+      };
+      if (apiConfigTestTarget) {
+        setAPIConfigTestArguments(buildAPIConfigTestArgumentPreview(apiConfigTestTarget, nextValues));
+      }
+      return nextValues;
+    });
+  }
+
+  function toAPIConfigPayload(item: APIConfig | (SaveAPIConfigInput & { id?: number })): SaveAPIConfigInput {
+    return {
+      name: item.name,
+      tool_name: item.tool_name,
+      url: item.url,
+      method: item.method,
+      category: item.category,
+      category_color: item.category_color,
+      icon: item.icon,
+      description: item.description,
+      headers: item.headers,
+      body: item.body,
+      parameters: item.parameters,
+      is_active: item.is_active,
+      is_public: item.is_public,
+      allow_admin_publish: item.allow_admin_publish,
+    };
+  }
+
+  function buildAPIConfigPayloadFromEditor(): SaveAPIConfigInput {
+    const rows = apiConfigParameterRows
+      .map((row) => ({
+        ...row,
+        name: row.name.trim(),
+        description: row.description.trim(),
+        exampleValue: row.exampleValue.trim(),
+      }))
+      .filter((row) => row.name);
+
+    const seen = new Set<string>();
+    for (const row of rows) {
+      if (seen.has(row.name)) {
+        throw new Error(`接口参数“${row.name}”重复，请调整后再保存。`);
+      }
+      if (/[=?&]/.test(row.name)) {
+        throw new Error(`参数名“${row.name}”只填写字段名即可，例如 keyword，不要带 =、?、&。`);
+      }
+      if (row.location === "header" && !isValidHTTPHeaderFieldName(row.name)) {
+        throw new Error(`请求头参数名“${row.name}”无效，请只填写标准请求头名称。`);
+      }
+      seen.add(row.name);
+    }
+
+    const headerObject: Record<string, unknown> = {};
+    const advancedHeaders = apiConfigAdvancedHeaders.trim();
+    if (advancedHeaders) {
+      let parsedHeaders: unknown;
+      try {
+        parsedHeaders = JSON.parse(advancedHeaders) as unknown;
+      } catch {
+        throw new Error("高级请求头必须是有效的 JSON 对象。");
+      }
+      if (!isPlainJSONObject(parsedHeaders)) {
+        throw new Error("高级请求头必须是有效的 JSON 对象。");
+      }
+      for (const key of Object.keys(parsedHeaders)) {
+        if (!isValidHTTPHeaderFieldName(key)) {
+          throw new Error(`高级请求头里的字段名“${key}”无效，请不要带 =。`);
+        }
+      }
+      Object.assign(headerObject, parsedHeaders);
+    }
+
+    const bodyRows = rows.filter((row) => row.location === "body");
+    const bodyAdvanced = apiConfigAdvancedBody.trim();
+    let bodyValue: unknown = null;
+    if (bodyAdvanced) {
+      try {
+        bodyValue = JSON.parse(bodyAdvanced) as unknown;
+      } catch {
+        throw new Error("高级请求体必须是有效的 JSON。");
+      }
+    }
+    if (bodyRows.length > 0) {
+      if (bodyValue !== null && !isPlainJSONObject(bodyValue)) {
+        throw new Error("当你使用请求体参数时，高级请求体需要填写为 JSON 对象。");
+      }
+      const bodyObject: Record<string, unknown> = isPlainJSONObject(bodyValue) ? { ...bodyValue } : {};
+      bodyRows.forEach((row) => {
+        bodyObject[row.name] = `{{${row.name}}}`;
+      });
+      bodyValue = bodyObject;
+    }
+
+    rows
+      .filter((row) => row.location === "header")
+      .forEach((row) => {
+        headerObject[row.name] = `{{${row.name}}}`;
+      });
+
+    const payload = toAPIConfigPayload(apiConfigEditor);
+    payload.headers = Object.keys(headerObject).length > 0 ? JSON.stringify(headerObject, null, 2) : "";
+    payload.body = bodyValue !== null ? JSON.stringify(bodyValue, null, 2) : "";
+    payload.parameters = JSON.stringify(
+      rows.map((row) => ({
+        name: row.name,
+        type: row.type,
+        description: row.description || `参数：${row.name}`,
+        example: row.exampleValue || undefined,
+        required: row.required,
+        in: row.location,
+      })),
+      null,
+      2,
+    );
+    return payload;
+  }
+
+  function startEditAPIConfig(item: APIConfig) {
+    const parameterEditorState = buildAPIParameterEditorState(item);
+    setAPIConfigEditor({
+      id: item.id,
+      ...toAPIConfigPayload(item),
+    });
+    setAPIConfigParameterRows(parameterEditorState.rows.length > 0 ? parameterEditorState.rows : [createAPIParameterRow()]);
+    setAPIConfigAdvancedHeaders(parameterEditorState.advancedHeaders);
+    setAPIConfigAdvancedBody(parameterEditorState.advancedBody);
+    setAPIConfigAdvancedOpen(parameterEditorState.advancedOpen);
+    setAPIConfigModalOpen(true);
+    setAPIConfigTestResult(null);
+  }
+
+  async function handleSaveAPIConfig(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session?.access_token) {
+      return;
+    }
+
+    setProfileBusyAction("api-config-save");
+    setProfileError("");
+    setAPIConfigTestResult(null);
+    try {
+      const payload = buildAPIConfigPayloadFromEditor();
+      if (apiConfigEditor.id > 0) {
+        await api.learnerUpdateAPIConfig(session.access_token, apiConfigEditor.id, payload);
+        setProfileNotice("API 工具已更新。");
+      } else {
+        await api.learnerCreateAPIConfig(session.access_token, payload);
+        setProfileNotice("API 工具已创建。");
+      }
+      closeAPIConfigModal();
+      setAPIConfigPage(1);
+      setProfileReloadKey((current) => current + 1);
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleToggleAPIConfig(item: APIConfig) {
+    if (!session?.access_token) {
+      return;
+    }
+    setProfileBusyAction(`api-config-toggle-${item.id}`);
+    setProfileError("");
+    try {
+      await api.learnerUpdateAPIConfig(session.access_token, item.id, {
+        ...toAPIConfigPayload(item),
+        is_active: !item.is_active,
+      });
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice(!item.is_active ? "API 工具已启用。" : "API 工具已停用。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleDeleteAPIConfig(item: APIConfig) {
+    if (!session?.access_token) {
+      return;
+    }
+    const confirmed = window.confirm(`确认删除 API 工具“${item.name || item.resolved_tool_name}”吗？`);
+    if (!confirmed) {
+      return;
+    }
+    setProfileBusyAction(`api-config-delete-${item.id}`);
+    setProfileError("");
+    try {
+      await api.learnerDeleteAPIConfig(session.access_token, item.id);
+      if (apiConfigModalOpen && apiConfigEditor.id === item.id) {
+        closeAPIConfigModal();
+      }
+      if (apiConfigTestTarget?.id === item.id) {
+        closeAPIConfigTestModal();
+      }
+      setProfileReloadKey((current) => current + 1);
+      setProfileNotice("API 工具已删除。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleTestAPIConfig(item: APIConfig) {
+    if (!session?.access_token) {
+      return;
+    }
+
+    let argumentsPayload: Record<string, unknown> = {};
+    try {
+      argumentsPayload = buildAPIConfigTestPayload(item, apiConfigTestValues);
+      setAPIConfigTestArguments(buildAPIConfigTestArgumentPreview(item, apiConfigTestValues));
+    } catch (err) {
+      setProfileError((err as Error).message);
+      return;
+    }
+
+    setProfileBusyAction(`api-config-test-${item.id}`);
+    setProfileError("");
+    try {
+      const result = await api.learnerTestAPIConfig(session.access_token, item.id, { arguments: argumentsPayload });
+      setAPIConfigTestResult(result);
+      setProfileNotice("API 工具测试已完成。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleSaveXiaomiConfig(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session?.access_token || !xiaomiConfig) {
+      return;
+    }
+    setProfileBusyAction("xiaomi-save");
+    try {
+      const saved = await api.learnerSaveXiaomiConfig(session.access_token, {
+        username: xiaomiConfig.username || "",
+        xiaomi_user_id: xiaomiConfig.xiaomi_user_id || "",
+        server: xiaomiConfig.server || "cn",
+        ssecurity: "",
+        service_token: "",
+        is_active: xiaomiConfig.is_active,
+      });
+      setXiaomiConfig(saved);
+      setProfileNotice("小米配置已保存。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleStartXiaomiQRLogin() {
+    if (!session?.access_token) {
+      return;
+    }
+    setProfileBusyAction("xiaomi-qr-login");
+    try {
+      const result = await api.learnerStartXiaomiQRLogin(session.access_token, xiaomiConfig?.server || "cn");
+      setXiaomiQRSession(result);
+      setXiaomiQRStatus(result.message || "请使用米家 App 扫码。");
+      setProfileNotice("二维码已生成，请使用米家 App 扫码登录。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleClearXiaomiTokens() {
+    if (!session?.access_token) {
+      return;
+    }
+    const confirmed = window.confirm("确认清空当前小米账号令牌吗？清空后需要重新扫码或重新填写凭证。");
+    if (!confirmed) {
+      return;
+    }
+    setProfileBusyAction("xiaomi-clear");
+    try {
+      await api.learnerClearXiaomiTokens(session.access_token);
+      setXiaomiQRSession(null);
+      setXiaomiQRStatus("");
+      await loadXiaomiWorkspace(false);
+      setProfileNotice("小米账号令牌已清空。");
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleRefreshXiaomiDevices() {
+    if (!session?.access_token) {
+      return;
+    }
+    setProfileBusyAction("xiaomi-refresh");
+    try {
+      const result = await api.learnerRefreshXiaomiDevices(session.access_token);
+      setXiaomiDevices((current) =>
+        current
+          ? {
+              ...current,
+              devices: result.devices,
+              total: result.device_count,
+              refreshed: true,
+              account: {
+                ...current.account,
+                device_count: result.device_count,
+              },
+            }
+          : null,
+      );
+      setXiaomiHomes(buildXiaomiHomesFromDevices(result.devices));
+      await loadXiaomiWorkspace(false);
+      setProfileNotice(`设备列表已刷新，共 ${result.device_count} 台。`);
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
+    }
+  }
+
+  async function handleLoadXiaomiHomes() {
+    if (!session?.access_token) {
+      return;
+    }
+    setProfileBusyAction("xiaomi-homes");
+    try {
+      const items = await api.learnerXiaomiHomes(session.access_token);
+      setXiaomiHomes(items);
+      setProfileNotice(`已加载 ${items.length} 个家庭。`);
+    } catch (err) {
+      setProfileError((err as Error).message);
+    } finally {
+      setProfileBusyAction("");
     }
   }
 
@@ -855,11 +2699,52 @@ export default function PublicSite() {
     });
   };
 
-  const profileIntroTitle = currentUser ? "你的学习账号与会员安排" : "先注册学习账号，再开始持续学习";
-  const profileIntroDescription = currentUser
-    ? `你好，${learnerName}。这里集中放你的账号信息、购买入口和后续学习安排，后面扩展更多学科内容时也继续使用这一套学习身份。`
-    : "先注册一个学习账号，后面不管是购买会员、切换设备继续学，还是扩展到其他学科内容，学习记录都会跟着你的账号一起保存。";
   const selectedSubjectLabel = formatSubjectLabel(subjectKey);
+  const profileOverviewSnapshotItems: Array<{ label: string; value: string; note: string }> = currentUser
+    ? [
+        {
+          label: "当前账号",
+          value: learnerName || currentUser.username,
+          note: "学习记录与购买信息都会绑定到这个账号",
+        },
+        {
+          label: "会员状态",
+          value: membershipBadgeText,
+          note: membershipExpiryText || "去会员方案页签开通或续费",
+        },
+        {
+          label: "当前科目",
+          value: selectedSubjectLabel,
+          note: "当前浏览与学习入口都会跟着这个学科切换",
+        },
+        {
+          label: "可选方案",
+          value: plans.length > 0 ? `${plans.length} 种方案` : "暂无方案",
+          note: "支持按需购买、续费和升级",
+        },
+      ]
+    : [
+        {
+          label: "当前状态",
+          value: "未登录",
+          note: "先登录后再保存学习记录和购买信息",
+        },
+        {
+          label: "学习账号",
+          value: "待创建",
+          note: "注册后可跨设备继续学习",
+        },
+        {
+          label: "会员权益",
+          value: "未开通",
+          note: "开通后会自动绑定到你的学习账号",
+        },
+        {
+          label: "当前科目",
+          value: selectedSubjectLabel,
+          note: "先浏览词库，再决定是否开通会员",
+        },
+      ];
   const classificationOnCurrentPage = classification === "" || classifications.some((item) => item.name === classification);
   const classificationOptions: ClassificationStat[] =
     classification !== "" && !classifications.some((item) => item.name === classification)
@@ -881,6 +2766,78 @@ export default function PublicSite() {
     !!selectedClassificationStat &&
     selectedClassificationStat.requires_membership &&
     selectedClassificationStat.accessible_count === 0;
+  const visibleXiaomiDevices = (xiaomiDevices?.devices ?? []).filter((item) => {
+    const queryText = xiaomiSearchQuery.trim().toLowerCase();
+    if (!queryText) {
+      return true;
+    }
+    return [item.name, item.model, item.did, item.home_name, item.room_name]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(queryText));
+  });
+  const apiConfigTestPreview = apiConfigTestResult
+    ? JSON.stringify(apiConfigTestResult.body ?? apiConfigTestResult.raw_body ?? apiConfigTestResult, null, 2)
+    : "";
+  const xiaomiControlStatus = xiaomiControlModalDevice ? xiaomiDeviceStatusMap[xiaomiControlModalDevice.did] ?? null : null;
+  const xiaomiControlStatusLoading = xiaomiControlModalDevice
+    ? Boolean(xiaomiDeviceStatusLoadingMap[xiaomiControlModalDevice.did])
+    : false;
+  const xiaomiControlPropertyRows = buildXiaomiPropertyRows(xiaomiControlStatus);
+  const xiaomiControlActionRows = buildXiaomiActionRows(xiaomiControlStatus);
+  const xiaomiControlSwitchState = inferXiaomiSwitchState(xiaomiControlStatus);
+  // These workspaces are mounted conditionally, so keep their state and helpers
+  // referenced under strict TS unused-local checks.
+  void [
+    apiConfigs,
+    setAPIConfigs,
+    apiConfigPage,
+    setAPIConfigPage,
+    apiConfigQuery,
+    setAPIConfigQuery,
+    apiConfigEditor,
+    setAPIConfigEditor,
+    apiConfigTestArguments,
+    setAPIConfigTestArguments,
+    apiConfigTestResult,
+    setAPIConfigTestResult,
+    knowledgeBaseDocumentPreview,
+    knowledgeBaseDocumentChunks,
+    knowledgeBaseDocumentPreviewLoading,
+    setKnowledgeBaseDocumentPreviewLoading,
+    handleViewKnowledgeBaseDocument,
+    closeKnowledgeBaseDocumentPreview,
+    handleSaveLearningProgress,
+    handleReviewLearningWord,
+    xiaomiConfig,
+    setXiaomiConfig,
+    xiaomiHomes,
+    setXiaomiHomes,
+    xiaomiDevices,
+    setXiaomiDevices,
+    xiaomiSearchQuery,
+    setXiaomiSearchQuery,
+    xiaomiQRSession,
+    setXiaomiQRSession,
+    xiaomiQRStatus,
+    setXiaomiQRStatus,
+    marketResult,
+    marketLoading,
+    marketError,
+    marketPage,
+    setMarketPage,
+    setMarketQuery,
+    setMarketCategory,
+    marketCategories,
+    marketTools,
+    learningSummary,
+    learningProgress,
+    setLearningQuery,
+    setLearningLevelFilter,
+    setLearningDifficultyFilter,
+    deferredAPIConfigQuery,
+    deferredMarketQuery,
+    apiConfigs?.items?.[0] as APIConfig | undefined,
+  ];
 
   return (
     <div className="site-shell">
@@ -898,12 +2855,10 @@ export default function PublicSite() {
             <p>{currentSettings.site_tagline}</p>
           </div>
         </a>
-        <nav className="site-topnav">
-          <a href="#catalog">词库学习</a>
-          <a href="#plans">会员方案</a>
-          <a href="#mcp">MCP连接</a>
-        </nav>
         <div className="site-header-actions">
+          <a className="secondary-button site-account-link" href="#mcp-market">
+            MCP 工具市场
+          </a>
           {currentUser ? (
             <div className="site-account-menu" ref={accountMenuRef}>
               <button
@@ -957,6 +2912,16 @@ export default function PublicSite() {
                       role="menuitem"
                     >
                       进入个人中心
+                    </a>
+                    <a
+                      className="site-account-dropdown-link"
+                      href="#mcp-market"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                      }}
+                      role="menuitem"
+                    >
+                      MCP 工具市场
                     </a>
                     <a
                       className="site-account-dropdown-link"
@@ -1018,356 +2983,1743 @@ export default function PublicSite() {
       {activeView === "profile" ? (
         <div className="site-main site-main-profile">
           <main className="site-content profile-page">
-            <section className="content-card profile-hero-card" id="profile">
-              <div className="section-header profile-hero-header">
-                <div>
-                  <p className="section-eyebrow">个人中心</p>
-                  <h1>{profileIntroTitle}</h1>
-                  <p className="helper-text">{profileIntroDescription}</p>
-                </div>
-                <div className="button-row">
-                  <a className="secondary-button" href="#catalog">
-                    去词库学习
-                  </a>
-                  <a className="primary-button" href="#plans">
-                    查看会员方案
-                  </a>
-                </div>
-              </div>
+            <nav className="profile-tabbar" aria-label="个人中心导航" id="profile">
+              {profileTabItems.map((item) => (
+                <a
+                  className={currentProfileTab === item.key ? "profile-tab-link profile-tab-link-active" : "profile-tab-link"}
+                  href={item.href}
+                  key={item.key}
+                >
+                  <span>{item.label}</span>
+                  <small>{item.helper}</small>
+                  {item.count !== undefined ? <em>{formatCount(item.count)}</em> : null}
+                </a>
+              ))}
+            </nav>
 
-              <div className="profile-overview">
-                <div>
-                  <strong>{currentUser ? learnerName || currentUser.username : "未登录"}</strong>
-                  <span>{currentUser ? "当前学习身份" : "登录后可保存学习记录"}</span>
-                </div>
-                <div>
-                  <strong>{currentUser ? "可正常学习" : "等待注册 / 登录"}</strong>
-                  <span>账号状态</span>
-                </div>
-                <div>
-                  <strong>{selectedSubjectLabel}</strong>
-                  <span>当前学习科目</span>
-                </div>
-                <div>
-                  <strong>{plans.length > 0 ? `${plans.length} 种可选方案` : "暂未上架方案"}</strong>
-                  <span>会员购买入口</span>
-                </div>
-              </div>
-              {currentUser ? (
-                <div className={hasActiveMembership ? "membership-highlight-card membership-highlight-card-active" : "membership-highlight-card"}>
-                  <div className="membership-highlight-head">
-                    <span className={hasActiveMembership ? "site-membership-badge site-membership-badge-active" : "site-membership-badge"}>
-                      {membershipBadgeText}
-                    </span>
-                    <strong>{selectedSubjectLabel}</strong>
+            <div className="profile-workbench">
+              {currentProfileTab === "overview" ? (
+                <div className="profile-panel-stack">
+                  <div className="profile-snapshot-grid">
+                    {profileOverviewSnapshotItems.map((item) => (
+                      <article className="profile-snapshot-card" key={item.label}>
+                        <span>{item.label}</span>
+                        <strong>{item.value}</strong>
+                        <small>{item.note}</small>
+                      </article>
+                    ))}
                   </div>
-                  <p>{hasActiveMembership ? (membershipExpiryText || "当前会员为长期有效。") : "当前账号还没有生效中的会员权益。"}</p>
+                  <div className="profile-grid">
+                    <section className="content-card profile-card profile-panel-card">
+                      <div className="section-header">
+                        <div>
+                          <p className="section-eyebrow">账号概览</p>
+                          <h2>{currentUser ? "学习资料和权益都跟着这个账号走" : "先准备好你的学习账号"}</h2>
+                        </div>
+                      </div>
+
+                      {currentUser ? (
+                        <>
+                          <p className="helper-text">
+                            你的购买记录、会员权益和后续学习进度都会绑定到这个账号，后续继续补充其他学科内容时也可以共用这一套学习身份。
+                          </p>
+                          <dl className="metric-list">
+                            <div>
+                              <dt>学习账号</dt>
+                              <dd>{currentUser.username}</dd>
+                            </div>
+                            <div>
+                              <dt>会员状态</dt>
+                              <dd>
+                                <span className={hasActiveMembership ? "site-membership-badge site-membership-badge-active" : "site-membership-badge"}>
+                                  {membershipBadgeText}
+                                </span>
+                              </dd>
+                            </div>
+                            {membershipExpiryText ? (
+                              <div>
+                                <dt>会员到期</dt>
+                                <dd>{membershipExpiryText.replace("有效期至 ", "")}</dd>
+                              </div>
+                            ) : null}
+                            <div>
+                              <dt>账号昵称</dt>
+                              <dd>{currentUser.display_name || "-"}</dd>
+                            </div>
+                            <div>
+                              <dt>注册时间</dt>
+                              <dd>{formatDateTime(currentUser.created_at)}</dd>
+                            </div>
+                            <div>
+                              <dt>当前学习科目</dt>
+                              <dd>{selectedSubjectLabel}</dd>
+                            </div>
+                          </dl>
+                          <div className="button-row">
+                            <a className="primary-button" href="#plans">
+                              去看会员方案
+                            </a>
+                            <a className="secondary-button" href="#catalog">
+                              返回词库学习
+                            </a>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="helper-text">
+                            注册之后，购买会员、切换设备继续学、后续增加其他科目内容，都会继续沿用同一个学习账号，不用重复建立新的学习身份。
+                          </p>
+                          <div className="tag-list">
+                            <span className="tag">购买记录跟账号绑定</span>
+                            <span className="tag">会员权益自动发放</span>
+                            <span className="tag">后续学习进度可持续保留</span>
+                          </div>
+                          <div className="button-row">
+                            <button
+                              className={authMode === "register" ? "primary-button small-button" : "secondary-button small-button"}
+                              onClick={() => setAuthMode("register")}
+                              type="button"
+                            >
+                              注册账号
+                            </button>
+                            <button
+                              className={authMode === "login" ? "primary-button small-button" : "secondary-button small-button"}
+                              onClick={() => setAuthMode("login")}
+                              type="button"
+                            >
+                              已有账号登录
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </section>
+
+                    <section className="content-card profile-card profile-panel-card">
+                      <div className="section-header">
+                        <div>
+                          <p className="section-eyebrow">{currentUser ? "会员与服务" : authMode === "register" ? "注册账号" : "账号登录"}</p>
+                          <h2>{currentUser ? "购买后的权益会自动关联到你的账号" : authMode === "register" ? "填写资料，马上开始学习" : "输入账号信息，继续上次学习"}</h2>
+                        </div>
+                      </div>
+
+                      {!currentUser ? (
+                        <form className="setup-form" onSubmit={handleSubmitAuth}>
+                          <label className="form-field">
+                            <span>学习账号</span>
+                            <input
+                              value={authForm.username}
+                              onChange={(event) => {
+                                setAuthForm((current) => ({ ...current, username: event.target.value }));
+                              }}
+                              placeholder="例如：xiaoming"
+                            />
+                          </label>
+                          {authMode === "register" ? (
+                            <label className="form-field">
+                              <span>昵称</span>
+                              <input
+                                value={authForm.displayName}
+                                onChange={(event) => {
+                                  setAuthForm((current) => ({ ...current, displayName: event.target.value }));
+                                }}
+                                placeholder="例如：小明"
+                              />
+                            </label>
+                          ) : null}
+                          {authMode === "register" ? (
+                            <label className="form-field">
+                              <span>邀请码</span>
+                              <input
+                                readOnly={inviteCodeLocked}
+                                value={authForm.inviteCode}
+                                onChange={(event) => {
+                                  setAuthForm((current) => ({ ...current, inviteCode: event.target.value }));
+                                }}
+                                placeholder="有邀请码可填写，没有可留空"
+                              />
+                            </label>
+                          ) : null}
+                          {authMode === "register" ? (
+                            <p className="helper-text">
+                              {inviteCodeLocked
+                                ? "通过邀请链接进入，邀请码已自动带入并锁定。注册成功后会自动建立邀请关系。"
+                                : "有邀请码可以填写；如果从邀请链接进入，这里会自动带入。"}
+                            </p>
+                          ) : null}
+                          <label className="form-field">
+                            <span>登录密码</span>
+                            <input
+                              type="password"
+                              value={authForm.password}
+                              onChange={(event) => {
+                                setAuthForm((current) => ({ ...current, password: event.target.value }));
+                              }}
+                              placeholder="至少 8 位"
+                            />
+                          </label>
+                          {authMode === "register" ? (
+                            <label className="form-field">
+                              <span>确认密码</span>
+                              <input
+                                type="password"
+                                value={authForm.confirmPassword}
+                                onChange={(event) => {
+                                  setAuthForm((current) => ({ ...current, confirmPassword: event.target.value }));
+                                }}
+                                placeholder="请再输入一次密码"
+                              />
+                            </label>
+                          ) : null}
+                          <div className="form-grid-two">
+                            <label className="form-field">
+                              <span>图形验证码</span>
+                              <input
+                                value={authCaptchaAnswer}
+                                onChange={(event) => {
+                                  setAuthCaptchaAnswer(event.target.value);
+                                }}
+                                placeholder="请输入图中的字符"
+                              />
+                            </label>
+                            <div className="form-field">
+                              <span>验证码图片</span>
+                              <div className="button-row">
+                                <img
+                                  alt="图形验证码"
+                                  className="captcha-image"
+                                  src={authCaptcha?.image_data || ""}
+                                />
+                                <button
+                                  className="secondary-button small-button"
+                                  disabled={authCaptchaLoading}
+                                  onClick={() => {
+                                    void refreshAuthCaptcha(authMode);
+                                  }}
+                                  type="button"
+                                >
+                                  {authCaptchaLoading ? "刷新中..." : "换一张"}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          <button className="primary-button" disabled={authBusy !== ""} type="submit">
+                            {authBusy === "register"
+                              ? "注册中..."
+                              : authBusy === "login"
+                                ? "登录中..."
+                                : authMode === "register"
+                                  ? "注册并开始学习"
+                                  : "进入个人中心"}
+                          </button>
+                        </form>
+                      ) : (
+                        <div className="profile-card-body">
+                          <div className={hasActiveMembership ? "feedback-banner feedback-success membership-summary-banner" : "feedback-banner membership-summary-banner"}>
+                            <div className="membership-summary-banner-head">
+                              <span className={hasActiveMembership ? "site-membership-badge site-membership-badge-active" : "site-membership-badge"}>
+                                {membershipBadgeText}
+                              </span>
+                              <strong>{currentMembership ? subscriptionStatusLabel(currentMembership.status) : "未开通"}</strong>
+                            </div>
+                            <p>
+                              {hasActiveMembership
+                                ? membershipExpiryText
+                                  ? `你当前是按月会员，${membershipExpiryText}。`
+                                  : "你当前会员权益已生效，当前为长期有效。"
+                                : "当前账号还没有生效中的会员权益，购买后会自动关联到你的学习账号。"}
+                            </p>
+                          </div>
+                          <div className="feedback-banner">
+                            购买会员后，后台会直接把会员状态和有效期关联到账号 <strong>{currentUser.username}</strong>，你在前台继续学习时就能一直使用同一个账号。
+                          </div>
+                          <p className="helper-text">
+                            如果你准备开通会员，可以直接从这里的按钮或会员方案页面进入购买；付款完成后，这个账号就是后续所有学习记录的承接入口。
+                          </p>
+                          <div className="button-row">
+                            <a className="primary-button" href="#plans">
+                              立即购买会员
+                            </a>
+                            <a className="secondary-button" href="#catalog">
+                              返回词库学习
+                            </a>
+                          </div>
+                        </div>
+                      )}
+                    </section>
+                  </div>
                 </div>
               ) : null}
-            </section>
 
-            <div className="profile-grid">
-              <section className="content-card profile-card">
-                <div className="section-header">
-                  <div>
-                    <p className="section-eyebrow">账号概览</p>
-                    <h2>{currentUser ? "学习资料和权益都跟着这个账号走" : "先准备好你的学习账号"}</h2>
+              {currentProfileTab === "memberships" ? (
+                <section className="content-card profile-card profile-panel-card" id="profile-memberships">
+                  <div className="section-header">
+                    <div>
+                      <p className="section-eyebrow">会员记录</p>
+                      <h2>按月会员到期时间和历史权益都在这里</h2>
+                    </div>
                   </div>
-                </div>
+                  {currentUser ? (
+                    <>
+                      <div className="feedback-banner">
+                        当前学科：<strong>{selectedSubjectLabel}</strong>
+                        {membershipExpiryText ? `，${membershipExpiryText}` : "，当前没有生效中的到期时间。"}
+                      </div>
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>方案</th>
+                              <th>状态</th>
+                              <th>学科</th>
+                              <th>有效期至</th>
+                              <th>开通时间</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(membershipHistory?.items ?? []).map((item) => (
+                              <tr key={item.id}>
+                                <td>{item.plan_key || "-"}</td>
+                                <td>
+                                  <span className={`pill ${subscriptionStatusClass(item.status)}`}>
+                                    {subscriptionStatusLabel(item.status)}
+                                  </span>
+                                </td>
+                                <td>{formatSubjectLabel(item.subject_key)}</td>
+                                <td>{item.current_period_end ? formatDateTime(item.current_period_end) : "长期有效"}</td>
+                                <td>{item.started_at ? formatDateTime(item.started_at) : "-"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {(membershipHistory?.items ?? []).length === 0 ? (
+                        <div className="feedback-banner">当前还没有会员记录，购买后会自动同步到这里。</div>
+                      ) : null}
+                      <PagerControls
+                        onChange={setMembershipHistoryPage}
+                        page={membershipHistory?.page ?? membershipHistoryPage}
+                        pageSize={membershipHistory?.page_size ?? profilePageSize}
+                        total={membershipHistory?.total ?? 0}
+                      />
+                    </>
+                  ) : (
+                    <div className="feedback-banner">登录后可查看会员开通状态、按月到期时间和历史权益记录。</div>
+                  )}
+                </section>
+              ) : null}
 
-                {currentUser ? (
-                  <>
-                    <p className="helper-text">
-                      你的购买记录、会员权益和后续学习进度都会绑定到这个账号，后续继续补充其他学科内容时也可以共用这一套学习身份。
-                    </p>
-                    <dl className="metric-list">
-                      <div>
-                        <dt>学习账号</dt>
-                        <dd>{currentUser.username}</dd>
+              {currentProfileTab === "orders" ? (
+                <section className="content-card profile-card profile-panel-card" id="profile-orders">
+                  <div className="section-header">
+                    <div>
+                      <p className="section-eyebrow">购买记录</p>
+                      <h2>充值、下单和支付结果一目了然</h2>
+                    </div>
+                  </div>
+                  {currentUser ? (
+                    <>
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>订单号</th>
+                              <th>方案</th>
+                              <th>金额</th>
+                              <th>状态</th>
+                              <th>支付时间</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(paymentOrders?.items ?? []).map((item) => (
+                              <tr key={item.order_no}>
+                                <td>{item.order_no}</td>
+                                <td>{item.description || item.plan_key}</td>
+                                <td>{formatPrice(item.amount_cents)}</td>
+                                <td>
+                                  <span className={`pill ${paymentStatusClass(item.status)}`}>{paymentStatusLabel(item.status)}</span>
+                                </td>
+                                <td>{item.paid_at ? formatDateTime(item.paid_at) : item.created_at ? formatDateTime(item.created_at) : "-"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                      <div>
-                        <dt>会员状态</dt>
-                        <dd>
-                          <span className={hasActiveMembership ? "site-membership-badge site-membership-badge-active" : "site-membership-badge"}>
-                            {membershipBadgeText}
-                          </span>
-                        </dd>
+                      {(paymentOrders?.items ?? []).length === 0 ? (
+                        <div className="feedback-banner">当前还没有购买记录，支付成功后会自动显示在这里。</div>
+                      ) : null}
+                      <PagerControls
+                        onChange={setOrderHistoryPage}
+                        page={paymentOrders?.page ?? orderHistoryPage}
+                        pageSize={paymentOrders?.page_size ?? profilePageSize}
+                        total={paymentOrders?.total ?? 0}
+                      />
+                    </>
+                  ) : (
+                    <div className="feedback-banner">登录后可查看充值和会员购买记录。</div>
+                  )}
+                </section>
+              ) : null}
+
+              {currentProfileTab === "invite" ? (
+                <section className="content-card profile-card profile-panel-card" id="profile-invite">
+                  <div className="section-header">
+                    <div>
+                      <p className="section-eyebrow">邀请好友</p>
+                      <h2>邀请码、邀请统计和转化记录集中查看</h2>
+                    </div>
+                    {currentUser ? (
+                      <div className="button-row">
+                        <button className="secondary-button small-button" onClick={() => void handleCopyInviteCode()} type="button">
+                          复制邀请码
+                        </button>
                       </div>
-                      {membershipExpiryText ? (
+                    ) : null}
+                  </div>
+                  {currentUser ? (
+                    <div className="profile-panel-stack">
+                      <label className="form-field">
+                        <span>注册链接</span>
+                        <input readOnly value={inviteRegistrationLink} />
+                        <small className="helper-text">把这个注册链接分享给好友，打开后会自动带入邀请码并进入注册流程。</small>
+                      </label>
+                      <div className="button-row">
+                        <button className="secondary-button small-button" onClick={() => void handleCopyInviteCode()} type="button">
+                          复制邀请码
+                        </button>
+                        <button className="secondary-button small-button" onClick={() => void handleCopyInviteLink()} type="button">
+                          复制注册链接
+                        </button>
+                        {inviteRegistrationLink ? (
+                          <a className="secondary-button small-button" href={inviteRegistrationLink} rel="noreferrer" target="_blank">
+                            打开注册链接
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                  {currentUser ? (
+                    <>
+                      <div className="profile-overview">
                         <div>
-                          <dt>会员到期</dt>
-                          <dd>{membershipExpiryText.replace("有效期至 ", "")}</dd>
+                          <strong>{inviteSummary?.invite_code || currentUser.invite_code || "-"}</strong>
+                          <span>我的邀请码</span>
+                        </div>
+                        <div>
+                          <strong>{formatCount(Number(inviteSummary?.invited_count ?? 0))}</strong>
+                          <span>已邀请人数</span>
+                        </div>
+                        <div>
+                          <strong>{formatCount(Number(inviteSummary?.paid_invite_count ?? 0))}</strong>
+                          <span>已付费人数</span>
+                        </div>
+                        <div>
+                          <strong>{formatPrice(inviteSummary?.total_recharge_cents ?? 0)}</strong>
+                          <span>累计邀请充值</span>
+                        </div>
+                      </div>
+                      <label className="form-field">
+                        <span>邀请码</span>
+                        <input readOnly value={currentInviteCode} />
+                        <small className="helper-text">邀请码由系统自动生成，前台普通用户不可修改。</small>
+                      </label>
+                      <div className="profile-overview">
+                        <div>
+                          <strong>{formatPrice(inviteSummary?.commission_available_cents ?? 0)}</strong>
+                          <span>可提现佣金</span>
+                        </div>
+                        <div>
+                          <strong>{formatPrice(inviteSummary?.commission_withdrawing_cents ?? 0)}</strong>
+                          <span>提现处理中</span>
+                        </div>
+                        <div>
+                          <strong>{formatPrice(inviteSummary?.commission_paid_cents ?? 0)}</strong>
+                          <span>已打款佣金</span>
+                        </div>
+                        <div>
+                          <strong>{formatCommissionRate(inviteCommissionRate)}</strong>
+                          <span>当前返佣比例</span>
+                        </div>
+                      </div>
+                      <div className="profile-grid">
+                        <form className="setup-form" onSubmit={handleSaveInvitePayoutProfile}>
+                          <div className="section-header">
+                            <div>
+                              <p className="section-eyebrow">返佣收款信息</p>
+                              <h3>保存微信提现或支付宝收款资料</h3>
+                            </div>
+                          </div>
+                          <label className="form-field">
+                            <span>收款人姓名</span>
+                            <input
+                              value={invitePayoutProfile.real_name}
+                              onChange={(event) => {
+                                setInvitePayoutProfile((current) => ({ ...current, real_name: event.target.value }));
+                              }}
+                              placeholder="例如：张三"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>微信收款账号</span>
+                            <input
+                              value={invitePayoutProfile.wechat_account}
+                              onChange={(event) => {
+                                setInvitePayoutProfile((current) => ({ ...current, wechat_account: event.target.value }));
+                              }}
+                              placeholder="可填写微信号、手机号或备注"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>微信收款码图片地址</span>
+                            <input
+                              value={invitePayoutProfile.wechat_qr_code}
+                              onChange={(event) => {
+                                setInvitePayoutProfile((current) => ({ ...current, wechat_qr_code: event.target.value }));
+                              }}
+                              placeholder="可选，填写收款码图片 URL"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>支付宝收款账号</span>
+                            <input
+                              value={invitePayoutProfile.alipay_account}
+                              onChange={(event) => {
+                                setInvitePayoutProfile((current) => ({ ...current, alipay_account: event.target.value }));
+                              }}
+                              placeholder="支付宝账号或手机号"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>支付宝收款码图片地址</span>
+                            <input
+                              value={invitePayoutProfile.alipay_qr_code}
+                              onChange={(event) => {
+                                setInvitePayoutProfile((current) => ({ ...current, alipay_qr_code: event.target.value }));
+                              }}
+                              placeholder="可选，填写收款码图片 URL"
+                            />
+                          </label>
+                          <div className="site-icon-field invite-qr-upload-field">
+                            <label className={`upload-picker ${invitePayoutProfile.wechat_qr_code ? "upload-picker-ready" : ""}`}>
+                              <input
+                                accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                                className="upload-picker-input"
+                                onChange={(event) => {
+                                  void handleInviteQRCodeSelected("wechat", event);
+                                }}
+                                type="file"
+                              />
+                              <div className="upload-picker-main">
+                                <div className="upload-picker-meta">
+                                  <strong>{invitePayoutProfile.wechat_qr_code ? "已选择微信收款码图片" : "上传微信收款码图片"}</strong>
+                                  <span>可直接上传二维码图片；如果不上传，也可以继续保留上面的图片地址。</span>
+                                </div>
+                                <span className="upload-picker-action">{invitePayoutProfile.wechat_qr_code ? "重新上传" : "选择图片"}</span>
+                              </div>
+                            </label>
+                            {invitePayoutProfile.wechat_qr_code ? (
+                              <div className="site-icon-preview-card invite-qr-preview-card">
+                                <div className="site-icon-preview-frame invite-qr-preview-frame">
+                                  <img alt="微信收款码预览" className="site-icon-preview-image" src={invitePayoutProfile.wechat_qr_code} />
+                                </div>
+                                <div className="site-icon-preview-meta">
+                                  <strong>微信收款码预览</strong>
+                                  <span>保存后管理员审核提现时会直接看到这张收款码。</span>
+                                </div>
+                                <button
+                                  className="secondary-button small-button"
+                                  onClick={() => {
+                                    handleClearInviteQRCode("wechat");
+                                  }}
+                                  type="button"
+                                >
+                                  清空图片
+                                </button>
+                              </div>
+                            ) : null}
+                            <label className={`upload-picker ${invitePayoutProfile.alipay_qr_code ? "upload-picker-ready" : ""}`}>
+                              <input
+                                accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                                className="upload-picker-input"
+                                onChange={(event) => {
+                                  void handleInviteQRCodeSelected("alipay", event);
+                                }}
+                                type="file"
+                              />
+                              <div className="upload-picker-main">
+                                <div className="upload-picker-meta">
+                                  <strong>{invitePayoutProfile.alipay_qr_code ? "已选择支付宝收款码图片" : "上传支付宝收款码图片"}</strong>
+                                  <span>支持上传图片或继续保留上面的图片地址，两种方式都可用。</span>
+                                </div>
+                                <span className="upload-picker-action">{invitePayoutProfile.alipay_qr_code ? "重新上传" : "选择图片"}</span>
+                              </div>
+                            </label>
+                            {invitePayoutProfile.alipay_qr_code ? (
+                              <div className="site-icon-preview-card invite-qr-preview-card">
+                                <div className="site-icon-preview-frame invite-qr-preview-frame">
+                                  <img alt="支付宝收款码预览" className="site-icon-preview-image" src={invitePayoutProfile.alipay_qr_code} />
+                                </div>
+                                <div className="site-icon-preview-meta">
+                                  <strong>支付宝收款码预览</strong>
+                                  <span>如果走支付宝提现，后台审核页会直接展示这张收款码图片。</span>
+                                </div>
+                                <button
+                                  className="secondary-button small-button"
+                                  onClick={() => {
+                                    handleClearInviteQRCode("alipay");
+                                  }}
+                                  type="button"
+                                >
+                                  清空图片
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                          <button className="primary-button" disabled={profileBusyAction === "invite-payout-save"} type="submit">
+                            {profileBusyAction === "invite-payout-save" ? "保存中..." : "保存返佣收款信息"}
+                          </button>
+                        </form>
+                        <form className="setup-form" onSubmit={handleCreateInviteWithdraw}>
+                          <div className="section-header">
+                            <div>
+                              <p className="section-eyebrow">佣金提现</p>
+                              <h3>把可提现佣金提交给管理员审核打款</h3>
+                            </div>
+                          </div>
+                          <div className="feedback-banner">
+                            当前可提现金额 <strong>{formatPrice(inviteAvailableCommissionCents)}</strong>
+                            {inviteCommissionRate > 0 ? `，返佣比例 ${formatCommissionRate(inviteCommissionRate)}` : ""}
+                          </div>
+                          <label className="form-field">
+                            <span>提现方式</span>
+                            <select
+                              value={inviteWithdrawForm.paymentType}
+                              onChange={(event) => {
+                                setInviteWithdrawForm((current) => ({ ...current, paymentType: event.target.value }));
+                              }}
+                            >
+                              <option value="alipay">支付宝</option>
+                              <option value="wechat">微信</option>
+                            </select>
+                          </label>
+                          <label className="form-field">
+                            <span>提现金额</span>
+                            <input
+                              inputMode="decimal"
+                              value={inviteWithdrawForm.amount}
+                              onChange={(event) => {
+                                setInviteWithdrawForm((current) => ({ ...current, amount: event.target.value }));
+                              }}
+                              placeholder="例如 10.00"
+                            />
+                            <small className="helper-text">推荐直接提取全部可提现佣金；如果按部分金额提现，金额需要能和可用佣金记录精确匹配。</small>
+                          </label>
+                          <div className="button-row">
+                            <button className="secondary-button" onClick={handleFillInviteWithdrawAmount} type="button">
+                              填入全部可提现金额
+                            </button>
+                            <button
+                              className="primary-button"
+                              disabled={profileBusyAction === "invite-withdraw-create" || inviteAvailableCommissionCents <= 0}
+                              type="submit"
+                            >
+                              {profileBusyAction === "invite-withdraw-create" ? "提交中..." : "提交提现申请"}
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>好友账号</th>
+                              <th>显示名称</th>
+                              <th>注册时间</th>
+                              <th>付费次数</th>
+                              <th>累计充值</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(inviteSummary?.items ?? []).map((item) => (
+                              <tr key={item.user_id}>
+                                <td>{item.username}</td>
+                                <td>{item.display_name || "-"}</td>
+                                <td>{formatDateTime(item.created_at)}</td>
+                                <td>{formatCount(item.paid_order_count)}</td>
+                                <td>{formatPrice(item.total_recharge_cents)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {(inviteSummary?.items ?? []).length === 0 ? (
+                        <div className="feedback-banner">分享邀请码后，你邀请注册的用户和他们的付费记录会显示在这里。</div>
+                      ) : null}
+                      <div className="section-header">
+                        <div>
+                          <p className="section-eyebrow">邀请返佣明细</p>
+                          <h3>每一笔好友充值带来的佣金记录都在这里</h3>
+                        </div>
+                      </div>
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>好友账号</th>
+                              <th>订单号</th>
+                              <th>充值金额</th>
+                              <th>佣金比例</th>
+                              <th>佣金金额</th>
+                              <th>状态</th>
+                              <th>支付时间</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(inviteCommissions?.items ?? []).map((item) => (
+                              <tr key={item.id}>
+                                <td>{item.invited_display_name || item.invited_username || "-"}</td>
+                                <td>{item.payment_order_no}</td>
+                                <td>{formatPrice(item.order_amount_cents)}</td>
+                                <td>{formatCommissionRate(item.commission_rate)}</td>
+                                <td>{formatPrice(item.commission_cents)}</td>
+                                <td>
+                                  <span className={`pill ${inviteCommissionStatusClass(item)}`}>{inviteCommissionStatusLabel(item)}</span>
+                                </td>
+                                <td>{item.order_paid_at ? formatDateTime(item.order_paid_at) : "-"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {(inviteCommissions?.items ?? []).length === 0 ? (
+                        <div className="feedback-banner">好友充值成功后，返佣记录会自动出现在这里。</div>
+                      ) : null}
+                      <PagerControls
+                        onChange={setInviteCommissionPage}
+                        page={inviteCommissions?.page ?? inviteCommissionPage}
+                        pageSize={inviteCommissions?.page_size ?? profilePageSize}
+                        total={inviteCommissions?.total ?? 0}
+                      />
+                      <div className="section-header">
+                        <div>
+                          <p className="section-eyebrow">提现申请记录</p>
+                          <h3>提交、审核、打款状态一页看清</h3>
+                        </div>
+                      </div>
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>申请单号</th>
+                              <th>提现金额</th>
+                              <th>方式</th>
+                              <th>状态</th>
+                              <th>申请时间</th>
+                              <th>处理时间</th>
+                              <th>说明</th>
+                              <th>操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(inviteWithdraws?.items ?? []).map((item) => {
+                              const cancelBusy = profileBusyAction === `invite-withdraw-cancel-${item.id}`;
+                              return (
+                                <tr key={item.id}>
+                                  <td>{item.id}</td>
+                                  <td>{formatPrice(item.amount_cents)}</td>
+                                  <td>{invitePaymentTypeLabel(item.payment_type)}</td>
+                                  <td>
+                                    <span className={`pill ${inviteWithdrawStatusClass(item.status)}`}>{inviteWithdrawStatusLabel(item.status)}</span>
+                                  </td>
+                                  <td>{formatDateTime(item.created_at)}</td>
+                                  <td>{item.processed_at ? formatDateTime(item.processed_at) : "-"}</td>
+                                  <td>{item.admin_note || "-"}</td>
+                                  <td>
+                                    {item.status === "pending" ? (
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={cancelBusy}
+                                        onClick={() => void handleCancelInviteWithdraw(item)}
+                                        type="button"
+                                      >
+                                        {cancelBusy ? "取消中..." : "取消申请"}
+                                      </button>
+                                    ) : (
+                                      <span className="helper-text">-</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      {(inviteWithdraws?.items ?? []).length === 0 ? (
+                        <div className="feedback-banner">你提交的返佣提现申请会显示在这里。</div>
+                      ) : null}
+                      <PagerControls
+                        onChange={setInviteWithdrawPage}
+                        page={inviteWithdraws?.page ?? inviteWithdrawPage}
+                        pageSize={inviteWithdraws?.page_size ?? profilePageSize}
+                        total={inviteWithdraws?.total ?? 0}
+                      />
+                    </>
+                  ) : (
+                    <div className="feedback-banner">登录后可查看邀请码、邀请人数和累计充值统计。</div>
+                  )}
+                </section>
+              ) : null}
+
+              {currentProfileTab === "knowledge-base" ? (
+                <section className="content-card profile-card profile-panel-card" id="profile-knowledge-base">
+                  <div className="section-header">
+                    <div>
+                      <p className="section-eyebrow">我的知识库</p>
+                      <h2>上传文本、Markdown、CSV、Excel、Word 作为你自己的 MCP 私有知识库</h2>
+                    </div>
+                  </div>
+                  {currentUser ? (
+                    <>
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>我的知识库文档</h2>
+                          <p className="helper-text">这里只展示当前账号上传的私有知识库文档。</p>
+                        </div>
+                        <div className="toolbar-controls">
+                          <button className="primary-button" onClick={openKnowledgeBaseUploadModal} type="button">
+                            上传文件
+                          </button>
+                          <input
+                            className="toolbar-search"
+                            onChange={(event) => {
+                              setKnowledgeBaseQuery(event.target.value);
+                              setKnowledgeBasePage(1);
+                            }}
+                            placeholder="搜索标题或文件名"
+                            value={knowledgeBaseQuery}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="feedback-banner">
+                        上传后的文档会自动切片，并可被当前账号可用的 MCP 工具直接检索调用；支持 TXT、Markdown、CSV、Excel、Word(.docx)。
+                      </div>
+
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>标题</th>
+                              <th>文件名</th>
+                              <th>格式</th>
+                              <th>状态</th>
+                              <th>片段数</th>
+                              <th>更新时间</th>
+                              <th>操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(knowledgeBaseDocuments?.items ?? []).map((item) => {
+                              const statusBusy = profileBusyAction === `knowledge-base-status-${item.id}`;
+                              const deleteBusy = profileBusyAction === `knowledge-base-delete-${item.id}`;
+                              const viewBusy = knowledgeBaseDocumentPreviewLoading && knowledgeBaseDocumentPreview?.id === item.id;
+                              return (
+                                <tr key={item.id}>
+                                  <td>{item.title}</td>
+                                  <td>{item.source_file_name}</td>
+                                  <td>{item.source_type}</td>
+                                  <td>
+                                    <span className={item.status === "active" ? "pill pill-success" : "pill pill-muted"}>
+                                      {item.status === "active" ? "启用中" : "已停用"}
+                                    </span>
+                                  </td>
+                                  <td>{formatCount(item.chunk_count)}</td>
+                                  <td>{formatDateTime(item.updated_at)}</td>
+                                  <td>
+                                    <div className="button-row">
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={statusBusy || deleteBusy || viewBusy}
+                                        onClick={() => void handleViewKnowledgeBaseDocument(item)}
+                                        type="button"
+                                      >
+                                        {viewBusy ? "加载中..." : "查看内容"}
+                                      </button>
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={statusBusy || deleteBusy}
+                                        onClick={() => void handleToggleKnowledgeBaseDocument(item)}
+                                        type="button"
+                                      >
+                                        {statusBusy ? "处理中..." : item.status === "active" ? "停用" : "启用"}
+                                      </button>
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={statusBusy || deleteBusy}
+                                        onClick={() => void handleDeleteKnowledgeBaseDocument(item)}
+                                        type="button"
+                                      >
+                                        {deleteBusy ? "删除中..." : "删除"}
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      {(knowledgeBaseDocuments?.items ?? []).length === 0 ? (
+                        <div className="feedback-banner">
+                          <div className="button-row">
+                            <span>当前还没有上传个人知识库文件，先上传一份文本、表格或 Word 文件试试。</span>
+                            <button className="secondary-button small-button" onClick={openKnowledgeBaseUploadModal} type="button">
+                              立即上传
+                            </button>
+                          </div>
                         </div>
                       ) : null}
-                      <div>
-                        <dt>账号昵称</dt>
-                        <dd>{currentUser.display_name || "-"}</dd>
-                      </div>
-                      <div>
-                        <dt>注册时间</dt>
-                        <dd>{formatDateTime(currentUser.created_at)}</dd>
-                      </div>
-                      <div>
-                        <dt>当前学习科目</dt>
-                        <dd>{selectedSubjectLabel}</dd>
-                      </div>
-                    </dl>
-                    <div className="button-row">
-                      <a className="primary-button" href="#plans">
-                        去看会员方案
-                      </a>
-                      <a className="secondary-button" href="#catalog">
-                        返回词库学习
-                      </a>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="helper-text">
-                      注册之后，购买会员、切换设备继续学、后续增加其他科目内容，都会继续沿用同一个学习账号，不用重复建立新的学习身份。
-                    </p>
-                    <div className="tag-list">
-                      <span className="tag">购买记录跟账号绑定</span>
-                      <span className="tag">会员权益自动发放</span>
-                      <span className="tag">后续学习进度可持续保留</span>
-                    </div>
-                    <div className="button-row">
-                      <button
-                        className={authMode === "register" ? "primary-button small-button" : "secondary-button small-button"}
-                        onClick={() => setAuthMode("register")}
-                        type="button"
-                      >
-                        注册账号
-                      </button>
-                      <button
-                        className={authMode === "login" ? "primary-button small-button" : "secondary-button small-button"}
-                        onClick={() => setAuthMode("login")}
-                        type="button"
-                      >
-                        已有账号登录
-                      </button>
-                    </div>
-                  </>
-                )}
-              </section>
+                      <PagerControls
+                        onChange={setKnowledgeBasePage}
+                        page={knowledgeBaseDocuments?.page ?? knowledgeBasePage}
+                        pageSize={knowledgeBaseDocuments?.page_size ?? profilePageSize}
+                        total={knowledgeBaseDocuments?.total ?? 0}
+                      />
+                    </>
+                  ) : (
+                    <div className="feedback-banner">登录后可上传你自己的知识库文件，并在 MCP 工具中按会员权限调用。</div>
+                  )}
+                </section>
+              ) : null}
 
-              <section className="content-card profile-card">
-                <div className="section-header">
-                  <div>
-                    <p className="section-eyebrow">{currentUser ? "会员与服务" : authMode === "register" ? "注册账号" : "账号登录"}</p>
-                    <h2>{currentUser ? "购买后的权益会自动关联到你的账号" : authMode === "register" ? "填写资料，马上开始学习" : "输入账号信息，继续上次学习"}</h2>
+              {currentProfileTab === "api-tools" ? (
+                <section className="content-card profile-card profile-panel-card" id="profile-api-tools">
+                  <div className="section-header">
+                    <div>
+                      <p className="section-eyebrow">API 工具</p>
+                      <h2>把你自己的开放接口整理成可直接给 MCP 调用的个人工具</h2>
+                    </div>
+                    {currentUser ? (
+                      <button className="primary-button" onClick={openCreateAPIConfigModal} type="button">
+                        新增 API 工具
+                      </button>
+                    ) : null}
                   </div>
-                </div>
+                  {currentUser ? (
+                    <>
+                      <div className="feedback-banner feedback-success">
+                        这里创建的是你自己的 API 工具。新增和编辑都会走弹窗表单，按参数逐项填写即可，不需要手写 JSON。
+                      </div>
 
-                {!currentUser ? (
-                  <form className="setup-form" onSubmit={handleSubmitAuth}>
-                    <label className="form-field">
-                      <span>学习账号</span>
-                      <input
-                        value={authForm.username}
-                        onChange={(event) => {
-                          setAuthForm((current) => ({ ...current, username: event.target.value }));
-                        }}
-                        placeholder="例如：xiaoming"
-                      />
-                    </label>
-                    {authMode === "register" ? (
-                      <label className="form-field">
-                        <span>昵称</span>
-                        <input
-                          value={authForm.displayName}
-                          onChange={(event) => {
-                            setAuthForm((current) => ({ ...current, displayName: event.target.value }));
-                          }}
-                          placeholder="例如：小明"
-                        />
-                      </label>
-                    ) : null}
-                    <label className="form-field">
-                      <span>登录密码</span>
-                      <input
-                        type="password"
-                        value={authForm.password}
-                        onChange={(event) => {
-                          setAuthForm((current) => ({ ...current, password: event.target.value }));
-                        }}
-                        placeholder="至少 8 位"
-                      />
-                    </label>
-                    {authMode === "register" ? (
-                      <label className="form-field">
-                        <span>确认密码</span>
-                        <input
-                          type="password"
-                          value={authForm.confirmPassword}
-                          onChange={(event) => {
-                            setAuthForm((current) => ({ ...current, confirmPassword: event.target.value }));
-                          }}
-                          placeholder="请再输入一次密码"
-                        />
-                      </label>
-                    ) : null}
-                    <div className="form-grid-two">
-                      <label className="form-field">
-                        <span>图形验证码</span>
-                        <input
-                          value={authCaptchaAnswer}
-                          onChange={(event) => {
-                            setAuthCaptchaAnswer(event.target.value);
-                          }}
-                          placeholder="请输入图中的字符"
-                        />
-                      </label>
-                      <div className="form-field">
-                        <span>验证码图片</span>
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>我的 API 工具</h2>
+                          <p className="helper-text">支持编辑、测试、启用停用和删除；启用后可以进入 MCP 工具链路。</p>
+                        </div>
                         <div className="button-row">
-                          <img
-                            alt="图形验证码"
-                            className="captcha-image"
-                            src={authCaptcha?.image_data || ""}
-                          />
-                          <button
-                            className="secondary-button small-button"
-                            disabled={authCaptchaLoading}
-                            onClick={() => {
-                              void refreshAuthCaptcha(authMode);
+                          <input
+                            className="toolbar-search"
+                            value={apiConfigQuery}
+                            onChange={(event) => {
+                              setAPIConfigQuery(event.target.value);
+                              setAPIConfigPage(1);
                             }}
-                            type="button"
-                          >
-                            {authCaptchaLoading ? "刷新中..." : "换一张"}
+                            placeholder="搜索工具名称、MCP 名称或分类"
+                          />
+                          <button className="secondary-button" onClick={openCreateAPIConfigModal} type="button">
+                            添加
                           </button>
                         </div>
                       </div>
-                    </div>
-                    <button className="primary-button" disabled={authBusy !== ""} type="submit">
-                      {authBusy === "register"
-                        ? "注册中..."
-                        : authBusy === "login"
-                          ? "登录中..."
-                          : authMode === "register"
-                            ? "注册并开始学习"
-                            : "进入个人中心"}
-                    </button>
-                  </form>
-                ) : (
-                  <div className="profile-card-body">
-                    <div className={hasActiveMembership ? "feedback-banner feedback-success membership-summary-banner" : "feedback-banner membership-summary-banner"}>
-                      <div className="membership-summary-banner-head">
-                        <span className={hasActiveMembership ? "site-membership-badge site-membership-badge-active" : "site-membership-badge"}>
-                          {membershipBadgeText}
-                        </span>
-                        <strong>{currentMembership ? subscriptionStatusLabel(currentMembership.status) : "\u672a\u5f00\u901a"}</strong>
+
+                      <div className="table-wrap">
+                        <table className="data-table">
+                          <thead>
+                            <tr>
+                              <th>工具名称</th>
+                              <th>MCP 工具名</th>
+                              <th>请求方式</th>
+                              <th>分类</th>
+                              <th>状态</th>
+                              <th>公开</th>
+                              <th>操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(apiConfigs?.items ?? []).map((item) => {
+                              const toggleBusy = profileBusyAction === `api-config-toggle-${item.id}`;
+                              const deleteBusy = profileBusyAction === `api-config-delete-${item.id}`;
+                              const testBusy = profileBusyAction === `api-config-test-${item.id}`;
+                              return (
+                                <tr key={item.id}>
+                                  <td>{item.name}</td>
+                                  <td>{item.resolved_tool_name}</td>
+                                  <td>{item.method}</td>
+                                  <td>{item.category || "-"}</td>
+                                  <td>
+                                    <span className={item.is_active ? "pill pill-success" : "pill pill-muted"}>
+                                      {item.is_active ? "已启用" : "已停用"}
+                                    </span>
+                                  </td>
+                                  <td>{item.is_public ? "公开" : "私有"}</td>
+                                  <td>
+                                    <div className="button-row api-config-actions">
+                                      <button className="secondary-button small-button" onClick={() => startEditAPIConfig(item)} type="button">
+                                        编辑
+                                      </button>
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={testBusy}
+                                        onClick={() => openAPIConfigTestModal(item)}
+                                        type="button"
+                                      >
+                                        {testBusy ? "测试中..." : "测试"}
+                                      </button>
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={toggleBusy || deleteBusy}
+                                        onClick={() => void handleToggleAPIConfig(item)}
+                                        type="button"
+                                      >
+                                        {toggleBusy ? "处理中..." : item.is_active ? "停用" : "启用"}
+                                      </button>
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={toggleBusy || deleteBusy}
+                                        onClick={() => void handleDeleteAPIConfig(item)}
+                                        type="button"
+                                      >
+                                        {deleteBusy ? "删除中..." : "删除"}
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </div>
-                      <p>
-                        {hasActiveMembership
-                          ? membershipExpiryText
-                            ? `你当前是按月会员，${membershipExpiryText}。`
-                            : "你当前会员权益已生效，当前为长期有效。"
-                          : "当前账号还没有生效中的会员权益，购买后会自动关联到你的学习账号。"}
-                      </p>
-                    </div>
-                    <div className="feedback-banner">
-                      购买会员后，后台会直接把会员状态和有效期关联到账号 <strong>{currentUser.username}</strong>，你在前台继续学习时就能一直使用同一个账号。
-                    </div>
-                    <p className="helper-text">
-                      如果你准备开通会员，可以从顶部导航、这里的按钮，或者会员方案页面进入购买；付款完成后，这个账号就是后续所有学习记录的承接入口。
-                    </p>
-                    <div className="button-row">
-                      <a className="primary-button" href="#plans">
-                        立即购买会员
-                      </a>
-                      <a className="secondary-button" href="#catalog">
-                        返回词库学习
-                      </a>
+                      {(apiConfigs?.items ?? []).length === 0 ? (
+                        <div className="feedback-banner">当前还没有创建个人 API 工具，点右上角“新增 API 工具”先配置一条接口试试。</div>
+                      ) : null}
+                      <PagerControls
+                        onChange={setAPIConfigPage}
+                        page={apiConfigs?.page ?? apiConfigPage}
+                        pageSize={apiConfigs?.page_size ?? profilePageSize}
+                        total={apiConfigs?.total ?? 0}
+                      />
+                    </>
+                  ) : (
+                    <div className="feedback-banner">登录后才可以创建和管理你自己的 API 工具。</div>
+                  )}
+                </section>
+              ) : null}
+
+              {currentProfileTab === "xiaomi" ? (
+                <section className="content-card profile-card profile-panel-card" id="profile-xiaomi">
+                  <div className="section-header">
+                    <div>
+                      <p className="section-eyebrow">米家智能</p>
+                      <h2>绑定小米账号，刷新设备列表，并作为 MCP 工具直接调用</h2>
                     </div>
                   </div>
-                )}
-              </section>
-            </div>
+                  {currentUser ? (
+                    <>
+                      <div className="profile-grid">
+                        <form className="setup-form" onSubmit={handleSaveXiaomiConfig}>
+                          <label className="form-field">
+                            <span>服务器区域</span>
+                            <select
+                              value={xiaomiConfig?.server || "cn"}
+                              onChange={(event) => {
+                                setXiaomiConfig((current) => ({
+                                  ...(current || {
+                                    learner_user_id: currentUser.id,
+                                    username: "",
+                                    xiaomi_user_id: "",
+                                    server: "cn",
+                                    is_active: false,
+                                    has_credentials: false,
+                                    device_count: 0,
+                                  }),
+                                  server: event.target.value,
+                                }));
+                              }}
+                            >
+                              <option value="cn">cn</option>
+                              <option value="de">de</option>
+                              <option value="sg">sg</option>
+                              <option value="us">us</option>
+                              <option value="ru">ru</option>
+                              <option value="tw">tw</option>
+                            </select>
+                          </label>
+                          <label className="form-field">
+                            <span>账号备注</span>
+                            <input
+                              value={xiaomiConfig?.username || ""}
+                              onChange={(event) => {
+                                setXiaomiConfig((current) => ({
+                                  ...(current || {
+                                    learner_user_id: currentUser.id,
+                                    xiaomi_user_id: "",
+                                    server: "cn",
+                                    is_active: false,
+                                    has_credentials: false,
+                                    device_count: 0,
+                                    username: "",
+                                  }),
+                                  username: event.target.value,
+                                }));
+                              }}
+                              placeholder="例如：我的米家主账号"
+                            />
+                          </label>
+                          <label className="form-field">
+                            <span>小米用户 ID</span>
+                            <input
+                              value={xiaomiConfig?.xiaomi_user_id || ""}
+                              onChange={(event) => {
+                                setXiaomiConfig((current) => ({
+                                  ...(current || {
+                                    learner_user_id: currentUser.id,
+                                    username: "",
+                                    server: "cn",
+                                    is_active: false,
+                                    has_credentials: false,
+                                    device_count: 0,
+                                    xiaomi_user_id: "",
+                                  }),
+                                  xiaomi_user_id: event.target.value,
+                                }));
+                              }}
+                              placeholder="扫码成功后会自动回填"
+                            />
+                          </label>
+                          <div className="button-row">
+                            <label className="tag">
+                              <input
+                                checked={Boolean(xiaomiConfig?.is_active)}
+                                onChange={(event) => {
+                                  setXiaomiConfig((current) => ({
+                                    ...(current || {
+                                      learner_user_id: currentUser.id,
+                                      username: "",
+                                      xiaomi_user_id: "",
+                                      server: "cn",
+                                      is_active: false,
+                                      has_credentials: false,
+                                      device_count: 0,
+                                    }),
+                                    is_active: event.target.checked,
+                                  }));
+                                }}
+                                type="checkbox"
+                              />
+                              启用此账号
+                            </label>
+                            <span className="pill pill-muted">
+                              {xiaomiConfig?.has_credentials ? "已保存令牌" : "尚未保存令牌"}
+                            </span>
+                          </div>
+                          <div className="button-row">
+                            <button className="primary-button" disabled={profileBusyAction === "xiaomi-save"} type="submit">
+                              {profileBusyAction === "xiaomi-save" ? "保存中..." : "保存基础配置"}
+                            </button>
+                            <button
+                              className="secondary-button"
+                              disabled={profileBusyAction === "xiaomi-qr-login"}
+                              onClick={() => void handleStartXiaomiQRLogin()}
+                              type="button"
+                            >
+                              {profileBusyAction === "xiaomi-qr-login" ? "生成中..." : "扫码登录"}
+                            </button>
+                            <button
+                              className="secondary-button"
+                              disabled={profileBusyAction === "xiaomi-clear"}
+                              onClick={() => void handleClearXiaomiTokens()}
+                              type="button"
+                            >
+                              {profileBusyAction === "xiaomi-clear" ? "处理中..." : "清空令牌"}
+                            </button>
+                          </div>
+                        </form>
 
-            <section className="content-card profile-card">
-              <div className="section-header">
+                        <div className="profile-card-body">
+                          <div className="profile-overview">
+                            <div>
+                              <strong>{xiaomiConfig?.server || "cn"}</strong>
+                              <span>当前区域</span>
+                            </div>
+                            <div>
+                              <strong>{formatCount(xiaomiDevices?.total ?? xiaomiConfig?.device_count ?? 0)}</strong>
+                              <span>设备数量</span>
+                            </div>
+                            <div>
+                              <strong>{xiaomiHomes.length}</strong>
+                              <span>家庭数量</span>
+                            </div>
+                            <div>
+                              <strong>{xiaomiConfig?.last_sync_at ? formatDateTime(xiaomiConfig.last_sync_at) : "-"}</strong>
+                              <span>最近同步</span>
+                            </div>
+                          </div>
+                          {xiaomiQRSession?.qr_image ? (
+                            <div className="feedback-banner">
+                              <strong>扫码登录</strong>
+                              <img alt="xiaomi qr" className="qr-preview-image" src={xiaomiQRSession.qr_image} />
+                              <span>{xiaomiQRStatus || "等待扫码..."}</span>
+                            </div>
+                          ) : (
+                            <div className="feedback-banner">
+                              点击“扫码登录”后，会在这里显示二维码；成功后会自动保存小米令牌。
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="section-toolbar">
+                        <div>
+                          <h2>设备与家庭</h2>
+                          <p className="helper-text">刷新后即可在 MCP 中调用 `xiaomi_*` / `mijia_*` 工具操作这些设备。</p>
+                        </div>
+                        <div className="button-row">
+                          <input
+                            className="toolbar-search"
+                            value={xiaomiSearchQuery}
+                            onChange={(event) => {
+                              setXiaomiSearchQuery(event.target.value);
+                            }}
+                            placeholder="搜索设备名称、型号、did"
+                          />
+                          <button
+                            className="secondary-button"
+                            disabled={profileBusyAction === "xiaomi-homes"}
+                            onClick={() => void handleLoadXiaomiHomes()}
+                            type="button"
+                          >
+                            {profileBusyAction === "xiaomi-homes" ? "加载中..." : "加载家庭"}
+                          </button>
+                          <button
+                            className="primary-button"
+                            disabled={profileBusyAction === "xiaomi-refresh"}
+                            onClick={() => void handleRefreshXiaomiDevices()}
+                            type="button"
+                          >
+                            {profileBusyAction === "xiaomi-refresh" ? "刷新中..." : "刷新设备"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {xiaomiHomes.length > 0 ? (
+                        <div className="tag-list">
+                          {xiaomiHomes.map((item) => (
+                            <span className="tag" key={item.id}>
+                              {item.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      <div className="table-wrap">
+                        <table className="data-table xiaomi-device-table">
+                          <thead>
+                            <tr>
+                              <th>设备名</th>
+                              <th>型号</th>
+                              <th>DID</th>
+                              <th>家庭</th>
+                              <th>房间</th>
+                              <th>在线</th>
+                              <th className="xiaomi-ops-col">网页控制</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {visibleXiaomiDevices.map((item) => {
+                              const deviceStatus = xiaomiDeviceStatusMap[item.did];
+                              const statusLoading = Boolean(xiaomiDeviceStatusLoadingMap[item.did]);
+                              const switchBusy = xiaomiControlBusyDid === item.did;
+                              const switchState = inferXiaomiSwitchState(deviceStatus);
+                              const canSwitch = canControlXiaomiSwitch(item);
+                              const switchButtonLabel =
+                                switchState === true ? "立即关闭" : switchState === false ? "立即开启" : "尝试开启";
+                              const statusNote = !item.is_online
+                                ? "设备离线时暂时不能网页控制。"
+                                : statusLoading
+                                  ? "正在读取设备状态..."
+                                  : canSwitch
+                                    ? switchState === null
+                                      ? "支持网页开关，建议先读取状态后再操作。"
+                                      : switchState
+                                        ? "当前设备已开启。"
+                                        : "当前设备已关闭。"
+                                    : "打开详情可查看当前设备属性与动作。";
+
+                              return (
+                                <tr key={item.did}>
+                                  <td title={item.name}>
+                                    <div className="xiaomi-device-name">
+                                      <span className="xiaomi-ellipsis-text">{item.name}</span>
+                                      {item.is_shared ? <span className="pill pill-warning">共享</span> : null}
+                                    </div>
+                                  </td>
+                                  <td title={item.model}>
+                                    <span className="xiaomi-ellipsis-text">{item.model || "-"}</span>
+                                  </td>
+                                  <td title={item.did}>
+                                    <span className="xiaomi-did-text">{item.did}</span>
+                                  </td>
+                                  <td title={item.home_name || "-"}>
+                                    <span className="xiaomi-ellipsis-text">{item.home_name || "-"}</span>
+                                  </td>
+                                  <td title={item.room_name || "-"}>
+                                    <span className="xiaomi-ellipsis-text">{item.room_name || "-"}</span>
+                                  </td>
+                                  <td>
+                                    <span className={item.is_online ? "pill pill-success" : "pill pill-muted"}>
+                                      {item.is_online ? "在线" : "离线"}
+                                    </span>
+                                  </td>
+                                  <td className="xiaomi-ops-cell">
+                                    <div className="xiaomi-ops">
+                                      <button
+                                        className="secondary-button small-button"
+                                        onClick={() => openXiaomiControlModal(item)}
+                                        type="button"
+                                      >
+                                        设备详情
+                                      </button>
+                                      <button
+                                        className="secondary-button small-button"
+                                        disabled={statusLoading}
+                                        onClick={() => void handleLoadXiaomiDeviceStatus(item)}
+                                        type="button"
+                                      >
+                                        {statusLoading ? "读取中..." : "查看状态"}
+                                      </button>
+                                      {canSwitch ? (
+                                        <button
+                                          className={`small-button ${
+                                            switchState === true ? "secondary-button" : "primary-button"
+                                          }`}
+                                          disabled={!item.is_online || switchBusy}
+                                          onClick={() => void handleToggleXiaomiSwitch(item, !(switchState === true))}
+                                          type="button"
+                                        >
+                                          {switchBusy ? "执行中..." : switchButtonLabel}
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                    <div className="xiaomi-ops-note">{statusNote}</div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      {visibleXiaomiDevices.length === 0 ? (
+                        <div className="feedback-banner">当前没有可展示的设备，先扫码登录并刷新设备列表。</div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="feedback-banner">登录后才可以绑定你自己的米家账号和设备。</div>
+                  )}
+                </section>
+              ) : null}
+
+              {currentProfileTab === "plans" ? (
+                <section className="content-card profile-card profile-panel-card" id="plans">
+                  <div className="section-header">
+                    <div>
+                      <p className="section-eyebrow">会员方案</p>
+                      <h2>选择更适合你的学习节奏</h2>
+                    </div>
+                  </div>
+
+                  <div className="plan-table">
+                    {plans.map((plan) => (
+                      <article className="plan-row" key={plan.key}>
+                        <div>
+                          <div className="plan-row-header">
+                            <h3>{plan.name}</h3>
+                            {plan.recommended ? <span className="pill pill-primary">推荐选择</span> : null}
+                          </div>
+                          <p
+                            className="plan-row-meta"
+                            data-billing-label={plan.billing_mode === "monthly" ? "按月会员" : "一次性买断"}
+                            data-payment-channels={formatPaymentChannels(plan.payment_channels)}
+                          >
+                            {plan.billing_mode}
+                          </p>
+                          <p>{plan.description}</p>
+                          <div className="tag-list">
+                            {plan.features.map((feature) => (
+                              <span className="tag" key={feature}>
+                                {feature}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="plan-row-side">
+                          <strong>{formatPrice(plan.price_cents)}</strong>
+                          <button className="primary-button" onClick={() => openCheckout(plan)} type="button">
+                            立即购买
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {currentProfileTab === "insights" ? (
+                <div className="profile-panel-stack" id="profile-insights">
+                  {currentUser ? (
+                    <>
+                      <div className="profile-snapshot-grid">
+                        <article className="profile-snapshot-card">
+                          <span>待复习</span>
+                          <strong>{formatCount(learningSummary?.due_reviews ?? 0)}</strong>
+                          <small>到期的词条会优先出现在下面列表里。</small>
+                        </article>
+                        <article className="profile-snapshot-card">
+                          <span>已追踪</span>
+                          <strong>{formatCount(learningSummary?.tracked_words ?? 0)}</strong>
+                          <small>在词库页点“记住了 / 待复习”后，这里会持续累计。</small>
+                        </article>
+                        <article className="profile-snapshot-card">
+                          <span>已掌握</span>
+                          <strong>{formatCount(learningSummary?.mastered_words ?? 0)}</strong>
+                          <small>进入“已掌握”的词会获得更长的复习间隔。</small>
+                        </article>
+                        <article className="profile-snapshot-card">
+                          <span>记忆正确率</span>
+                          <strong>{formatPercent(learningSummary?.correct_rate ?? 0)}</strong>
+                          <small>基于你的复习记录自动计算。</small>
+                        </article>
+                      </div>
+
+                      <div className="profile-grid">
+                        <section className="content-card profile-card profile-panel-card">
+                          <div className="section-header">
+                            <div>
+                              <p className="section-eyebrow">学习等级</p>
+                              <h2>初级、中级、高级、已掌握一眼看清</h2>
+                            </div>
+                          </div>
+                          <div className="profile-overview">
+                            <div>
+                              <strong>{formatCount(learningCountByKey(learningLevelCounts, "beginner"))}</strong>
+                              <span>初级</span>
+                            </div>
+                            <div>
+                              <strong>{formatCount(learningCountByKey(learningLevelCounts, "intermediate"))}</strong>
+                              <span>中级</span>
+                            </div>
+                            <div>
+                              <strong>{formatCount(learningCountByKey(learningLevelCounts, "advanced"))}</strong>
+                              <span>高级</span>
+                            </div>
+                            <div>
+                              <strong>{formatCount(learningCountByKey(learningLevelCounts, "mastered"))}</strong>
+                              <span>已掌握</span>
+                            </div>
+                          </div>
+                          <div className="tag-list">
+                            {learningDifficultyCounts.map((item) => (
+                              <span className="tag" key={item.key}>
+                                {item.label} {formatCount(item.count)}
+                              </span>
+                            ))}
+                          </div>
+                        </section>
+
+                        <section className="content-card profile-card profile-panel-card">
+                          <div className="section-header">
+                            <div>
+                              <p className="section-eyebrow">记忆曲线</p>
+                              <h2>最近 14 天复习走势</h2>
+                            </div>
+                          </div>
+                          <LearningCurveChart points={learningCurvePoints} />
+                          <p className="helper-text">
+                            绿色越高代表当天记住比例越高；如果你在词库页持续点击“记住了 / 待复习”，这条线会越来越有参考价值。
+                          </p>
+                        </section>
+                      </div>
+
+                      <section className="content-card profile-card profile-panel-card">
+                        <div className="section-toolbar">
+                          <div>
+                            <h2>我的学习词条</h2>
+                            <p className="helper-text">可以直接调整难度、等级，并记录本次是否记住。</p>
+                          </div>
+                          <div className="button-row learning-toolbar">
+                            <input
+                              className="toolbar-search"
+                              onChange={(event) => {
+                                setLearningQuery(event.target.value);
+                                setLearningPage(1);
+                              }}
+                              placeholder="搜索单词或释义"
+                              value={learningQuery}
+                            />
+                            <select
+                              value={learningLevelFilter}
+                              onChange={(event) => {
+                                setLearningLevelFilter(event.target.value);
+                                setLearningPage(1);
+                              }}
+                            >
+                              <option value="">全部等级</option>
+                              <option value="beginner">初级</option>
+                              <option value="intermediate">中级</option>
+                              <option value="advanced">高级</option>
+                              <option value="mastered">已掌握</option>
+                            </select>
+                            <select
+                              value={learningDifficultyFilter}
+                              onChange={(event) => {
+                                setLearningDifficultyFilter(event.target.value);
+                                setLearningPage(1);
+                              }}
+                            >
+                              <option value="">全部难度</option>
+                              <option value="easy">简单</option>
+                              <option value="medium">中等</option>
+                              <option value="hard">困难</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="table-wrap">
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th>单词</th>
+                                <th>释义</th>
+                                <th>等级</th>
+                                <th>难度</th>
+                                <th>复习状态</th>
+                                <th>操作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(learningProgress?.items ?? []).map((item) => {
+                                const saveBusy = profileBusyAction === `learning-save-${item.word_id}`;
+                                const reviewBusy = profileBusyAction === `learning-review-${item.word_id}`;
+                                return (
+                                  <tr key={item.id}>
+                                    <td>
+                                      <strong>{item.term}</strong>
+                                      <div className="helper-text">{item.classification || "-"}</div>
+                                    </td>
+                                    <td>{item.translation || "-"}</td>
+                                    <td>
+                                      <select
+                                        disabled={saveBusy || reviewBusy}
+                                        value={item.level}
+                                        onChange={(event) =>
+                                          void handleSaveLearningProgress(item.word_id, event.target.value, item.difficulty)
+                                        }
+                                      >
+                                        <option value="beginner">初级</option>
+                                        <option value="intermediate">中级</option>
+                                        <option value="advanced">高级</option>
+                                        <option value="mastered">已掌握</option>
+                                      </select>
+                                    </td>
+                                    <td>
+                                      <select
+                                        disabled={saveBusy || reviewBusy}
+                                        value={item.difficulty}
+                                        onChange={(event) =>
+                                          void handleSaveLearningProgress(item.word_id, item.level, event.target.value)
+                                        }
+                                      >
+                                        <option value="easy">简单</option>
+                                        <option value="medium">中等</option>
+                                        <option value="hard">困难</option>
+                                      </select>
+                                    </td>
+                                    <td>
+                                      <div>{formatLearningReviewStatus(item.next_review_at, item.is_due)}</div>
+                                      <small className="helper-text">
+                                        复习 {formatCount(item.review_count)} 次，连续记住 {formatCount(item.consecutive_correct)} 次
+                                      </small>
+                                    </td>
+                                    <td>
+                                      <div className="button-row">
+                                        <button
+                                          className="secondary-button small-button"
+                                          disabled={saveBusy || reviewBusy}
+                                          onClick={() =>
+                                            void handleReviewLearningWord({ id: item.word_id }, true, {
+                                              level: item.level,
+                                              difficulty: item.difficulty,
+                                            })
+                                          }
+                                          type="button"
+                                        >
+                                          {reviewBusy ? "处理中..." : "记住了"}
+                                        </button>
+                                        <button
+                                          className="secondary-button small-button"
+                                          disabled={saveBusy || reviewBusy}
+                                          onClick={() =>
+                                            void handleReviewLearningWord({ id: item.word_id }, false, {
+                                              level: item.level,
+                                              difficulty: item.difficulty,
+                                            })
+                                          }
+                                          type="button"
+                                        >
+                                          {reviewBusy ? "处理中..." : "待复习"}
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        {(learningProgress?.items ?? []).length === 0 ? (
+                          <div className="feedback-banner">
+                            还没有学习记录。先去词库页点击“记住了 / 待复习”，系统就会开始记录你的等级、难度和记忆曲线。
+                          </div>
+                        ) : null}
+                        <PagerControls
+                          onChange={setLearningPage}
+                          page={learningProgress?.page ?? learningPage}
+                          pageSize={learningProgress?.page_size ?? profilePageSize}
+                          total={learningProgress?.total ?? 0}
+                        />
+                      </section>
+                    </>
+                  ) : (
+                    <div className="feedback-banner">登录后可查看学习等级、难度分布、记忆曲线和个人复习记录。</div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </main>
+        </div>
+      ) : activeView === "market" ? (
+        <div className="site-main site-main-profile">
+          <main className="site-content profile-page mcp-page">
+            <section className="content-card profile-hero-card mcp-page-hero" id="mcp-market">
+              <div className="section-header profile-hero-header">
                 <div>
-                  <p className="section-eyebrow">学习概况</p>
-                  <h2>当前词库与学习方向一目了然</h2>
+                  <p className="section-eyebrow">MCP 工具市场</p>
+                  <h1>把能直接使用的 AI 工具整理给你</h1>
+                  <p className="helper-text">
+                    这里汇总了站内可调用的 MCP 工具。你可以按名称、用途和分类快速查找，也能一眼看出哪些工具需要登录、哪些需要会员、哪些现在就能直接使用。
+                  </p>
+                </div>
+                <div className="button-row">
+                  <a className="secondary-button" href="#profile">
+                    返回个人中心
+                  </a>
+                  <a className="primary-button" href="#mcp">
+                    管理我的连接
+                  </a>
                 </div>
               </div>
-              <dl className="metric-list">
-                <div>
-                  <dt>科目数量</dt>
-                  <dd>{stats?.subject_count ?? 0}</dd>
-                </div>
-                <div>
-                  <dt>词汇数量</dt>
-                  <dd>{formatCount(stats?.word_count ?? 0)}</dd>
-                </div>
-                <div>
-                  <dt>场景分类</dt>
-                  <dd>{stats?.classification_count ?? 0}</dd>
-                </div>
-                <div>
-                  <dt>年级维度</dt>
-                  <dd>{stats?.grade_count ?? 0}</dd>
-                </div>
-              </dl>
-              <p className="helper-text">{currentSettings.footer_text}</p>
+
+              <div className="mcp-page-toolbar">
+                <input
+                  className="toolbar-search"
+                  onChange={(event) => {
+                    setMarketQuery(event.target.value);
+                    setMarketPage(1);
+                  }}
+                  placeholder="搜索工具名称、用途或分类"
+                  value={marketQuery}
+                />
+                <select
+                  value={marketCategory}
+                  onChange={(event) => {
+                    setMarketCategory(event.target.value);
+                    setMarketPage(1);
+                  }}
+                >
+                  <option value="">全部分类</option>
+                  {marketCategories.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="helper-text">按名称、用途或分类筛选，看看哪些工具现在就能直接使用。</div>
+              <div className="tag-list">
+                <span className="tag">匹配结果 {formatCount(marketResult?.total ?? 0)}</span>
+                <span className="tag">本页显示 {formatCount(filteredMarketTools.length)}</span>
+                <span className="tag">{currentUser ? `当前账号：${learnerName}` : "游客浏览"}</span>
+              </div>
             </section>
 
-            <section className="content-card" id="plans">
-              <div className="section-header">
-                <div>
-                  <p className="section-eyebrow">会员方案</p>
-                  <h2>选择更适合你的学习节奏</h2>
-                </div>
-              </div>
+            {marketError ? <div className="feedback-banner feedback-error">{marketError}</div> : null}
+            {marketLoading ? <div className="feedback-banner">正在加载 MCP 工具市场...</div> : null}
 
-              <div className="plan-table">
-                {plans.map((plan) => (
-                  <article className="plan-row" key={plan.key}>
-                    <div>
-                      <div className="plan-row-header">
-                        <h3>{plan.name}</h3>
-                        {plan.recommended ? <span className="pill pill-primary">推荐选择</span> : null}
+            <section className="market-grid">
+              {filteredMarketTools.map((tool) => {
+                const localizedTool = localizeMarketTool(tool);
+                return (
+                  <article className="content-card market-card" key={tool.name}>
+                    <div className="market-card-header">
+                      <div className="market-card-header-copy">
+                        <strong className="market-card-title" title={localizedTool.title}>
+                          {localizedTool.title}
+                        </strong>
+                        <span className="market-card-name" title={tool.name}>
+                          {tool.name}
+                        </span>
                       </div>
-                      <p
-                        className="plan-row-meta"
-                        data-billing-label={plan.billing_mode === "monthly" ? "按月会员" : "一次性买断"}
-                        data-payment-channels={formatPaymentChannels(plan.payment_channels)}
-                      >
-                        {plan.billing_mode}
-                      </p>
-                      <p>{plan.description}</p>
-                      <div className="tag-list">
-                        {plan.features.map((feature) => (
-                          <span className="tag" key={feature}>
-                            {feature}
-                          </span>
-                        ))}
-                      </div>
+                      <span className={tool.canUse ? "pill pill-success" : "pill pill-warning"}>
+                        {tool.canUse ? "可调用" : "受限"}
+                      </span>
                     </div>
-                    <div className="plan-row-side">
-                      <strong>{formatPrice(plan.price_cents)}</strong>
-                      <button className="primary-button" onClick={() => openCheckout(plan)} type="button">
-                        立即购买
-                      </button>
+                    <p className="market-card-description" title={localizedTool.description}>
+                      {localizedTool.description}
+                    </p>
+                    <div className="tag-list">
+                      <span className="tag" title={localizedTool.category}>
+                        {localizedTool.category}
+                      </span>
+                      <span className="tag" title={localizedTool.sourceType}>
+                        {localizedTool.sourceType}
+                      </span>
+                      {tool.requiresAuth ? <span className="tag">需登录</span> : null}
+                      {tool.requiresMembership ? <span className="tag">需会员</span> : null}
+                    </div>
+                    <div className="helper-text">
+                      {tool.canUse
+                        ? "你现在就可以直接使用这个工具。"
+                        : tool.requiresMembership
+                          ? "这是会员工具，开通会员后才可以使用。"
+                          : tool.requiresAuth
+                            ? "登录后才可以使用这个工具。"
+                            : "这个工具暂时不可用。"}
                     </div>
                   </article>
-                ))}
-              </div>
+                );
+              })}
             </section>
-
-            <section className="content-card profile-card">
-              <div className="section-header">
-                <div>
-                  <p className="section-eyebrow">学习建议</p>
-                  <h2>先学会用得上的，再慢慢学得更广</h2>
-                </div>
-              </div>
-              <p className="helper-text">
-                {currentSettings.seo_description}
-                {currentSettings.contact_email ? ` 如需合作或内容支持，可联系：${currentSettings.contact_email}` : ""}
-              </p>
-            </section>
+            {marketResult && marketResult.total > 0 ? (
+              <PagerControls
+                disabled={marketLoading}
+                onChange={setMarketPage}
+                page={marketResult.page}
+                pageSize={marketResult.page_size}
+                total={marketResult.total}
+              />
+            ) : null}
+            {!marketLoading && filteredMarketTools.length === 0 ? (
+              <div className="feedback-banner">当前筛选条件下没有匹配的 MCP 工具。</div>
+            ) : null}
           </main>
         </div>
       ) : activeView === "mcp" ? (
@@ -1653,6 +5005,26 @@ export default function PublicSite() {
                             <small>{speakingTerm === word.term ? "朗读中" : "点读"}</small>
                           </button>
                           {word.explanation ? <p>{word.explanation}</p> : null}
+                          {currentUser ? (
+                            <div className="button-row word-learning-actions">
+                              <button
+                                className="secondary-button small-button"
+                                disabled={profileBusyAction === `learning-review-${word.id}`}
+                                onClick={() => void handleReviewLearningWord(word, true)}
+                                type="button"
+                              >
+                                {profileBusyAction === `learning-review-${word.id}` ? "处理中..." : "记住了"}
+                              </button>
+                              <button
+                                className="secondary-button small-button"
+                                disabled={profileBusyAction === `learning-review-${word.id}`}
+                                onClick={() => void handleReviewLearningWord(word, false)}
+                                type="button"
+                              >
+                                {profileBusyAction === `learning-review-${word.id}` ? "处理中..." : "待复习"}
+                              </button>
+                            </div>
+                          ) : null}
                         </td>
                         <td>{word.translation || "-"}</td>
                         <td>{word.classification || "-"}</td>
@@ -1680,6 +5052,730 @@ export default function PublicSite() {
           </main>
         </div>
       )}
+
+      {xiaomiControlModalDevice ? (
+        <div className="admin-edit-modal-backdrop" onClick={closeXiaomiControlModal} role="presentation">
+          <section
+            aria-labelledby="xiaomi-control-modal-title"
+            aria-modal="true"
+            className="admin-edit-modal xiaomi-control-modal"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+            role="dialog"
+          >
+            <div className="admin-edit-modal-header">
+              <div>
+                <p className="section-eyebrow">米家设备网页控制</p>
+                <h2 id="xiaomi-control-modal-title">{xiaomiControlModalDevice.name}</h2>
+                <p className="helper-text">这里展示的是当前网页端已经连上的设备能力，开关类设备可以直接在这里控制。</p>
+              </div>
+              <button className="secondary-button small-button" onClick={closeXiaomiControlModal} type="button">
+                关闭
+              </button>
+            </div>
+
+            <div className="xiaomi-control-stack">
+              <div className="xiaomi-control-grid">
+                <div>
+                  <span>设备名称</span>
+                  <strong>{xiaomiControlModalDevice.name}</strong>
+                </div>
+                <div>
+                  <span>设备型号</span>
+                  <strong>{xiaomiControlModalDevice.model || "-"}</strong>
+                </div>
+                <div>
+                  <span>DID</span>
+                  <strong>{xiaomiControlModalDevice.did}</strong>
+                </div>
+                <div>
+                  <span>所属家庭 / 房间</span>
+                  <strong>
+                    {[xiaomiControlModalDevice.home_name, xiaomiControlModalDevice.room_name].filter(Boolean).join(" / ") ||
+                      "-"}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="button-row xiaomi-control-actions">
+                <button
+                  className="secondary-button"
+                  disabled={xiaomiControlStatusLoading}
+                  onClick={() => void handleLoadXiaomiDeviceStatus(xiaomiControlModalDevice)}
+                  type="button"
+                >
+                  {xiaomiControlStatusLoading ? "刷新中..." : "刷新设备状态"}
+                </button>
+                {canControlXiaomiSwitch(xiaomiControlModalDevice) ? (
+                  <button
+                    className="primary-button"
+                    disabled={!xiaomiControlModalDevice.is_online || xiaomiControlBusyDid === xiaomiControlModalDevice.did}
+                    onClick={() =>
+                      void handleToggleXiaomiSwitch(
+                        xiaomiControlModalDevice,
+                        !(xiaomiControlSwitchState === true),
+                      )
+                    }
+                    type="button"
+                  >
+                    {xiaomiControlBusyDid === xiaomiControlModalDevice.did
+                      ? "执行中..."
+                      : xiaomiControlSwitchState === true
+                        ? "关闭设备"
+                        : xiaomiControlSwitchState === false
+                          ? "开启设备"
+                          : "尝试开启"}
+                  </button>
+                ) : null}
+                <span className={xiaomiControlModalDevice.is_online ? "pill pill-success" : "pill pill-muted"}>
+                  {xiaomiControlModalDevice.is_online ? "设备在线" : "设备离线"}
+                </span>
+                {canControlXiaomiSwitch(xiaomiControlModalDevice) ? (
+                  <span
+                    className={
+                      xiaomiControlSwitchState === true
+                        ? "pill pill-success"
+                        : xiaomiControlSwitchState === false
+                          ? "pill pill-warning"
+                          : "pill pill-muted"
+                    }
+                  >
+                    {xiaomiControlSwitchState === true
+                      ? "当前已开启"
+                      : xiaomiControlSwitchState === false
+                        ? "当前已关闭"
+                        : "状态待读取"}
+                  </span>
+                ) : null}
+              </div>
+
+              {!xiaomiControlStatus && !xiaomiControlStatusLoading ? (
+                <div className="feedback-banner">点击“刷新设备状态”后，这里会显示当前设备的状态、属性和可用动作。</div>
+              ) : null}
+
+              {xiaomiControlStatusLoading ? <div className="feedback-banner">正在读取设备状态，请稍候...</div> : null}
+
+              {xiaomiControlPropertyRows.length > 0 ? (
+                <section className="xiaomi-control-section">
+                  <div>
+                    <h3>可读取属性</h3>
+                    <p className="helper-text">网页端会优先展示常见属性的当前值，同时保留米家返回的能力说明。</p>
+                  </div>
+                  <div className="table-wrap">
+                    <table className="data-table xiaomi-control-table">
+                      <thead>
+                        <tr>
+                          <th>属性</th>
+                          <th>当前值</th>
+                          <th>说明</th>
+                          <th>读写</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {xiaomiControlPropertyRows.map((row) => (
+                          <tr key={row.key}>
+                            <td>
+                              <strong>{row.name}</strong>
+                              {row.metaSummary ? <small>{row.metaSummary}</small> : null}
+                            </td>
+                            <td>{row.value}</td>
+                            <td>{row.desc || "-"}</td>
+                            <td>{row.rw}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ) : null}
+
+              {xiaomiControlActionRows.length > 0 ? (
+                <section className="xiaomi-control-section">
+                  <div>
+                    <h3>可执行动作</h3>
+                    <p className="helper-text">当前先把动作能力展示出来，后续如果你要我继续做，也可以把常用动作做成直接按钮。</p>
+                  </div>
+                  <div className="table-wrap">
+                    <table className="data-table xiaomi-control-table">
+                      <thead>
+                        <tr>
+                          <th>动作名</th>
+                          <th>说明</th>
+                          <th>调用编号</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {xiaomiControlActionRows.map((row) => (
+                          <tr key={row.key}>
+                            <td>{row.name}</td>
+                            <td>{row.desc || "-"}</td>
+                            <td>{row.identity}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ) : null}
+
+              {xiaomiControlStatus ? (
+                <details className="xiaomi-raw-preview">
+                  <summary>查看原始返回数据</summary>
+                  <pre className="code-panel">{JSON.stringify(xiaomiControlStatus, null, 2)}</pre>
+                </details>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {knowledgeBaseUploadModalOpen ? (
+        <div className="admin-edit-modal-backdrop" onClick={closeKnowledgeBaseUploadModal} role="presentation">
+          <section
+            aria-labelledby="knowledge-base-upload-modal-title"
+            aria-modal="true"
+            className="admin-edit-modal"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+            role="dialog"
+          >
+            <div className="admin-edit-modal-header">
+              <div>
+                <p className="section-eyebrow">知识库上传</p>
+                <h2 id="knowledge-base-upload-modal-title">上传我的知识库文件</h2>
+                <p className="helper-text">上传后会自动切片，可直接给当前账号可用的 MCP 工具检索调用。</p>
+              </div>
+              <button className="secondary-button small-button" onClick={closeKnowledgeBaseUploadModal} type="button">
+                关闭
+              </button>
+            </div>
+
+            <form className="setup-form admin-edit-modal-form" onSubmit={handleSubmitKnowledgeBase}>
+              <label className="form-field">
+                <span>选择知识库文件</span>
+                <label className={`upload-picker ${knowledgeBaseForm.file ? "upload-picker-ready" : ""}`}>
+                  <input
+                    accept=".txt,.md,.csv,.xlsx,.docx"
+                    className="upload-picker-input"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      setKnowledgeBaseForm((current) => ({
+                        ...current,
+                        file,
+                        fileName: file?.name ?? "",
+                        title: current.title || (file?.name ? file.name.replace(/\.[^.]+$/, "") : ""),
+                      }));
+                    }}
+                    type="file"
+                  />
+                  <div className="upload-picker-main">
+                    <div className="upload-picker-meta">
+                      <strong>{knowledgeBaseForm.fileName || "点击选择要上传的知识库文件"}</strong>
+                      <span>
+                        {knowledgeBaseForm.file
+                          ? `文件大小 ${formatFileSize(knowledgeBaseForm.file?.size ?? 0)}，上传后仅当前账号和对应 MCP 检索可见`
+                          : "支持 TXT、Markdown、CSV、Excel、Word(.docx)，上传后会自动切片用于检索"}
+                      </span>
+                    </div>
+                    <span className="upload-picker-action">{knowledgeBaseForm.file ? "重新选择" : "选择文件"}</span>
+                  </div>
+                </label>
+              </label>
+
+              <div className="upload-hint-list">
+                <span className="tag">私有知识库</span>
+                <span className="tag">支持 TXT / Markdown / Word</span>
+                <span className="tag">支持 CSV / Excel</span>
+                <span className="tag">支持 MCP 检索</span>
+              </div>
+
+              <label className="form-field">
+                <span>文档标题</span>
+                <input
+                  value={knowledgeBaseForm.title}
+                  onChange={(event) => {
+                    setKnowledgeBaseForm((current) => ({ ...current, title: event.target.value }));
+                  }}
+                  placeholder="例如：我的产品知识库"
+                />
+              </label>
+
+              <div className="feedback-banner">
+                当前将上传到 <strong>{selectedSubjectLabel}</strong> 学科下，管理员也能在后台区分公共知识库和你的私有知识库。
+              </div>
+
+              <ul className="detail-list">
+                <li>适合上传自己的说明文档、表格资料、流程文档和问答素材。</li>
+                <li>停用后不会参与检索；删除后文档和切片都会一起移除。</li>
+                <li>检索结果会返回命中片段和文档来源，方便定位答案来自哪份文档。</li>
+              </ul>
+
+              <div className="button-row">
+                <button className="primary-button" disabled={profileBusyAction === "knowledge-base-upload"} type="submit">
+                  {profileBusyAction === "knowledge-base-upload" ? "上传处理中..." : "上传到我的知识库"}
+                </button>
+                <button className="secondary-button" onClick={closeKnowledgeBaseUploadModal} type="button">
+                  取消
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {knowledgeBaseDocumentPreview ? (
+        <div
+          className="document-preview-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeKnowledgeBaseDocumentPreview();
+            }
+          }}
+        >
+          <section className="document-preview-card">
+            <div className="section-header">
+              <div>
+                <p className="section-eyebrow">知识库文档内容</p>
+                <h2>{knowledgeBaseDocumentPreview.title || knowledgeBaseDocumentPreview.source_file_name}</h2>
+                <p className="helper-text">
+                  {knowledgeBaseDocumentPreview.source_file_name} · {formatCount(knowledgeBaseDocumentPreview.chunk_count)} 个片段
+                </p>
+              </div>
+              <button className="secondary-button" onClick={closeKnowledgeBaseDocumentPreview} type="button">
+                关闭
+              </button>
+            </div>
+            {knowledgeBaseDocumentPreviewLoading ? (
+              <div className="feedback-banner">正在加载文档内容...</div>
+            ) : (
+              <div className="document-preview-body">
+                {knowledgeBaseDocumentChunks.map((chunk) => (
+                  <article className="document-preview-chunk" key={chunk.id}>
+                    <div className="document-preview-chunk-meta">
+                      <strong>{chunk.title || knowledgeBaseDocumentPreview.title}</strong>
+                      <span>片段 #{chunk.chunk_index}</span>
+                    </div>
+                    <pre>{chunk.content}</pre>
+                  </article>
+                ))}
+                {knowledgeBaseDocumentChunks.length === 0 ? (
+                  <div className="feedback-banner">这份文档暂时没有可展示的内容片段。</div>
+                ) : null}
+              </div>
+            )}
+          </section>
+        </div>
+      ) : null}
+
+      {apiConfigModalOpen ? (
+        <div className="admin-edit-modal-backdrop" onClick={closeAPIConfigModal} role="presentation">
+          <section
+            aria-labelledby="api-config-modal-title"
+            aria-modal="true"
+            className="admin-edit-modal api-config-modal"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+            role="dialog"
+          >
+            <div className="admin-edit-modal-header">
+              <div>
+                <p className="section-eyebrow">API 工具弹窗</p>
+                <h2 id="api-config-modal-title">{apiConfigEditor.id > 0 ? "编辑 API 工具" : "新增 API 工具"}</h2>
+              </div>
+              <button className="secondary-button small-button" onClick={closeAPIConfigModal} type="button">
+                关闭
+              </button>
+            </div>
+
+            <form className="setup-form admin-edit-modal-form" onSubmit={handleSaveAPIConfig}>
+              <div className="form-grid-two">
+                <label className="form-field">
+                  <span>工具名称</span>
+                  <input
+                    value={apiConfigEditor.name}
+                    onChange={(event) => {
+                      setAPIConfigEditor((current) => ({ ...current, name: event.target.value }));
+                    }}
+                    placeholder="例如：汇率查询"
+                  />
+                </label>
+                <label className="form-field">
+                  <span>MCP 工具名</span>
+                  <input
+                    value={apiConfigEditor.tool_name}
+                    onChange={(event) => {
+                      setAPIConfigEditor((current) => ({ ...current, tool_name: event.target.value }));
+                    }}
+                    placeholder="例如：exchange_rate_query"
+                  />
+                </label>
+              </div>
+
+              <div className="feedback-banner">这里按参数逐项填写即可，下面的 JSON 会自动生成，不需要手动写。</div>
+
+              <label className="form-field">
+                <span>请求地址</span>
+                <input
+                  value={apiConfigEditor.url}
+                  onChange={(event) => {
+                    setAPIConfigEditor((current) => ({ ...current, url: event.target.value }));
+                  }}
+                  placeholder="例如：https://api.example.com/search?keyword={{keyword}}"
+                />
+                <small className="helper-text">URL 上需要拼接的参数，直接写成 {"{{keyword}}"} 这种模板即可。</small>
+              </label>
+
+              <div className="form-grid-two">
+                <label className="form-field">
+                  <span>请求方法</span>
+                  <select
+                    value={apiConfigEditor.method}
+                    onChange={(event) => {
+                      setAPIConfigEditor((current) => ({ ...current, method: event.target.value }));
+                    }}
+                  >
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="PATCH">PATCH</option>
+                    <option value="DELETE">DELETE</option>
+                    <option value="HEAD">HEAD</option>
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>分类</span>
+                  <input
+                    value={apiConfigEditor.category}
+                    onChange={(event) => {
+                      setAPIConfigEditor((current) => ({ ...current, category: event.target.value }));
+                    }}
+                    placeholder="例如：查询 / 数据 / 办公"
+                  />
+                </label>
+              </div>
+
+              <label className="form-field">
+                <span>说明</span>
+                <textarea
+                  rows={3}
+                  value={apiConfigEditor.description}
+                  onChange={(event) => {
+                    setAPIConfigEditor((current) => ({ ...current, description: event.target.value }));
+                  }}
+                  placeholder="简单说明这个接口是做什么的、适合什么场景调用。"
+                />
+              </label>
+
+              <div className="button-row">
+                <label className="tag">
+                  <input
+                    checked={apiConfigEditor.is_active}
+                    onChange={(event) => {
+                      setAPIConfigEditor((current) => ({ ...current, is_active: event.target.checked }));
+                    }}
+                    type="checkbox"
+                  />
+                  启用
+                </label>
+                <label className="tag">
+                  <input
+                    checked={Boolean(apiConfigEditor.is_public)}
+                    onChange={(event) => {
+                      setAPIConfigEditor((current) => ({ ...current, is_public: event.target.checked }));
+                    }}
+                    type="checkbox"
+                  />
+                  发布到工具市场
+                </label>
+                <label className="tag">
+                  <input
+                    checked={Boolean(apiConfigEditor.allow_admin_publish)}
+                    onChange={(event) => {
+                      setAPIConfigEditor((current) => ({ ...current, allow_admin_publish: event.target.checked }));
+                    }}
+                    type="checkbox"
+                  />
+                  允许管理员代为公开
+                </label>
+              </div>
+
+              <section className="api-parameter-builder">
+                <div className="api-parameter-builder-header">
+                  <div>
+                    <h3>接口参数</h3>
+                    <p className="helper-text">按参数名、类型、位置和说明添加，系统会自动生成 URL 参数、请求体和请求头。</p>
+                  </div>
+                  <button
+                    className="secondary-button small-button"
+                    onClick={() => {
+                      addAPIConfigParameterRow();
+                    }}
+                    type="button"
+                  >
+                    添加参数
+                  </button>
+                </div>
+
+                <div className="api-parameter-list">
+                  {apiConfigParameterRows.map((row) => (
+                    <div className="api-parameter-card" key={row.id}>
+                      <div className="api-parameter-row">
+                        <input
+                          placeholder="参数名"
+                          value={row.name}
+                          onChange={(event) => {
+                            updateAPIConfigParameterRow(row.id, { name: event.target.value });
+                          }}
+                        />
+                        <select
+                          value={row.type}
+                          onChange={(event) => {
+                            updateAPIConfigParameterRow(row.id, {
+                              type: normalizeAPIParameterType(event.target.value),
+                            });
+                          }}
+                        >
+                          {apiParameterTypeOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={row.location}
+                          onChange={(event) => {
+                            updateAPIConfigParameterRow(row.id, {
+                              location: normalizeAPIParameterLocation(event.target.value),
+                            });
+                          }}
+                        >
+                          {apiParameterLocationOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          placeholder="参数描述"
+                          value={row.description}
+                          onChange={(event) => {
+                            updateAPIConfigParameterRow(row.id, { description: event.target.value });
+                          }}
+                        />
+                        <label className="checkbox-field api-parameter-required">
+                          <input
+                            checked={row.required}
+                            onChange={(event) => {
+                              updateAPIConfigParameterRow(row.id, { required: event.target.checked });
+                            }}
+                            type="checkbox"
+                          />
+                          <span>必填</span>
+                        </label>
+                        <button
+                          className="secondary-button small-button api-parameter-delete"
+                          onClick={() => {
+                            removeAPIConfigParameterRow(row.id);
+                          }}
+                          type="button"
+                        >
+                          删除
+                        </button>
+                      </div>
+                      <div className="api-parameter-example">
+                        <label className="form-field">
+                          <span>测试示例值</span>
+                          <input
+                            placeholder={row.type === "object" ? '{"keyword":"value"}' : "保存后点测试会自动带出这个值"}
+                            value={row.exampleValue}
+                            onChange={(event) => {
+                              updateAPIConfigParameterRow(row.id, { exampleValue: event.target.value });
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <details
+                className="api-config-advanced"
+                onToggle={(event) => {
+                  setAPIConfigAdvancedOpen((event.currentTarget as HTMLDetailsElement).open);
+                }}
+                open={apiConfigAdvancedOpen}
+              >
+                <summary>高级设置（可选）</summary>
+                <p className="helper-text">只有遇到固定请求头、复杂请求体、签名字段这些特殊场景时，才需要展开填写。</p>
+
+                <label className="form-field">
+                  <span>额外请求头 JSON</span>
+                  <textarea
+                    rows={5}
+                    value={apiConfigAdvancedHeaders}
+                    onChange={(event) => {
+                      setAPIConfigAdvancedHeaders(event.target.value);
+                    }}
+                    placeholder='{"Authorization":"Bearer {{token}}"}'
+                  />
+                </label>
+
+                <label className="form-field">
+                  <span>额外请求体 JSON</span>
+                  <textarea
+                    rows={6}
+                    value={apiConfigAdvancedBody}
+                    onChange={(event) => {
+                      setAPIConfigAdvancedBody(event.target.value);
+                    }}
+                    placeholder='{"fixed_key":"fixed_value"}'
+                  />
+                </label>
+              </details>
+
+              <div className="button-row">
+                <button className="primary-button" disabled={profileBusyAction === "api-config-save"} type="submit">
+                  {profileBusyAction === "api-config-save"
+                    ? "保存中..."
+                    : apiConfigEditor.id > 0
+                      ? "保存 API 工具"
+                      : "添加 API 工具"}
+                </button>
+                <button className="secondary-button" onClick={closeAPIConfigModal} type="button">
+                  取消
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {apiConfigTestTarget ? (
+        <div className="admin-edit-modal-backdrop" onClick={closeAPIConfigTestModal} role="presentation">
+          <section
+            aria-labelledby="api-config-test-modal-title"
+            aria-modal="true"
+            className="admin-edit-modal api-test-modal"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+            role="dialog"
+          >
+            <div className="admin-edit-modal-header">
+              <div>
+                <p className="section-eyebrow">测试数据弹窗</p>
+                <h2 id="api-config-test-modal-title">测试 API 工具</h2>
+              </div>
+              <button className="secondary-button small-button" onClick={closeAPIConfigTestModal} type="button">
+                关闭
+              </button>
+            </div>
+
+            <div className="api-test-meta">
+              <div>
+                <span>工具名称</span>
+                <strong>{apiConfigTestTarget.name}</strong>
+              </div>
+              <div>
+                <span>MCP 工具名</span>
+                <strong>{apiConfigTestTarget.resolved_tool_name}</strong>
+              </div>
+              <div>
+                <span>请求方式</span>
+                <strong>{apiConfigTestTarget.method}</strong>
+              </div>
+            </div>
+
+            <form
+              className="setup-form admin-edit-modal-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleTestAPIConfig(apiConfigTestTarget);
+              }}
+            >
+              {getAPIConfigTestRows(apiConfigTestTarget).length > 0 ? (
+                <section className="api-test-parameter-builder">
+                  <div className="feedback-banner">真实参数值要填在这里，不是填在“参数描述”里。系统会按这些值自动拼出测试请求。</div>
+                  <div className="api-test-parameter-list">
+                    {getAPIConfigTestRows(apiConfigTestTarget).map((row) => (
+                      <label className="form-field api-test-parameter-field" key={row.name}>
+                        <span>
+                          {row.name}
+                          {row.required ? " *" : ""}
+                        </span>
+                        <small className="helper-text">
+                          {row.description || (row.location === "url" ? "URL 参数" : row.location === "body" ? "请求体参数" : "请求头参数")}
+                        </small>
+
+                        {row.type === "object" ? (
+                          <textarea
+                            rows={6}
+                            value={apiConfigTestValues[row.name] ?? ""}
+                            onChange={(event) => {
+                              updateAPIConfigTestValue(row.name, event.target.value);
+                            }}
+                            placeholder='{"key":"value"}'
+                          />
+                        ) : row.type === "boolean" ? (
+                          <select
+                            value={apiConfigTestValues[row.name] ?? "true"}
+                            onChange={(event) => {
+                              updateAPIConfigTestValue(row.name, event.target.value);
+                            }}
+                          >
+                            <option value="true">true</option>
+                            <option value="false">false</option>
+                          </select>
+                        ) : (
+                          <input
+                            type={row.type === "number" ? "number" : "text"}
+                            value={apiConfigTestValues[row.name] ?? ""}
+                            onChange={(event) => {
+                              updateAPIConfigTestValue(row.name, event.target.value);
+                            }}
+                            placeholder={row.exampleValue || `请输入 ${row.name}`}
+                          />
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </section>
+              ) : (
+                <div className="feedback-banner">这个接口当前没有定义测试参数，直接点击“开始测试”即可。</div>
+              )}
+
+              <label className="form-field">
+                <span>生成的测试参数 JSON（自动生成）</span>
+                <textarea rows={12} readOnly value={apiConfigTestArguments} />
+              </label>
+
+              {apiConfigTestResult ? (
+                <div className="api-test-response">
+                  <div className="feedback-banner">
+                    <strong>最近一次状态：</strong> {apiConfigTestResult.status_code}
+                  </div>
+                  <pre className="code-panel">{apiConfigTestPreview}</pre>
+                </div>
+              ) : (
+                <div className="feedback-banner">输入测试值后点击“开始测试”，返回结果会显示在这个弹窗里。</div>
+              )}
+
+              <div className="button-row">
+                <button className="primary-button" disabled={profileBusyAction === `api-config-test-${apiConfigTestTarget.id}`} type="submit">
+                  {profileBusyAction === `api-config-test-${apiConfigTestTarget.id}` ? "测试中..." : "开始测试"}
+                </button>
+                <button className="secondary-button" onClick={closeAPIConfigTestModal} type="button">
+                  关闭弹窗
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
 
       {noticeDialog ? (
         <div
@@ -1878,6 +5974,51 @@ function PagerControls(props: {
   );
 }
 
+function LearningCurveChart(props: { points: Array<{ date: string; retention_rate: number; review_count: number }> }) {
+  if (props.points.length === 0) {
+    return <div className="feedback-banner">还没有复习记录，记忆曲线会在你开始复习后自动生成。</div>;
+  }
+
+  const width = 640;
+  const height = 220;
+  const paddingX = 24;
+  const paddingY = 24;
+  const usableWidth = width - paddingX * 2;
+  const usableHeight = height - paddingY * 2;
+  const stepX = props.points.length > 1 ? usableWidth / (props.points.length - 1) : usableWidth;
+  const points = props.points.map((item, index) => {
+    const x = paddingX + index * stepX;
+    const y = paddingY + usableHeight - Math.max(0, Math.min(1, item.retention_rate)) * usableHeight;
+    return { ...item, x, y };
+  });
+  const linePath = points
+    .map((item, index) => `${index === 0 ? "M" : "L"} ${item.x.toFixed(2)} ${item.y.toFixed(2)}`)
+    .join(" ");
+
+  return (
+    <div className="learning-curve-card">
+      <svg aria-label="学习记忆曲线" className="learning-curve-svg" viewBox={`0 0 ${width} ${height}`} role="img">
+        <path className="learning-curve-grid" d={`M ${paddingX} ${paddingY} H ${width - paddingX}`} />
+        <path className="learning-curve-grid" d={`M ${paddingX} ${paddingY + usableHeight / 2} H ${width - paddingX}`} />
+        <path className="learning-curve-grid" d={`M ${paddingX} ${height - paddingY} H ${width - paddingX}`} />
+        <path className="learning-curve-line" d={linePath} />
+        {points.map((item) => (
+          <g key={item.date}>
+            <circle className="learning-curve-point" cx={item.x} cy={item.y} r={4} />
+          </g>
+        ))}
+      </svg>
+      <div className="learning-curve-labels">
+        {points.map((item) => (
+          <span key={item.date}>
+            {item.date.slice(5)} · {formatPercent(item.retention_rate)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function applyMetaTag(name: string, content: string) {
   const trimmed = content.trim();
   let meta = document.querySelector(`meta[name="${name}"]`);
@@ -1906,6 +6047,21 @@ function applyIconLink(href?: string) {
   link.setAttribute("href", normalized);
 }
 
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("invalid file result"));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("read file failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
 function readStoredState<T>(key: string, fallback: T): T {
   try {
     const raw = window.localStorage.getItem(key);
@@ -1926,6 +6082,49 @@ function formatPrice(value: number) {
   return `${(value / 100).toFixed(2)} 元`;
 }
 
+function formatPriceInput(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "";
+  }
+  return (value / 100).toFixed(2);
+}
+
+function parsePriceInputToCents(value: string) {
+  const normalized = value.trim().replace(/[^0-9.]/g, "");
+  if (!normalized) {
+    return 0;
+  }
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return 0;
+  }
+  return Math.round(amount * 100);
+}
+
+function formatCommissionRate(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0%";
+  }
+  return `${Number(value.toFixed(2))}%`;
+}
+
+function formatPercent(value: number) {
+  return `${Math.round(Math.max(0, value) * 100)}%`;
+}
+
+function formatFileSize(value: number) {
+  if (value <= 0) {
+    return "0 B";
+  }
+  if (value < 1024) {
+    return `${value} B`;
+  }
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
+  }
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function formatDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -1941,6 +6140,17 @@ function formatMembershipExpiry(membership?: SubscriptionStatus | null) {
   return `有效期至 ${formatDateTime(membership.current_period_end)}`;
 }
 
+function formatLearningReviewStatus(value?: string, isDue?: boolean) {
+  if (!value) {
+    return "尚未安排复习";
+  }
+  const text = formatDateTime(value);
+  if (isDue) {
+    return `待复习 · ${text}`;
+  }
+  return `下次复习 · ${text}`;
+}
+
 function getCurrentHash() {
   if (typeof window === "undefined") {
     return "#home";
@@ -1949,13 +6159,78 @@ function getCurrentHash() {
 }
 
 function resolvePublicView(hash: string): PublicView {
+  if (hash === "#mcp-market") {
+    return "market";
+  }
   if (hash === "#mcp") {
     return "mcp";
   }
-  if (hash === "#profile" || hash === "#account" || hash === "#plans") {
+  if (hash === "#profile" || hash === "#account" || hash === "#plans" || hash.startsWith("#profile-")) {
     return "profile";
   }
   return "home";
+}
+
+function resolveProfileWorkspaceTab(hash: string): ProfileWorkspaceTab {
+  switch (hash) {
+    case "#profile-memberships":
+      return "memberships";
+    case "#profile-orders":
+      return "orders";
+    case "#profile-invite":
+      return "invite";
+    case "#profile-knowledge-base":
+      return "knowledge-base";
+    case "#profile-api-tools":
+      return "api-tools";
+    case "#profile-xiaomi":
+      return "xiaomi";
+    case "#plans":
+      return "plans";
+    case "#profile-insights":
+      return "insights";
+    default:
+      return "overview";
+  }
+}
+
+function resolveInitialInviteCode() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const search = new URLSearchParams(window.location.search);
+  const inviteCode = (search.get("invite_code") || search.get("invite") || search.get("code") || "").trim();
+  if (inviteCode) {
+    window.sessionStorage.setItem(inviteCodeSessionStorageKey, inviteCode);
+    return inviteCode;
+  }
+
+  return window.sessionStorage.getItem(inviteCodeSessionStorageKey)?.trim() || "";
+}
+
+function clearInviteQueryParam() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  url.searchParams.delete("invite_code");
+  url.searchParams.delete("invite");
+  url.searchParams.delete("code");
+  window.history.replaceState({}, "", url.toString());
+}
+
+function buildInviteRegistrationLink(inviteCode: string) {
+  const code = inviteCode.trim();
+  if (!code || typeof window === "undefined") {
+    return "";
+  }
+
+  const url = new URL(window.location.origin + window.location.pathname);
+  url.searchParams.set("invite", code);
+  url.hash = "profile";
+  return url.toString();
 }
 
 function canUseBrowserSpeech() {
@@ -1991,6 +6266,235 @@ function formatPaymentChannels(channels: string[]) {
     }
   });
   return labels.join(" / ");
+}
+
+function localizeMCPToolTitle(name: string, fallback?: string) {
+  switch (name.trim()) {
+    case "list_subjects":
+      return "查看学科列表";
+    case "list_categories":
+      return "查看分类列表";
+    case "list_grades":
+      return "查看阶段列表";
+    case "search_words":
+      return "搜索单词";
+    case "list_classification_stats":
+      return "查看分类统计";
+    case "list_membership_plans":
+      return "查看会员方案";
+    case "get_catalog_stats":
+      return "查看词库总览";
+    case "search_knowledge_base":
+      return "搜索知识库";
+    case "list_my_knowledge_base_documents":
+      return "查看我的知识库文档";
+    case "view_knowledge_base_document":
+      return "查看知识库文档内容";
+    case "list_my_payment_orders":
+      return "查看我的订单";
+    case "list_my_memberships":
+      return "查看我的会员";
+    case "get_invite_summary":
+      return "查看邀请概览";
+    case "get_my_invite_payout_profile":
+      return "查看邀请提现资料";
+    case "save_my_invite_payout_profile":
+      return "保存邀请提现资料";
+    case "list_my_invite_commissions":
+      return "查看邀请佣金";
+    case "list_my_invite_withdraw_requests":
+      return "查看提现申请";
+    case "create_invite_withdraw_request":
+      return "发起提现申请";
+    case "cancel_invite_withdraw_request":
+      return "取消提现申请";
+    case "get_learning_summary":
+      return "查看学习概况";
+    case "list_learning_progress":
+      return "查看学习进度";
+    case "save_learning_word_progress":
+      return "保存单词进度";
+    case "review_learning_word":
+      return "记录单词复习";
+    case "xiaomi_get_devices":
+      return "查看米家设备";
+    case "xiaomi_extract_tokens":
+      return "刷新米家设备";
+    case "xiaomi_miot_prop_get":
+      return "读取设备属性";
+    case "xiaomi_miot_prop_set":
+      return "设置设备属性";
+    case "xiaomi_miot_action":
+      return "执行设备动作";
+    case "xiaomi_miot_prop_get_batch":
+      return "批量读取属性";
+    case "xiaomi_find_device":
+      return "查找米家设备";
+    case "xiaomi_control_device":
+      return "语义控制设备";
+    case "list_mijia_homes":
+      return "查看米家家庭";
+    case "get_mijia_devices":
+      return "查看家庭设备";
+    case "get_device_status":
+      return "查看设备状态";
+    case "control_device":
+      return "控制设备";
+    case "get_device_spec":
+      return "查看设备规格";
+    case "mijia_list_devices":
+      return "列出米家设备";
+    case "mijia_get_caps":
+      return "查看设备能力";
+    case "mijia_switch_set":
+      return "开关设备";
+    case "mijia_sensor_get":
+      return "读取传感器";
+    case "mijia_position_set":
+      return "设置位置值";
+    case "mijia_action_call":
+      return "调用设备动作";
+    case "mijia_hvac_set":
+      return "设置空调参数";
+    default:
+      return fallback?.trim() || name.trim();
+  }
+}
+
+function localizeMCPToolDescription(name: string, fallback?: string) {
+  switch (name.trim()) {
+    case "list_subjects":
+      return "列出 Brights 当前可用的全部学科。";
+    case "list_categories":
+      return "按学科和分类类型列出可用分类。";
+    case "list_grades":
+      return "列出全部阶段与级别定义。";
+    case "search_words":
+      return "按关键词和分页条件查询 Brights 单词库。";
+    case "list_classification_stats":
+      return "分页查看各分类下的词条统计数据。";
+    case "list_membership_plans":
+      return "列出 Brights 的会员方案和支付方案。";
+    case "get_catalog_stats":
+      return "获取 Brights 词库的整体统计数据。";
+    case "search_knowledge_base":
+      return "检索已上传的文本、表格或 Word 知识库内容。";
+    case "list_my_knowledge_base_documents":
+      return "列出当前学员上传的文本、表格或 Word 知识库文档。";
+    case "view_knowledge_base_document":
+      return "查看单个知识库文档的片段和原始内容。";
+    case "list_my_payment_orders":
+      return "列出当前学员的充值或购买订单记录。";
+    case "list_my_memberships":
+      return "列出当前学员的会员开通与续费记录。";
+    case "get_invite_summary":
+      return "获取当前学员的邀请码和邀请统计。";
+    case "get_my_invite_payout_profile":
+      return "获取当前学员的邀请佣金收款资料。";
+    case "save_my_invite_payout_profile":
+      return "创建或更新当前学员的邀请佣金收款资料。";
+    case "list_my_invite_commissions":
+      return "列出当前学员的邀请佣金记录。";
+    case "list_my_invite_withdraw_requests":
+      return "列出当前学员的邀请佣金提现申请记录。";
+    case "create_invite_withdraw_request":
+      return "为当前学员的邀请佣金创建提现申请。";
+    case "cancel_invite_withdraw_request":
+      return "取消当前学员待处理的邀请佣金提现申请。";
+    case "get_learning_summary":
+      return "获取当前学员的等级分布、难度分布和记忆曲线统计。";
+    case "list_learning_progress":
+      return "列出当前学员已跟踪单词的等级、难度和下次复习时间。";
+    case "save_learning_word_progress":
+      return "创建或更新当前学员某个单词的学习等级和难度。";
+    case "review_learning_word":
+      return "记录当前学员是否记住该单词，并安排下一次复习。";
+    case "xiaomi_get_devices":
+      return "同步或列出当前学员绑定的小米 / 米家设备。";
+    case "xiaomi_extract_tokens":
+      return "使用已保存凭证刷新当前学员的小米设备列表。";
+    case "xiaomi_miot_prop_get":
+      return "按 did、siid、piid 读取小米 MIoT 设备属性。";
+    case "xiaomi_miot_prop_set":
+      return "按 did、siid、piid 写入小米 MIoT 设备属性。";
+    case "xiaomi_miot_action":
+      return "按 did、siid、aiid 执行小米 MIoT 设备动作。";
+    case "xiaomi_miot_prop_get_batch":
+      return "批量读取多个小米 MIoT 设备属性。";
+    case "xiaomi_find_device":
+      return "按名称、型号、did、房间或家庭搜索小米设备。";
+    case "xiaomi_control_device":
+      return "按语义属性名或动作名控制小米设备。";
+    case "list_mijia_homes":
+      return "列出当前学员小米账号下可用的家庭。";
+    case "get_mijia_devices":
+      return "获取小米设备列表，可按家庭 ID 过滤。";
+    case "get_device_status":
+      return "读取小米设备的基础信息和可选 MIoT 属性状态。";
+    case "control_device":
+      return "以统一语义方式控制小米设备。";
+    case "get_device_spec":
+      return "拉取并缓存指定小米型号的 MIoT 规格。";
+    case "mijia_list_devices":
+      return "按条件列出小米设备，支持模糊搜索。";
+    case "mijia_get_caps":
+      return "根据 MIoT 规格汇总展示小米设备能力。";
+    case "mijia_switch_set":
+      return "控制小米开关类设备的开启与关闭。";
+    case "mijia_sensor_get":
+      return "读取温度、湿度、电量等常见传感器数值。";
+    case "mijia_position_set":
+      return "设置窗帘等支持位置控制的小米设备位置。";
+    case "mijia_action_call":
+      return "按动作名称执行小米设备的语义动作。";
+    case "mijia_hvac_set":
+      return "设置电源、模式、目标温度、风速等空调类小米控制项。";
+    default:
+      return fallback?.trim() || "";
+  }
+}
+
+function formatMCPToolCategory(value?: string) {
+  switch ((value ?? "").trim().toLowerCase()) {
+    case "catalog":
+      return "词库";
+    case "membership":
+      return "会员";
+    case "knowledge":
+      return "知识库";
+    case "account":
+      return "账号";
+    case "learning":
+      return "学习";
+    case "smart-home":
+      return "智能家居";
+    case "general":
+      return "通用";
+    default:
+      return value?.trim() || "通用";
+  }
+}
+
+function formatMCPToolSourceType(value?: string) {
+  switch ((value ?? "").trim().toLowerCase()) {
+    case "builtin":
+      return "内置工具";
+    case "api_config":
+      return "接口工具";
+    case "api_config_personal":
+      return "个人接口";
+    default:
+      return value?.trim() || "内置工具";
+  }
+}
+
+function localizeMarketTool(tool: MCPInfoTool) {
+  return {
+    title: localizeMCPToolTitle(tool.name, tool.title),
+    description: localizeMCPToolDescription(tool.name, tool.description),
+    category: formatMCPToolCategory(tool.category),
+    sourceType: formatMCPToolSourceType(tool.sourceType),
+  };
 }
 
 function paymentStatusLabel(status?: string) {
@@ -2031,6 +6535,87 @@ function subscriptionStatusLabel(status?: string) {
       return "已取消";
     default:
       return status || "-";
+  }
+}
+
+function subscriptionStatusClass(status?: string) {
+  switch (status) {
+    case "active":
+      return "pill-success";
+    case "expired":
+      return "pill-muted";
+    case "pending":
+      return "pill-warning";
+    case "cancelled":
+      return "pill-danger";
+    default:
+      return "pill-muted";
+  }
+}
+
+function inviteCommissionStatusLabel(item: { status?: string; withdraw_request_id?: number }) {
+  if (item.status === "paid") {
+    return "已打款";
+  }
+  if (item.status === "cancelled") {
+    return "已取消";
+  }
+  if (item.withdraw_request_id) {
+    return "提现处理中";
+  }
+  return "可提现";
+}
+
+function inviteCommissionStatusClass(item: { status?: string; withdraw_request_id?: number }) {
+  if (item.status === "paid") {
+    return "pill-success";
+  }
+  if (item.status === "cancelled") {
+    return "pill-danger";
+  }
+  if (item.withdraw_request_id) {
+    return "pill-warning";
+  }
+  return "pill-muted";
+}
+
+function inviteWithdrawStatusLabel(status?: string) {
+  switch (status) {
+    case "approved":
+      return "已审核";
+    case "paid":
+      return "已打款";
+    case "rejected":
+      return "已驳回";
+    case "cancelled":
+      return "已取消";
+    default:
+      return "待审核";
+  }
+}
+
+function inviteWithdrawStatusClass(status?: string) {
+  switch (status) {
+    case "approved":
+      return "pill-warning";
+    case "paid":
+      return "pill-success";
+    case "rejected":
+    case "cancelled":
+      return "pill-danger";
+    default:
+      return "pill-muted";
+  }
+}
+
+function invitePaymentTypeLabel(value?: string) {
+  switch ((value ?? "").trim().toLowerCase()) {
+    case "wechat":
+      return "微信";
+    case "alipay":
+      return "支付宝";
+    default:
+      return value || "-";
   }
 }
 

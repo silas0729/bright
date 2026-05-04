@@ -54,6 +54,8 @@ export interface Word {
   source?: string;
   phonetics?: string;
   explanation?: string;
+  default_level?: string;
+  default_difficulty?: string;
   is_vip?: boolean;
 }
 
@@ -141,6 +143,7 @@ export interface LearnerUser {
   display_name: string;
   status: string;
   created_at: string;
+  invite_code?: string;
   membership?: SubscriptionStatus;
 }
 
@@ -163,6 +166,7 @@ export interface SiteSetting {
   seo_keywords: string;
   footer_text: string;
   contact_email: string;
+  invite_commission_rate?: number;
 }
 
 export interface SaveSiteSettingInput {
@@ -177,6 +181,7 @@ export interface SaveSiteSettingInput {
   seo_keywords: string;
   footer_text: string;
   contact_email: string;
+  invite_commission_rate?: number;
 }
 
 export interface LearnerSession {
@@ -240,6 +245,9 @@ export interface KnowledgeBaseDocument {
   source_file_name: string;
   source_type: string;
   status: string;
+  visibility?: string;
+  owner_learner_user_id?: number;
+  owner_username?: string;
   chunk_count: number;
   character_count: number;
   created_at: string;
@@ -251,8 +259,14 @@ export interface KnowledgeBaseChunk {
   document_id: number;
   subject_key: string;
   title: string;
+  document_title?: string;
+  source_file_name?: string;
+  source_type?: string;
+  status?: string;
   chunk_index: number;
   content: string;
+  snippet?: string;
+  highlighted_snippet?: string;
   character_count: number;
   created_at: string;
 }
@@ -272,6 +286,406 @@ export interface PagedKnowledgeBaseDocuments {
 
 export interface PagedKnowledgeBaseChunks {
   items: KnowledgeBaseChunk[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface LearningWordProgress {
+  id: number;
+  learner_user_id: number;
+  word_id: number;
+  subject_key: string;
+  term: string;
+  translation: string;
+  classification: string;
+  source?: string;
+  phonetics?: string;
+  explanation?: string;
+  level: string;
+  difficulty: string;
+  review_count: number;
+  correct_count: number;
+  incorrect_count: number;
+  consecutive_correct: number;
+  last_reviewed_at?: string;
+  next_review_at?: string;
+  mastered_at?: string;
+  is_due: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LearningCountItem {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface LearningCurvePoint {
+  date: string;
+  review_count: number;
+  correct_count: number;
+  incorrect_count: number;
+  retention_rate: number;
+}
+
+export interface LearningSummary {
+  subject_key: string;
+  tracked_words: number;
+  due_reviews: number;
+  mastered_words: number;
+  review_count: number;
+  correct_rate: number;
+  level_counts: LearningCountItem[];
+  difficulty_counts: LearningCountItem[];
+  curve_points: LearningCurvePoint[];
+}
+
+export interface PagedLearningWordProgress {
+  items: LearningWordProgress[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface SaveLearningWordProgressInput {
+  word_id: number;
+  subject_key?: string;
+  level?: string;
+  difficulty?: string;
+}
+
+export interface ReviewLearningWordInput {
+  word_id: number;
+  subject_key?: string;
+  remembered: boolean;
+  level?: string;
+  difficulty?: string;
+}
+
+export interface APIConfig {
+  id: number;
+  name: string;
+  tool_name: string;
+  resolved_tool_name: string;
+  url: string;
+  method: string;
+  category: string;
+  category_color: string;
+  icon: string;
+  description: string;
+  headers: string;
+  body: string;
+  parameters: string;
+  is_active: boolean;
+  is_public: boolean;
+  allow_admin_publish: boolean;
+  owner_learner_user_id?: number;
+  owner_admin_user_id?: number;
+  owner_name?: string;
+  owner_type?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PagedAPIConfigs {
+  items: APIConfig[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface SaveAPIConfigInput {
+  name: string;
+  tool_name: string;
+  url: string;
+  method: string;
+  category: string;
+  category_color: string;
+  icon: string;
+  description: string;
+  headers: string;
+  body: string;
+  parameters: string;
+  is_active: boolean;
+  is_public?: boolean;
+  allow_admin_publish?: boolean;
+}
+
+export interface APIConfigTestResult {
+  status_code: number;
+  headers?: Record<string, string>;
+  body?: unknown;
+  raw_body?: string;
+}
+
+export interface APIConfigMarketResponse {
+  items: APIConfig[];
+  total: number;
+}
+
+export interface XiaomiConfig {
+  id?: number;
+  learner_user_id: number;
+  username: string;
+  xiaomi_user_id: string;
+  server: string;
+  is_active: boolean;
+  has_credentials: boolean;
+  device_count: number;
+  last_sync_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SaveXiaomiConfigInput {
+  username: string;
+  xiaomi_user_id: string;
+  server: string;
+  ssecurity: string;
+  service_token: string;
+  is_active: boolean;
+}
+
+export interface XiaomiHome {
+  id: string;
+  name: string;
+  owner_id?: string;
+  raw?: Record<string, unknown>;
+}
+
+export interface XiaomiDevice {
+  did: string;
+  name: string;
+  model: string;
+  token?: string;
+  localip?: string;
+  spec_type?: string;
+  home_id?: string;
+  home_name?: string;
+  room_id?: string;
+  room_name?: string;
+  is_online: boolean;
+  is_shared?: boolean;
+  raw?: Record<string, unknown>;
+}
+
+export interface XiaomiDeviceListResult {
+  account: {
+    username: string;
+    xiaomi_user_id: string;
+    server: string;
+    is_active: boolean;
+    has_credentials: boolean;
+    device_count: number;
+    last_sync_at?: string;
+  };
+  devices: XiaomiDevice[];
+  total: number;
+  refreshed: boolean;
+}
+
+export interface XiaomiDeviceMatch {
+  did: string;
+  name: string;
+  model: string;
+  spec_type?: string;
+}
+
+export interface XiaomiDeviceStatusResult {
+  success?: boolean;
+  device?: {
+    did?: string;
+    name?: string;
+    model?: string;
+  };
+  properties?: unknown;
+  available_properties?: Record<string, unknown>;
+  available_actions?: Record<string, unknown>;
+}
+
+export interface XiaomiQRLoginResult {
+  success: boolean;
+  session_id: string;
+  qr_image: string;
+  login_url?: string;
+  timeout: number;
+  server: string;
+  message?: string;
+}
+
+export interface XiaomiQRCheckResult {
+  success?: boolean;
+  status?: string;
+  message?: string;
+  user_id?: string | number;
+  xiaomi_user_id?: string;
+  ssecurity?: string;
+  service_token?: string;
+  device_count?: number;
+  devices_synced?: boolean;
+  device_sync_error?: string;
+  config?: XiaomiConfig;
+}
+
+export interface MCPToolConfig {
+  id: number;
+  tool_name: string;
+  title: string;
+  description: string;
+  category: string;
+  source_type: string;
+  is_enabled: boolean;
+  requires_membership: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PagedMCPToolConfigs {
+  items: MCPToolConfig[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface UpdateMCPToolConfigInput {
+  is_enabled?: boolean;
+  requires_membership?: boolean;
+}
+
+export interface InviteeItem {
+  user_id: number;
+  username: string;
+  display_name: string;
+  created_at: string;
+  paid_order_count: number;
+  total_recharge_cents: number;
+  last_paid_at?: string;
+}
+
+export interface InviteSummary {
+  invite_code: string;
+  invited_count: number;
+  paid_invite_count: number;
+  total_recharge_cents: number;
+  commission_rate: number;
+  commission_available_cents: number;
+  commission_withdrawing_cents: number;
+  commission_paid_cents: number;
+  commission_total_cents: number;
+  items: InviteeItem[];
+}
+
+export interface InvitePayoutProfile {
+  real_name: string;
+  wechat_account: string;
+  wechat_qr_code: string;
+  alipay_account: string;
+  alipay_qr_code: string;
+}
+
+export interface SaveInvitePayoutProfileInput {
+  real_name: string;
+  wechat_account: string;
+  wechat_qr_code: string;
+  alipay_account: string;
+  alipay_qr_code: string;
+}
+
+export interface InviteCommissionRecord {
+  id: number;
+  payment_order_id: number;
+  payment_order_no: string;
+  invited_user_id: number;
+  invited_username: string;
+  invited_display_name: string;
+  order_amount_cents: number;
+  commission_rate: number;
+  commission_cents: number;
+  status: string;
+  withdraw_request_id?: number;
+  order_paid_at?: string;
+  paid_at?: string;
+  created_at: string;
+}
+
+export interface PagedInviteCommissionRecords {
+  items: InviteCommissionRecord[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface InviteWithdrawRequest {
+  id: number;
+  amount_cents: number;
+  payment_type: string;
+  account_name: string;
+  account_no: string;
+  account_qr_code: string;
+  status: string;
+  admin_note: string;
+  processed_at?: string;
+  created_at: string;
+}
+
+export interface CreateInviteWithdrawRequestInput {
+  amount_cents: number;
+  payment_type: string;
+}
+
+export interface PagedInviteWithdrawRequests {
+  items: InviteWithdrawRequest[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface AdminInviteWithdrawItem {
+  id: number;
+  learner_user_id: number;
+  learner_username: string;
+  learner_display_name: string;
+  amount_cents: number;
+  payment_type: string;
+  account_name: string;
+  account_no: string;
+  account_qr_code: string;
+  status: string;
+  admin_note: string;
+  processed_by_admin_id?: number;
+  processed_by_name?: string;
+  processed_at?: string;
+  created_at: string;
+}
+
+export interface PagedAdminInviteWithdrawRequests {
+  items: AdminInviteWithdrawItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface AdminInviteWithdrawDetail {
+  withdraw: AdminInviteWithdrawItem;
+  commissions: InviteCommissionRecord[];
+}
+
+export interface AdminInviteStatItem {
+  inviter_user_id: number;
+  inviter_username: string;
+  inviter_display_name: string;
+  invite_code: string;
+  invited_count: number;
+  paid_invite_count: number;
+  total_recharge_cents: number;
+  last_invite_at?: string;
+  last_paid_at?: string;
+}
+
+export interface PagedAdminInviteStats {
+  items: AdminInviteStatItem[];
   total: number;
   page: number;
   page_size: number;
@@ -445,12 +859,14 @@ export interface CreateWordInput {
   source: string;
   phonetics: string;
   explanation: string;
+  default_level?: string;
+  default_difficulty?: string;
   is_vip: boolean;
 }
 
 export interface UpdateWordInput {
- legacy_id?: number;
- subject_key: string;
+  legacy_id?: number;
+  subject_key: string;
   classification?: string;
   category_name?: string;
   grade_id?: number | null;
@@ -459,7 +875,9 @@ export interface UpdateWordInput {
   source: string;
   phonetics: string;
   explanation: string;
- is_vip: boolean;
+  default_level?: string;
+  default_difficulty?: string;
+  is_vip: boolean;
 }
 
 export interface BatchUpdateWordVIPInput {
@@ -540,6 +958,12 @@ export interface MCPInfoTool {
   name: string;
   title?: string;
   description: string;
+  category?: string;
+  sourceType?: string;
+  enabled?: boolean;
+  requiresAuth?: boolean;
+  requiresMembership?: boolean;
+  canUse?: boolean;
   inputSchema: Record<string, unknown>;
   outputSchema?: Record<string, unknown>;
 }
@@ -551,14 +975,29 @@ export interface MCPInfo {
   websocketPath: string;
   websocketURL: string;
   availableMethods: string[];
+  toolCount?: number;
   tools: MCPInfoTool[];
   auth?: {
     mode?: string;
     queryTokenParam?: string;
     querySubjectParam?: string;
     requiresMembership?: boolean;
+    tokenOptionalForInfo?: boolean;
+  };
+  viewer?: {
+    isAuthenticated?: boolean;
+    username?: string;
+    subjectKey?: string;
   };
   examples?: Record<string, unknown>;
+}
+
+export interface PagedMCPMarketTools {
+  items: MCPInfoTool[];
+  total: number;
+  page: number;
+  page_size: number;
+  categories: string[];
 }
 
 export interface MCPEndpoint {
@@ -755,13 +1194,44 @@ export const api = {
   getPlans() {
     return request<Plan[]>("/api/v1/plans");
   },
-  getMCPInfo(subjectKey?: string) {
+  getMCPInfo(subjectKey?: string, token?: string) {
     const search = new URLSearchParams();
     if (subjectKey?.trim()) {
       search.set("subject", subjectKey.trim());
     }
     const query = search.toString();
-    return request<MCPInfo>(query ? `/mcp/info?${query}` : "/mcp/info");
+    return request<MCPInfo>(query ? `/mcp/info?${query}` : "/mcp/info", {
+      headers: token?.trim()
+        ? {
+            Authorization: `Bearer ${token.trim()}`,
+          }
+        : undefined,
+    });
+  },
+  getMCPToolMarket(params: {
+    page: number;
+    pageSize: number;
+    query?: string;
+    category?: string;
+    token?: string;
+  }) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.category) {
+      search.set("category", params.category);
+    }
+    return request<PagedMCPMarketTools>(`/api/v1/mcp/tools/market?${search.toString()}`, {
+      headers: params.token?.trim()
+        ? {
+            Authorization: `Bearer ${params.token.trim()}`,
+          }
+        : undefined,
+    });
   },
   listLearnerMCPEndpoints(token: string) {
     return request<MCPEndpoint[]>("/api/v1/auth/mcp/endpoints", {
@@ -784,6 +1254,17 @@ export const api = {
   },
   getLearnerMCPEndpointTools(token: string, id: number) {
     return request<MCPEndpointToolsResponse>(`/api/v1/auth/mcp/endpoints/${id}/tools`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  getLearnerMCPEndpointToolsWithSubject(token: string, id: number, subjectKey?: string) {
+    const search = new URLSearchParams();
+    if (subjectKey?.trim()) {
+      search.set("subject", subjectKey.trim());
+    }
+    const query = search.toString();
+    const path = query ? `/api/v1/auth/mcp/endpoints/${id}/tools?${query}` : `/api/v1/auth/mcp/endpoints/${id}/tools`;
+    return request<MCPEndpointToolsResponse>(path, {
       headers: { Authorization: `Bearer ${token}` },
     });
   },
@@ -824,6 +1305,7 @@ export const api = {
     username: string;
     password: string;
     display_name: string;
+    invite_code?: string;
     captcha_id: string;
     captcha_answer: string;
   }) {
@@ -852,6 +1334,411 @@ export const api = {
   learnerLogout(token: string) {
     return request<{ success: boolean }>("/api/v1/auth/logout", {
       method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerPaymentOrders(
+    token: string,
+    params: { page: number; pageSize: number; query?: string; status?: string; subject?: string },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.status) {
+      search.set("status", params.status);
+    }
+    if (params.subject) {
+      search.set("subject", params.subject);
+    }
+    return request<PagedPaymentOrders>(`/api/v1/auth/payments/orders?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerMemberships(
+    token: string,
+    params: { page: number; pageSize: number; query?: string; status?: string; subject?: string },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.status) {
+      search.set("status", params.status);
+    }
+    if (params.subject) {
+      search.set("subject", params.subject);
+    }
+    return request<PagedSubscriptions>(`/api/v1/auth/payments/subscriptions?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerInviteSummary(token: string) {
+    return request<InviteSummary>("/api/v1/auth/invite/summary", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerInvitePayoutProfile(token: string) {
+    return request<InvitePayoutProfile>("/api/v1/auth/invite/payout-profile", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerSaveInvitePayoutProfile(token: string, payload: SaveInvitePayoutProfileInput) {
+    return request<InvitePayoutProfile>("/api/v1/auth/invite/payout-profile", {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerInviteCommissions(
+    token: string,
+    params: { page: number; pageSize: number; status?: string },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.status) {
+      search.set("status", params.status);
+    }
+    return request<PagedInviteCommissionRecords>(`/api/v1/auth/invite/commissions?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerInviteWithdraws(
+    token: string,
+    params: { page: number; pageSize: number; status?: string; query?: string },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.status) {
+      search.set("status", params.status);
+    }
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    return request<PagedInviteWithdrawRequests>(`/api/v1/auth/invite/withdraws?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerCreateInviteWithdraw(token: string, payload: CreateInviteWithdrawRequestInput) {
+    return request<InviteWithdrawRequest>("/api/v1/auth/invite/withdraws", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerCancelInviteWithdraw(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/auth/invite/withdraws/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerKnowledgeBaseDocuments(
+    token: string,
+    params: { page: number; pageSize: number; query?: string; subjectKey?: string },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.subjectKey) {
+      search.set("subject", params.subjectKey);
+    }
+    return request<PagedKnowledgeBaseDocuments>(`/api/v1/auth/knowledge-base/documents?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerKnowledgeBaseDocumentChunks(
+    token: string,
+    id: number,
+    params?: { page?: number; pageSize?: number },
+  ) {
+    const search = new URLSearchParams();
+    if (params?.page) {
+      search.set("page", String(params.page));
+    }
+    if (params?.pageSize) {
+      search.set("page_size", String(params.pageSize));
+    }
+    return request<PagedKnowledgeBaseChunks>(
+      `/api/v1/auth/knowledge-base/documents/${id}/chunks${search.toString() ? `?${search.toString()}` : ""}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+  },
+  learnerImportKnowledgeBase(
+    token: string,
+    payload: { file: File; subject_key: string; title: string },
+  ) {
+    const formData = new FormData();
+    formData.set("file", payload.file);
+    formData.set("subject_key", payload.subject_key);
+    formData.set("title", payload.title);
+    return request<ImportKnowledgeBaseResult>("/api/v1/auth/knowledge-base/import", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+  },
+  learnerUpdateKnowledgeBaseDocumentStatus(token: string, id: number, status: "active" | "disabled") {
+    return request<KnowledgeBaseDocument>(`/api/v1/auth/knowledge-base/documents/${id}/status`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify({ status }),
+    });
+  },
+  learnerDeleteKnowledgeBaseDocument(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/auth/knowledge-base/documents/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerLearningProgress(
+    token: string,
+    params: {
+      page: number;
+      pageSize: number;
+      query?: string;
+      subjectKey?: string;
+      level?: string;
+      difficulty?: string;
+      dueOnly?: boolean;
+    },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.subjectKey) {
+      search.set("subject", params.subjectKey);
+    }
+    if (params.level) {
+      search.set("level", params.level);
+    }
+    if (params.difficulty) {
+      search.set("difficulty", params.difficulty);
+    }
+    if (params.dueOnly) {
+      search.set("due_only", "true");
+    }
+    return request<PagedLearningWordProgress>(`/api/v1/auth/learning/progress?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerSaveLearningProgress(token: string, payload: SaveLearningWordProgressInput) {
+    return request<LearningWordProgress>("/api/v1/auth/learning/progress", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerReviewLearningWord(token: string, payload: ReviewLearningWordInput) {
+    return request<LearningWordProgress>("/api/v1/auth/learning/review", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerLearningSummary(token: string, subjectKey?: string) {
+    const search = new URLSearchParams();
+    if (subjectKey) {
+      search.set("subject", subjectKey);
+    }
+    return request<LearningSummary>(`/api/v1/auth/learning/summary${search.toString() ? `?${search.toString()}` : ""}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerAPIConfigMarket(params?: { query?: string; category?: string; token?: string }) {
+    const search = new URLSearchParams();
+    if (params?.query) {
+      search.set("q", params.query);
+    }
+    if (params?.category) {
+      search.set("category", params.category);
+    }
+    return request<APIConfigMarketResponse>(`/api/v1/api-configs/market${search.toString() ? `?${search.toString()}` : ""}`, {
+      headers: params?.token
+        ? {
+            Authorization: `Bearer ${params.token}`,
+          }
+        : undefined,
+    });
+  },
+  learnerAPIConfigs(token: string, params: { page: number; pageSize: number; query?: string; category?: string }) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.category) {
+      search.set("category", params.category);
+    }
+    return request<PagedAPIConfigs>(`/api/v1/auth/api-configs?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerCreateAPIConfig(token: string, payload: SaveAPIConfigInput) {
+    return request<APIConfig>("/api/v1/auth/api-configs", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerUpdateAPIConfig(token: string, id: number, payload: SaveAPIConfigInput) {
+    return request<APIConfig>(`/api/v1/auth/api-configs/${id}`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerDeleteAPIConfig(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/auth/api-configs/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerTestAPIConfig(
+    token: string,
+    id: number,
+    payload: { arguments: Record<string, unknown> },
+  ) {
+    return request<APIConfigTestResult>(`/api/v1/auth/api-configs/${id}/test`, {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerXiaomiConfig(token: string) {
+    return request<XiaomiConfig>("/api/v1/auth/xiaomi/config", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerSaveXiaomiConfig(token: string, payload: SaveXiaomiConfigInput) {
+    return request<XiaomiConfig>("/api/v1/auth/xiaomi/config", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerClearXiaomiTokens(token: string) {
+    return request<{ success: boolean }>("/api/v1/auth/xiaomi/tokens", {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerStartXiaomiQRLogin(token: string, server: string) {
+    return request<XiaomiQRLoginResult>("/api/v1/auth/xiaomi/qr-login", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ server }),
+    });
+  },
+  learnerCheckXiaomiQRLogin(token: string, sessionID: string) {
+    return request<XiaomiQRCheckResult>(`/api/v1/auth/xiaomi/qr-check/${encodeURIComponent(sessionID)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerXiaomiHomes(token: string) {
+    return request<XiaomiHome[]>("/api/v1/auth/xiaomi/homes", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerXiaomiDevices(token: string, refresh?: boolean) {
+    const search = new URLSearchParams();
+    if (refresh) {
+      search.set("refresh", "true");
+    }
+    return request<XiaomiDeviceListResult>(
+      `/api/v1/auth/xiaomi/devices${search.toString() ? `?${search.toString()}` : ""}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+  },
+  learnerRefreshXiaomiDevices(token: string) {
+    return request<{ success: boolean; device_count: number; devices: XiaomiDevice[] }>("/api/v1/auth/xiaomi/devices/refresh", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerSearchXiaomiDevices(token: string, query: string, limit = 10) {
+    const search = new URLSearchParams({ q: query, limit: String(limit) });
+    return request<{ items: XiaomiDeviceMatch[]; total: number }>(`/api/v1/auth/xiaomi/devices/search?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  learnerXiaomiDeviceStatus(token: string, did: string, options?: { properties?: string[]; includeMetadata?: boolean }) {
+    const search = new URLSearchParams();
+    if (options?.properties?.length) {
+      search.set("properties", options.properties.join(","));
+    }
+    if (options?.includeMetadata === false) {
+      search.set("include_metadata", "false");
+    }
+    return request<Record<string, unknown>>(
+      `/api/v1/auth/xiaomi/devices/${encodeURIComponent(did)}/status${search.toString() ? `?${search.toString()}` : ""}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+  },
+  learnerControlXiaomiDevice(token: string, payload: Record<string, unknown>) {
+    return request<Record<string, unknown>>("/api/v1/auth/xiaomi/devices/control", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerXiaomiPropGet(token: string, payload: Record<string, unknown>) {
+    return request<unknown>("/api/v1/auth/xiaomi/miot/prop/get", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerXiaomiPropSet(token: string, payload: Record<string, unknown>) {
+    return request<unknown>("/api/v1/auth/xiaomi/miot/prop/set", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerXiaomiAction(token: string, payload: Record<string, unknown>) {
+    return request<unknown>("/api/v1/auth/xiaomi/miot/action", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  learnerXiaomiPropGetBatch(token: string, items: Array<Record<string, unknown>>) {
+    return request<unknown>("/api/v1/auth/xiaomi/miot/prop/get-batch", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ items }),
+    });
+  },
+  learnerXiaomiMiotSpec(token: string, model: string) {
+    return request<{ spec: unknown; summary: unknown }>(`/api/v1/auth/xiaomi/miot/spec?model=${encodeURIComponent(model)}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
   },
@@ -1060,7 +1947,39 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     });
   },
-  searchKnowledgeBase(params: { query: string; page: number; pageSize: number; subjectKey?: string }) {
+  adminKnowledgeBaseDocumentChunks(
+    token: string,
+    id: number,
+    params?: { page?: number; pageSize?: number },
+  ) {
+    const search = new URLSearchParams();
+    if (params?.page) {
+      search.set("page", String(params.page));
+    }
+    if (params?.pageSize) {
+      search.set("page_size", String(params.pageSize));
+    }
+    return request<PagedKnowledgeBaseChunks>(
+      `/api/v1/admin/knowledge-base/documents/${id}/chunks${search.toString() ? `?${search.toString()}` : ""}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+  },
+  adminUpdateKnowledgeBaseDocumentStatus(token: string, id: number, status: "active" | "disabled") {
+    return request<KnowledgeBaseDocument>(`/api/v1/admin/knowledge-base/documents/${id}/status`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify({ status }),
+    });
+  },
+  adminDeleteKnowledgeBaseDocument(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/admin/knowledge-base/documents/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  searchKnowledgeBase(params: { query: string; page: number; pageSize: number; subjectKey?: string; token?: string }) {
     const search = new URLSearchParams({
       page: String(params.page),
       page_size: String(params.pageSize),
@@ -1071,7 +1990,13 @@ export const api = {
     if (params.subjectKey) {
       search.set("subject", params.subjectKey);
     }
-    return request<PagedKnowledgeBaseChunks>(`/api/v1/knowledge-base/search?${search.toString()}`);
+    return request<PagedKnowledgeBaseChunks>(`/api/v1/knowledge-base/search?${search.toString()}`, {
+      headers: params.token
+        ? {
+            Authorization: `Bearer ${params.token}`,
+          }
+        : undefined,
+    });
   },
   adminCreateSubject(token: string, payload: CreateSubjectInput) {
     return request<Subject>("/api/v1/admin/subjects", {
@@ -1085,6 +2010,12 @@ export const api = {
       method: "PUT",
       headers: authHeaders(token),
       body: JSON.stringify(payload),
+    });
+  },
+  adminDeleteSubject(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/admin/subjects/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
     });
   },
   adminCreateCategory(token: string, payload: CreateCategoryInput) {
@@ -1101,6 +2032,12 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+  adminDeleteCategory(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/admin/categories/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
   adminCreateGrade(token: string, payload: CreateGradeInput) {
     return request<Grade>("/api/v1/admin/grades", {
       method: "POST",
@@ -1113,6 +2050,12 @@ export const api = {
       method: "PUT",
       headers: authHeaders(token),
       body: JSON.stringify(payload),
+    });
+  },
+  adminDeleteGrade(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/admin/grades/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
     });
   },
   adminCreateWord(token: string, payload: CreateWordInput) {
@@ -1274,6 +2217,151 @@ export const api = {
     }
     return request<PagedSubscriptions>(`/api/v1/admin/payments/subscriptions?${search.toString()}`, {
       headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminInviteStats(token: string, params: { page: number; pageSize: number; query?: string }) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    return request<PagedAdminInviteStats>(`/api/v1/admin/invite/stats?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminInviteWithdraws(
+    token: string,
+    params: { page: number; pageSize: number; query?: string; status?: string },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.status) {
+      search.set("status", params.status);
+    }
+    return request<PagedAdminInviteWithdrawRequests>(`/api/v1/admin/invite/withdraws?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminInviteWithdrawDetail(token: string, id: number) {
+    return request<AdminInviteWithdrawDetail>(`/api/v1/admin/invite/withdraws/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminApproveInviteWithdraw(token: string, id: number, admin_note: string) {
+    return request<AdminInviteWithdrawItem>(`/api/v1/admin/invite/withdraws/${id}/approve`, {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ admin_note }),
+    });
+  },
+  adminRejectInviteWithdraw(token: string, id: number, admin_note: string) {
+    return request<AdminInviteWithdrawItem>(`/api/v1/admin/invite/withdraws/${id}/reject`, {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ admin_note }),
+    });
+  },
+  adminPayInviteWithdraw(token: string, id: number, admin_note: string) {
+    return request<AdminInviteWithdrawItem>(`/api/v1/admin/invite/withdraws/${id}/pay`, {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({ admin_note }),
+    });
+  },
+  adminMCPToolConfigs(
+    token: string,
+    params: {
+      page: number;
+      pageSize: number;
+      query?: string;
+      category?: string;
+      enabled?: "enabled" | "disabled" | "";
+      requiresMembership?: "members" | "public" | "";
+    },
+  ) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.category) {
+      search.set("category", params.category);
+    }
+    if (params.enabled) {
+      search.set("enabled", params.enabled);
+    }
+    if (params.requiresMembership === "members") {
+      search.set("requires_membership", "true");
+    } else if (params.requiresMembership === "public") {
+      search.set("requires_membership", "false");
+    }
+    return request<PagedMCPToolConfigs>(`/api/v1/admin/mcp/tools?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminAPIConfigs(token: string, params: { page: number; pageSize: number; query?: string; category?: string }) {
+    const search = new URLSearchParams({
+      page: String(params.page),
+      page_size: String(params.pageSize),
+    });
+    if (params.query) {
+      search.set("q", params.query);
+    }
+    if (params.category) {
+      search.set("category", params.category);
+    }
+    return request<PagedAPIConfigs>(`/api/v1/admin/api-configs?${search.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminCreateAPIConfig(token: string, payload: SaveAPIConfigInput) {
+    return request<APIConfig>("/api/v1/admin/api-configs", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  adminUpdateAPIConfig(token: string, id: number, payload: SaveAPIConfigInput) {
+    return request<APIConfig>(`/api/v1/admin/api-configs/${id}`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
+    });
+  },
+  adminDeleteAPIConfig(token: string, id: number) {
+    return request<{ success: boolean }>(`/api/v1/admin/api-configs/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+  adminTestAPIConfig(
+    token: string,
+    id: number,
+    payload: { arguments: Record<string, unknown> },
+  ) {
+    return request<APIConfigTestResult>(
+      `/api/v1/admin/api-configs/${id}/test`,
+      {
+        method: "POST",
+        headers: authHeaders(token),
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  adminUpdateMCPToolConfig(token: string, toolName: string, payload: UpdateMCPToolConfigInput) {
+    return request<MCPToolConfig>(`/api/v1/admin/mcp/tools/${encodeURIComponent(toolName)}`, {
+      method: "PUT",
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
     });
   },
   adminSubscription(token: string, id: number) {

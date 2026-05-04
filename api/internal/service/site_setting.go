@@ -33,6 +33,13 @@ func (s *Service) SaveSiteSetting(ctx context.Context, input domain.SaveSiteSett
 	model.SEOKeywords = strings.TrimSpace(input.SEOKeywords)
 	model.FooterText = strings.TrimSpace(input.FooterText)
 	model.ContactEmail = strings.TrimSpace(input.ContactEmail)
+	model.InviteCommissionRate = input.InviteCommissionRate
+	if model.InviteCommissionRate < 0 {
+		model.InviteCommissionRate = 0
+	}
+	if model.InviteCommissionRate > 100 {
+		model.InviteCommissionRate = 100
+	}
 
 	if err := s.db.WithContext(ctx).Save(&model).Error; err != nil {
 		return domain.SiteSetting{}, err
@@ -70,6 +77,7 @@ func defaultSiteSetting() storage.SiteSetting {
 		SEOKeywords:     "英语单词学习,高频英语单词,场景英语词汇,英语词汇记忆,英语学习网站,英语会员学习,初中英语单词,高中英语单词,成人英语学习",
 		FooterText:      "Brights 适合以英语高频词汇为主线持续学习，也支持后续扩展更多学科内容。",
 		ContactEmail:    "support@brights.local",
+		InviteCommissionRate: 10,
 	}
 }
 
@@ -86,6 +94,7 @@ func toSiteSetting(model storage.SiteSetting) domain.SiteSetting {
 		SEOKeywords:     model.SEOKeywords,
 		FooterText:      model.FooterText,
 		ContactEmail:    model.ContactEmail,
+		InviteCommissionRate: model.InviteCommissionRate,
 	}
 }
 

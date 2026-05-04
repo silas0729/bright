@@ -97,20 +97,22 @@ type Grade struct {
 }
 
 type Word struct {
-	ID          uint64 `gorm:"primaryKey"`
-	LegacyID    int64  `gorm:"index"`
-	SubjectID   uint   `gorm:"not null;index;index:idx_words_subject_category,priority:1"`
-	CategoryID  *uint  `gorm:"index;index:idx_words_subject_category,priority:2"`
-	GradeID     *uint  `gorm:"index"`
-	Term        string `gorm:"size:180;not null;index"`
-	Translation string `gorm:"size:255;index"`
-	SourceLabel string `gorm:"size:255;index"`
-	Phonetics   string `gorm:"type:text"`
-	Explanation string `gorm:"type:text"`
-	IsVIP       bool   `gorm:"column:is_v_ip;not null;default:false;index"`
-	Status      string `gorm:"size:32;not null;default:published;index"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID                uint64 `gorm:"primaryKey"`
+	LegacyID          int64  `gorm:"index"`
+	SubjectID         uint   `gorm:"not null;index;index:idx_words_subject_category,priority:1"`
+	CategoryID        *uint  `gorm:"index;index:idx_words_subject_category,priority:2"`
+	GradeID           *uint  `gorm:"index"`
+	Term              string `gorm:"size:180;not null;index"`
+	Translation       string `gorm:"size:255;index"`
+	SourceLabel       string `gorm:"size:255;index"`
+	Phonetics         string `gorm:"type:text"`
+	Explanation       string `gorm:"type:text"`
+	DefaultLevel      string `gorm:"size:32;not null;default:beginner;index"`
+	DefaultDifficulty string `gorm:"size:32;not null;default:medium;index"`
+	IsVIP             bool   `gorm:"column:is_v_ip;not null;default:false;index"`
+	Status            string `gorm:"size:32;not null;default:published;index"`
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 
 	Subject  Subject   `gorm:"foreignKey:SubjectID"`
 	Category *Category `gorm:"foreignKey:CategoryID"`
@@ -168,13 +170,27 @@ type AdminRole struct {
 }
 
 type LearnerUser struct {
-	ID           uint   `gorm:"primaryKey"`
-	Username     string `gorm:"size:80;uniqueIndex;not null"`
-	PasswordHash string `gorm:"size:255;not null"`
-	DisplayName  string `gorm:"size:120;not null"`
-	Status       string `gorm:"size:32;not null;default:active"`
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID              uint   `gorm:"primaryKey"`
+	Username        string `gorm:"size:80;uniqueIndex;not null"`
+	PasswordHash    string `gorm:"size:255;not null"`
+	DisplayName     string `gorm:"size:120;not null"`
+	Status          string `gorm:"size:32;not null;default:active"`
+	InviteCode      string `gorm:"size:80;uniqueIndex;not null;default:''"`
+	InvitedByUserID *uint  `gorm:"index"`
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type InvitePayoutProfile struct {
+	ID             uint   `gorm:"primaryKey"`
+	LearnerUserID  uint   `gorm:"not null;uniqueIndex"`
+	RealName       string `gorm:"size:120"`
+	WechatAccount  string `gorm:"size:120"`
+	WechatQRCode   string `gorm:"type:longtext"`
+	AlipayAccount  string `gorm:"size:120"`
+	AlipayQRCode   string `gorm:"type:longtext"`
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 type SiteSetting struct {
@@ -190,6 +206,7 @@ type SiteSetting struct {
 	SEOKeywords     string `gorm:"type:text"`
 	FooterText      string `gorm:"type:text"`
 	ContactEmail    string `gorm:"size:120"`
+	InviteCommissionRate float64 `gorm:"not null;default:10"`
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
@@ -255,6 +272,39 @@ type MemberSubscription struct {
 	UpdatedAt          time.Time
 }
 
+type InviteCommissionRecord struct {
+	ID                  uint   `gorm:"primaryKey"`
+	InviterLearnerUserID uint   `gorm:"not null;index"`
+	PaymentOrderID      uint   `gorm:"not null;uniqueIndex"`
+	PaymentOrderNo      string `gorm:"size:80;not null;index"`
+	InvitedLearnerUserID uint   `gorm:"not null;index"`
+	OrderAmountCents    int64  `gorm:"not null"`
+	CommissionRate      float64 `gorm:"not null"`
+	CommissionCents     int64  `gorm:"not null"`
+	Status              string `gorm:"size:32;not null;default:pending;index"`
+	OrderPaidAt         *time.Time
+	PaidAt              *time.Time
+	WithdrawRequestID   *uint `gorm:"index"`
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+}
+
+type InviteWithdrawRequest struct {
+	ID                 uint   `gorm:"primaryKey"`
+	LearnerUserID      uint   `gorm:"not null;index"`
+	AmountCents        int64  `gorm:"not null"`
+	PaymentType        string `gorm:"size:32;not null;index"`
+	AccountName        string `gorm:"size:120"`
+	AccountNo          string `gorm:"size:255"`
+	AccountQRCode      string `gorm:"type:longtext"`
+	Status             string `gorm:"size:32;not null;default:pending;index"`
+	AdminNote          string `gorm:"type:text"`
+	ProcessedByAdminUserID *uint `gorm:"index"`
+	ProcessedAt        *time.Time
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
 type ImportJob struct {
 	ID            uint   `gorm:"primaryKey"`
 	SubjectID     uint   `gorm:"not null;index"`
@@ -270,16 +320,18 @@ type ImportJob struct {
 }
 
 type KnowledgeBaseDocument struct {
-	ID             uint   `gorm:"primaryKey"`
-	SubjectKey     string `gorm:"size:80;not null;index"`
-	Title          string `gorm:"size:255;not null;index"`
-	SourceFileName string `gorm:"size:255;not null"`
-	SourceType     string `gorm:"size:32;not null;index"`
-	Status         string `gorm:"size:32;not null;default:active;index"`
-	ChunkCount     int    `gorm:"not null;default:0"`
-	CharacterCount int    `gorm:"not null;default:0"`
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID                 uint   `gorm:"primaryKey"`
+	SubjectKey         string `gorm:"size:80;not null;index"`
+	Title              string `gorm:"size:255;not null;index"`
+	SourceFileName     string `gorm:"size:255;not null"`
+	SourceType         string `gorm:"size:32;not null;index"`
+	Status             string `gorm:"size:32;not null;default:active;index"`
+	Visibility         string `gorm:"size:32;not null;default:public;index"`
+	OwnerLearnerUserID *uint  `gorm:"index"`
+	ChunkCount         int    `gorm:"not null;default:0"`
+	CharacterCount     int    `gorm:"not null;default:0"`
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type KnowledgeBaseChunk struct {
@@ -293,6 +345,98 @@ type KnowledgeBaseChunk struct {
 	CharacterCount int    `gorm:"not null;default:0"`
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+}
+
+type LearnerWordProgress struct {
+	ID                 uint   `gorm:"primaryKey"`
+	LearnerUserID      uint   `gorm:"not null;index;uniqueIndex:idx_learner_word_progress,priority:1"`
+	WordID             uint64 `gorm:"not null;index;uniqueIndex:idx_learner_word_progress,priority:2"`
+	SubjectKey         string `gorm:"size:80;not null;index"`
+	Level              string `gorm:"size:32;not null;default:beginner;index"`
+	Difficulty         string `gorm:"size:32;not null;default:medium;index"`
+	ReviewCount        int    `gorm:"not null;default:0"`
+	CorrectCount       int    `gorm:"not null;default:0"`
+	IncorrectCount     int    `gorm:"not null;default:0"`
+	ConsecutiveCorrect int    `gorm:"not null;default:0"`
+	LastReviewedAt     *time.Time
+	NextReviewAt       *time.Time `gorm:"index"`
+	MasteredAt         *time.Time
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
+type LearnerWordReviewLog struct {
+	ID            uint   `gorm:"primaryKey"`
+	LearnerUserID uint   `gorm:"not null;index"`
+	WordID        uint64 `gorm:"not null;index"`
+	SubjectKey    string `gorm:"size:80;not null;index"`
+	Level         string `gorm:"size:32;not null;default:beginner;index"`
+	Difficulty    string `gorm:"size:32;not null;default:medium;index"`
+	Result        string `gorm:"size:32;not null;default:remembered;index"`
+	ReviewedAt    time.Time
+	NextReviewAt  *time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+type MCPToolConfig struct {
+	ID                 uint   `gorm:"primaryKey"`
+	ToolName           string `gorm:"column:tool_name;size:120;uniqueIndex;not null"`
+	Title              string `gorm:"size:160;not null"`
+	Description        string `gorm:"size:500"`
+	Category           string `gorm:"size:80;not null;default:general;index"`
+	SourceType         string `gorm:"size:40;not null;default:builtin;index"`
+	IsEnabled          bool   `gorm:"column:is_enabled;not null;default:true;index"`
+	RequiresMembership bool   `gorm:"column:requires_membership;not null;default:false;index"`
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
+type APIConfig struct {
+	ID                 uint   `gorm:"primaryKey"`
+	Name               string `gorm:"size:255;not null"`
+	ToolName           string `gorm:"column:tool_name;size:120;index"`
+	URL                string `gorm:"size:1000;not null"`
+	Method             string `gorm:"size:16;not null;default:GET"`
+	Category           string `gorm:"size:80;index"`
+	CategoryColor      string `gorm:"size:24"`
+	Icon               string `gorm:"size:80"`
+	Description        string `gorm:"type:text"`
+	Headers            string `gorm:"type:text"`
+	Body               string `gorm:"type:text"`
+	Parameters         string `gorm:"type:text"`
+	IsActive           bool   `gorm:"column:is_active;not null;default:true;index"`
+	IsPublic           bool   `gorm:"column:is_public;not null;default:false;index"`
+	AllowAdminPublish  bool   `gorm:"column:allow_admin_publish;not null;default:false;index"`
+	OwnerLearnerUserID *uint  `gorm:"index"`
+	OwnerAdminUserID   *uint  `gorm:"index"`
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
+type XiaomiConfig struct {
+	ID            uint   `gorm:"primaryKey"`
+	LearnerUserID uint   `gorm:"not null;uniqueIndex"`
+	Username      string `gorm:"size:255"`
+	XiaomiUserID  string `gorm:"size:80"`
+	Server        string `gorm:"size:16;not null;default:cn"`
+	Ssecurity     string `gorm:"type:text"`
+	ServiceToken  string `gorm:"type:text"`
+	DeviceList    string `gorm:"type:longtext"`
+	IsActive      bool   `gorm:"not null;default:false;index"`
+	LastSyncAt    *time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+type MiotSpecCache struct {
+	ID        uint   `gorm:"primaryKey"`
+	Model     string `gorm:"size:180;uniqueIndex;not null"`
+	SpecJSON  string `gorm:"type:longtext;not null"`
+	ETag      string `gorm:"size:255"`
+	FetchedAt *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func Open(driverName, dsn string, autoCreateDatabase bool) (*gorm.DB, error) {
@@ -330,14 +474,23 @@ func AutoMigrate(db *gorm.DB) error {
 		&AdminUser{},
 		&AdminRole{},
 		&LearnerUser{},
+		&InvitePayoutProfile{},
 		&SiteSetting{},
 		&WechatPayConfig{},
 		&PaymentOrder{},
 		&MemberSubscription{},
+		&InviteCommissionRecord{},
+		&InviteWithdrawRequest{},
 		&LearnerMCPEndpoint{},
 		&ImportJob{},
 		&KnowledgeBaseDocument{},
 		&KnowledgeBaseChunk{},
+		&LearnerWordProgress{},
+		&LearnerWordReviewLog{},
+		&MCPToolConfig{},
+		&APIConfig{},
+		&XiaomiConfig{},
+		&MiotSpecCache{},
 	)
 }
 
@@ -429,6 +582,15 @@ func migrateLegacyMySQLSchema(db *gorm.DB) error {
 		return err
 	}
 	if err := migrateMySQLColumnDefinition(db, "admin_users", "is_super", "TINYINT(1) NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := migrateMySQLColumnDefinition(db, "invite_payout_profiles", "wechat_qr_code", "LONGTEXT"); err != nil {
+		return err
+	}
+	if err := migrateMySQLColumnDefinition(db, "invite_payout_profiles", "alipay_qr_code", "LONGTEXT"); err != nil {
+		return err
+	}
+	if err := migrateMySQLColumnDefinition(db, "invite_withdraw_requests", "account_qr_code", "LONGTEXT"); err != nil {
 		return err
 	}
 
