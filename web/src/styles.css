@@ -96,6 +96,7 @@
 .market-card {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .market-card-header {
@@ -103,6 +104,13 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.market-card-header-copy {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  flex: 1 1 auto;
 }
 
 .market-card-header strong {
@@ -113,6 +121,28 @@
 .market-card-header span {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.market-card-title,
+.market-card-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-card-description {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.7;
+}
+
+.market-card .pill {
+  flex-shrink: 0;
 }
 
 .document-preview-backdrop {
@@ -2984,6 +3014,20 @@ textarea {
   color: var(--muted);
   line-height: 1.6;
   font-size: 0.92rem;
+}
+
+.invite-qr-upload-field {
+  margin-top: 12px;
+}
+
+.invite-qr-preview-card {
+  margin-top: 12px;
+}
+
+.invite-qr-preview-frame {
+  width: 120px;
+  height: 120px;
+  border-radius: 20px;
 }
 
 .detail-list {

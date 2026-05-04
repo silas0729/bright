@@ -1,5 +1,5 @@
 import QRCode from "qrcode";
-import { useDeferredValue, useEffect, useRef, useState, type FormEvent } from "react";
+import { useDeferredValue, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 import {
   api,
@@ -15,6 +15,7 @@ import {
   type LearningSummary,
   type LearnerSession,
   type LearnerUser,
+  type MCPInfoTool,
   type PagedAPIConfigs,
   type PagedClassificationStats,
   type PagedInviteCommissionRecords,
@@ -1415,6 +1416,41 @@ export default function PublicSite() {
     } catch {
       setProfileError("复制注册链接失败，请手动复制。");
     }
+  }
+
+  async function handleInviteQRCodeSelected(channel: "wechat" | "alipay", event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setProfileError("收款码只支持上传图片文件。");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setProfileError("收款码图片请控制在 2MB 以内。");
+      return;
+    }
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setInvitePayoutProfile((current) =>
+        channel === "wechat"
+          ? { ...current, wechat_qr_code: dataUrl }
+          : { ...current, alipay_qr_code: dataUrl },
+      );
+    } catch {
+      setProfileError("收款码图片读取失败，请换一张图片再试。");
+    }
+  }
+
+  function handleClearInviteQRCode(channel: "wechat" | "alipay") {
+    setInvitePayoutProfile((current) =>
+      channel === "wechat"
+        ? { ...current, wechat_qr_code: "" }
+        : { ...current, alipay_qr_code: "" },
+    );
   }
 
   async function handleSaveInvitePayoutProfile(event: FormEvent<HTMLFormElement>) {
@@ -3281,6 +3317,82 @@ export default function PublicSite() {
                               placeholder="可选，填写收款码图片 URL"
                             />
                           </label>
+                          <div className="site-icon-field invite-qr-upload-field">
+                            <label className={`upload-picker ${invitePayoutProfile.wechat_qr_code ? "upload-picker-ready" : ""}`}>
+                              <input
+                                accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                                className="upload-picker-input"
+                                onChange={(event) => {
+                                  void handleInviteQRCodeSelected("wechat", event);
+                                }}
+                                type="file"
+                              />
+                              <div className="upload-picker-main">
+                                <div className="upload-picker-meta">
+                                  <strong>{invitePayoutProfile.wechat_qr_code ? "已选择微信收款码图片" : "上传微信收款码图片"}</strong>
+                                  <span>可直接上传二维码图片；如果不上传，也可以继续保留上面的图片地址。</span>
+                                </div>
+                                <span className="upload-picker-action">{invitePayoutProfile.wechat_qr_code ? "重新上传" : "选择图片"}</span>
+                              </div>
+                            </label>
+                            {invitePayoutProfile.wechat_qr_code ? (
+                              <div className="site-icon-preview-card invite-qr-preview-card">
+                                <div className="site-icon-preview-frame invite-qr-preview-frame">
+                                  <img alt="微信收款码预览" className="site-icon-preview-image" src={invitePayoutProfile.wechat_qr_code} />
+                                </div>
+                                <div className="site-icon-preview-meta">
+                                  <strong>微信收款码预览</strong>
+                                  <span>保存后管理员审核提现时会直接看到这张收款码。</span>
+                                </div>
+                                <button
+                                  className="secondary-button small-button"
+                                  onClick={() => {
+                                    handleClearInviteQRCode("wechat");
+                                  }}
+                                  type="button"
+                                >
+                                  清空图片
+                                </button>
+                              </div>
+                            ) : null}
+                            <label className={`upload-picker ${invitePayoutProfile.alipay_qr_code ? "upload-picker-ready" : ""}`}>
+                              <input
+                                accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                                className="upload-picker-input"
+                                onChange={(event) => {
+                                  void handleInviteQRCodeSelected("alipay", event);
+                                }}
+                                type="file"
+                              />
+                              <div className="upload-picker-main">
+                                <div className="upload-picker-meta">
+                                  <strong>{invitePayoutProfile.alipay_qr_code ? "已选择支付宝收款码图片" : "上传支付宝收款码图片"}</strong>
+                                  <span>支持上传图片或继续保留上面的图片地址，两种方式都可用。</span>
+                                </div>
+                                <span className="upload-picker-action">{invitePayoutProfile.alipay_qr_code ? "重新上传" : "选择图片"}</span>
+                              </div>
+                            </label>
+                            {invitePayoutProfile.alipay_qr_code ? (
+                              <div className="site-icon-preview-card invite-qr-preview-card">
+                                <div className="site-icon-preview-frame invite-qr-preview-frame">
+                                  <img alt="支付宝收款码预览" className="site-icon-preview-image" src={invitePayoutProfile.alipay_qr_code} />
+                                </div>
+                                <div className="site-icon-preview-meta">
+                                  <strong>支付宝收款码预览</strong>
+                                  <span>如果走支付宝提现，后台审核页会直接展示这张收款码图片。</span>
+                                </div>
+                                <button
+                                  className="secondary-button small-button"
+                                  onClick={() => {
+                                    handleClearInviteQRCode("alipay");
+                                  }}
+                                  type="button"
+                                >
+                                  清空图片
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
                           <button className="primary-button" disabled={profileBusyAction === "invite-payout-save"} type="submit">
                             {profileBusyAction === "invite-payout-save" ? "保存中..." : "保存返佣收款信息"}
                           </button>
@@ -4305,35 +4417,48 @@ export default function PublicSite() {
             {marketLoading ? <div className="feedback-banner">正在加载 MCP 工具市场...</div> : null}
 
             <section className="market-grid">
-              {filteredMarketTools.map((tool) => (
-                <article className="content-card market-card" key={tool.name}>
-                  <div className="market-card-header">
-                    <div>
-                      <strong>{tool.title || tool.name}</strong>
-                      <span>{tool.name}</span>
+              {filteredMarketTools.map((tool) => {
+                const localizedTool = localizeMarketTool(tool);
+                return (
+                  <article className="content-card market-card" key={tool.name}>
+                    <div className="market-card-header">
+                      <div className="market-card-header-copy">
+                        <strong className="market-card-title" title={localizedTool.title}>
+                          {localizedTool.title}
+                        </strong>
+                        <span className="market-card-name" title={tool.name}>
+                          {tool.name}
+                        </span>
+                      </div>
+                      <span className={tool.canUse ? "pill pill-success" : "pill pill-warning"}>
+                        {tool.canUse ? "可调用" : "受限"}
+                      </span>
                     </div>
-                    <span className={tool.canUse ? "pill pill-success" : "pill pill-warning"}>
-                      {tool.canUse ? "可调用" : "受限"}
-                    </span>
-                  </div>
-                  <p>{tool.description}</p>
-                  <div className="tag-list">
-                    <span className="tag">{tool.category || "general"}</span>
-                    <span className="tag">{tool.sourceType || "builtin"}</span>
-                    {tool.requiresAuth ? <span className="tag">需登录</span> : null}
-                    {tool.requiresMembership ? <span className="tag">需会员</span> : null}
-                  </div>
-                  <div className="helper-text">
-                    {tool.canUse
-                      ? "你现在就可以直接使用这个工具。"
-                      : tool.requiresMembership
-                        ? "这是会员工具，开通会员后才可以使用。"
-                        : tool.requiresAuth
-                          ? "登录后才可以使用这个工具。"
-                          : "这个工具暂时不可用。"}
-                  </div>
-                </article>
-              ))}
+                    <p className="market-card-description" title={localizedTool.description}>
+                      {localizedTool.description}
+                    </p>
+                    <div className="tag-list">
+                      <span className="tag" title={localizedTool.category}>
+                        {localizedTool.category}
+                      </span>
+                      <span className="tag" title={localizedTool.sourceType}>
+                        {localizedTool.sourceType}
+                      </span>
+                      {tool.requiresAuth ? <span className="tag">需登录</span> : null}
+                      {tool.requiresMembership ? <span className="tag">需会员</span> : null}
+                    </div>
+                    <div className="helper-text">
+                      {tool.canUse
+                        ? "你现在就可以直接使用这个工具。"
+                        : tool.requiresMembership
+                          ? "这是会员工具，开通会员后才可以使用。"
+                          : tool.requiresAuth
+                            ? "登录后才可以使用这个工具。"
+                            : "这个工具暂时不可用。"}
+                    </div>
+                  </article>
+                );
+              })}
             </section>
             {marketResult && marketResult.total > 0 ? (
               <PagerControls
@@ -5497,6 +5622,21 @@ function applyIconLink(href?: string) {
   link.setAttribute("href", normalized);
 }
 
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("invalid file result"));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("read file failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
 function readStoredState<T>(key: string, fallback: T): T {
   try {
     const raw = window.localStorage.getItem(key);
@@ -5701,6 +5841,235 @@ function formatPaymentChannels(channels: string[]) {
     }
   });
   return labels.join(" / ");
+}
+
+function localizeMCPToolTitle(name: string, fallback?: string) {
+  switch (name.trim()) {
+    case "list_subjects":
+      return "查看学科列表";
+    case "list_categories":
+      return "查看分类列表";
+    case "list_grades":
+      return "查看阶段列表";
+    case "search_words":
+      return "搜索单词";
+    case "list_classification_stats":
+      return "查看分类统计";
+    case "list_membership_plans":
+      return "查看会员方案";
+    case "get_catalog_stats":
+      return "查看词库总览";
+    case "search_knowledge_base":
+      return "搜索知识库";
+    case "list_my_knowledge_base_documents":
+      return "查看我的知识库文档";
+    case "view_knowledge_base_document":
+      return "查看知识库文档内容";
+    case "list_my_payment_orders":
+      return "查看我的订单";
+    case "list_my_memberships":
+      return "查看我的会员";
+    case "get_invite_summary":
+      return "查看邀请概览";
+    case "get_my_invite_payout_profile":
+      return "查看邀请提现资料";
+    case "save_my_invite_payout_profile":
+      return "保存邀请提现资料";
+    case "list_my_invite_commissions":
+      return "查看邀请佣金";
+    case "list_my_invite_withdraw_requests":
+      return "查看提现申请";
+    case "create_invite_withdraw_request":
+      return "发起提现申请";
+    case "cancel_invite_withdraw_request":
+      return "取消提现申请";
+    case "get_learning_summary":
+      return "查看学习概况";
+    case "list_learning_progress":
+      return "查看学习进度";
+    case "save_learning_word_progress":
+      return "保存单词进度";
+    case "review_learning_word":
+      return "记录单词复习";
+    case "xiaomi_get_devices":
+      return "查看米家设备";
+    case "xiaomi_extract_tokens":
+      return "刷新米家设备";
+    case "xiaomi_miot_prop_get":
+      return "读取设备属性";
+    case "xiaomi_miot_prop_set":
+      return "设置设备属性";
+    case "xiaomi_miot_action":
+      return "执行设备动作";
+    case "xiaomi_miot_prop_get_batch":
+      return "批量读取属性";
+    case "xiaomi_find_device":
+      return "查找米家设备";
+    case "xiaomi_control_device":
+      return "语义控制设备";
+    case "list_mijia_homes":
+      return "查看米家家庭";
+    case "get_mijia_devices":
+      return "查看家庭设备";
+    case "get_device_status":
+      return "查看设备状态";
+    case "control_device":
+      return "控制设备";
+    case "get_device_spec":
+      return "查看设备规格";
+    case "mijia_list_devices":
+      return "列出米家设备";
+    case "mijia_get_caps":
+      return "查看设备能力";
+    case "mijia_switch_set":
+      return "开关设备";
+    case "mijia_sensor_get":
+      return "读取传感器";
+    case "mijia_position_set":
+      return "设置位置值";
+    case "mijia_action_call":
+      return "调用设备动作";
+    case "mijia_hvac_set":
+      return "设置空调参数";
+    default:
+      return fallback?.trim() || name.trim();
+  }
+}
+
+function localizeMCPToolDescription(name: string, fallback?: string) {
+  switch (name.trim()) {
+    case "list_subjects":
+      return "列出 Brights 当前可用的全部学科。";
+    case "list_categories":
+      return "按学科和分类类型列出可用分类。";
+    case "list_grades":
+      return "列出全部阶段与级别定义。";
+    case "search_words":
+      return "按关键词和分页条件查询 Brights 单词库。";
+    case "list_classification_stats":
+      return "分页查看各分类下的词条统计数据。";
+    case "list_membership_plans":
+      return "列出 Brights 的会员方案和支付方案。";
+    case "get_catalog_stats":
+      return "获取 Brights 词库的整体统计数据。";
+    case "search_knowledge_base":
+      return "检索已上传的文本、表格或 Word 知识库内容。";
+    case "list_my_knowledge_base_documents":
+      return "列出当前学员上传的文本、表格或 Word 知识库文档。";
+    case "view_knowledge_base_document":
+      return "查看单个知识库文档的片段和原始内容。";
+    case "list_my_payment_orders":
+      return "列出当前学员的充值或购买订单记录。";
+    case "list_my_memberships":
+      return "列出当前学员的会员开通与续费记录。";
+    case "get_invite_summary":
+      return "获取当前学员的邀请码和邀请统计。";
+    case "get_my_invite_payout_profile":
+      return "获取当前学员的邀请佣金收款资料。";
+    case "save_my_invite_payout_profile":
+      return "创建或更新当前学员的邀请佣金收款资料。";
+    case "list_my_invite_commissions":
+      return "列出当前学员的邀请佣金记录。";
+    case "list_my_invite_withdraw_requests":
+      return "列出当前学员的邀请佣金提现申请记录。";
+    case "create_invite_withdraw_request":
+      return "为当前学员的邀请佣金创建提现申请。";
+    case "cancel_invite_withdraw_request":
+      return "取消当前学员待处理的邀请佣金提现申请。";
+    case "get_learning_summary":
+      return "获取当前学员的等级分布、难度分布和记忆曲线统计。";
+    case "list_learning_progress":
+      return "列出当前学员已跟踪单词的等级、难度和下次复习时间。";
+    case "save_learning_word_progress":
+      return "创建或更新当前学员某个单词的学习等级和难度。";
+    case "review_learning_word":
+      return "记录当前学员是否记住该单词，并安排下一次复习。";
+    case "xiaomi_get_devices":
+      return "同步或列出当前学员绑定的小米 / 米家设备。";
+    case "xiaomi_extract_tokens":
+      return "使用已保存凭证刷新当前学员的小米设备列表。";
+    case "xiaomi_miot_prop_get":
+      return "按 did、siid、piid 读取小米 MIoT 设备属性。";
+    case "xiaomi_miot_prop_set":
+      return "按 did、siid、piid 写入小米 MIoT 设备属性。";
+    case "xiaomi_miot_action":
+      return "按 did、siid、aiid 执行小米 MIoT 设备动作。";
+    case "xiaomi_miot_prop_get_batch":
+      return "批量读取多个小米 MIoT 设备属性。";
+    case "xiaomi_find_device":
+      return "按名称、型号、did、房间或家庭搜索小米设备。";
+    case "xiaomi_control_device":
+      return "按语义属性名或动作名控制小米设备。";
+    case "list_mijia_homes":
+      return "列出当前学员小米账号下可用的家庭。";
+    case "get_mijia_devices":
+      return "获取小米设备列表，可按家庭 ID 过滤。";
+    case "get_device_status":
+      return "读取小米设备的基础信息和可选 MIoT 属性状态。";
+    case "control_device":
+      return "以统一语义方式控制小米设备。";
+    case "get_device_spec":
+      return "拉取并缓存指定小米型号的 MIoT 规格。";
+    case "mijia_list_devices":
+      return "按条件列出小米设备，支持模糊搜索。";
+    case "mijia_get_caps":
+      return "根据 MIoT 规格汇总展示小米设备能力。";
+    case "mijia_switch_set":
+      return "控制小米开关类设备的开启与关闭。";
+    case "mijia_sensor_get":
+      return "读取温度、湿度、电量等常见传感器数值。";
+    case "mijia_position_set":
+      return "设置窗帘等支持位置控制的小米设备位置。";
+    case "mijia_action_call":
+      return "按动作名称执行小米设备的语义动作。";
+    case "mijia_hvac_set":
+      return "设置电源、模式、目标温度、风速等空调类小米控制项。";
+    default:
+      return fallback?.trim() || "";
+  }
+}
+
+function formatMCPToolCategory(value?: string) {
+  switch ((value ?? "").trim().toLowerCase()) {
+    case "catalog":
+      return "词库";
+    case "membership":
+      return "会员";
+    case "knowledge":
+      return "知识库";
+    case "account":
+      return "账号";
+    case "learning":
+      return "学习";
+    case "smart-home":
+      return "智能家居";
+    case "general":
+      return "通用";
+    default:
+      return value?.trim() || "通用";
+  }
+}
+
+function formatMCPToolSourceType(value?: string) {
+  switch ((value ?? "").trim().toLowerCase()) {
+    case "builtin":
+      return "内置工具";
+    case "api_config":
+      return "接口工具";
+    case "api_config_personal":
+      return "个人接口";
+    default:
+      return value?.trim() || "内置工具";
+  }
+}
+
+function localizeMarketTool(tool: MCPInfoTool) {
+  return {
+    title: localizeMCPToolTitle(tool.name, tool.title),
+    description: localizeMCPToolDescription(tool.name, tool.description),
+    category: formatMCPToolCategory(tool.category),
+    sourceType: formatMCPToolSourceType(tool.sourceType),
+  };
 }
 
 function paymentStatusLabel(status?: string) {

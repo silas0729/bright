@@ -780,6 +780,13 @@ func (s *Server) tools(ctx context.Context, session *Session) []Tool {
 
 	items := make([]Tool, 0, len(tools))
 	for _, tool := range tools {
+		localizedTitle, localizedDescription := domain.LocalizedMCPToolText(tool.Name, tool.Title, tool.Description)
+		if strings.TrimSpace(localizedTitle) != "" {
+			tool.Title = localizedTitle
+		}
+		if strings.TrimSpace(localizedDescription) != "" {
+			tool.Description = localizedDescription
+		}
 		tool.RequiresAuth = toolRequiresAuthenticatedSession(tool)
 		if config, ok := configMap[tool.Name]; ok {
 			if strings.TrimSpace(config.Title) != "" {

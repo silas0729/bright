@@ -186,9 +186,9 @@ type InvitePayoutProfile struct {
 	LearnerUserID  uint   `gorm:"not null;uniqueIndex"`
 	RealName       string `gorm:"size:120"`
 	WechatAccount  string `gorm:"size:120"`
-	WechatQRCode   string `gorm:"size:500"`
+	WechatQRCode   string `gorm:"type:longtext"`
 	AlipayAccount  string `gorm:"size:120"`
-	AlipayQRCode   string `gorm:"size:500"`
+	AlipayQRCode   string `gorm:"type:longtext"`
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
@@ -296,7 +296,7 @@ type InviteWithdrawRequest struct {
 	PaymentType        string `gorm:"size:32;not null;index"`
 	AccountName        string `gorm:"size:120"`
 	AccountNo          string `gorm:"size:255"`
-	AccountQRCode      string `gorm:"size:500"`
+	AccountQRCode      string `gorm:"type:longtext"`
 	Status             string `gorm:"size:32;not null;default:pending;index"`
 	AdminNote          string `gorm:"type:text"`
 	ProcessedByAdminUserID *uint `gorm:"index"`
@@ -582,6 +582,15 @@ func migrateLegacyMySQLSchema(db *gorm.DB) error {
 		return err
 	}
 	if err := migrateMySQLColumnDefinition(db, "admin_users", "is_super", "TINYINT(1) NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := migrateMySQLColumnDefinition(db, "invite_payout_profiles", "wechat_qr_code", "LONGTEXT"); err != nil {
+		return err
+	}
+	if err := migrateMySQLColumnDefinition(db, "invite_payout_profiles", "alipay_qr_code", "LONGTEXT"); err != nil {
+		return err
+	}
+	if err := migrateMySQLColumnDefinition(db, "invite_withdraw_requests", "account_qr_code", "LONGTEXT"); err != nil {
 		return err
 	}
 

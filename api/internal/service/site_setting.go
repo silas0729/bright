@@ -34,6 +34,12 @@ func (s *Service) SaveSiteSetting(ctx context.Context, input domain.SaveSiteSett
 	model.FooterText = strings.TrimSpace(input.FooterText)
 	model.ContactEmail = strings.TrimSpace(input.ContactEmail)
 	model.InviteCommissionRate = input.InviteCommissionRate
+	if model.InviteCommissionRate < 0 {
+		model.InviteCommissionRate = 0
+	}
+	if model.InviteCommissionRate > 100 {
+		model.InviteCommissionRate = 100
+	}
 
 	if err := s.db.WithContext(ctx).Save(&model).Error; err != nil {
 		return domain.SiteSetting{}, err
